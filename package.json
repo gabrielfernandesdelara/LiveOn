@@ -1,0 +1,84 @@
+{
+  "name": "liveon",
+  "version": "1.3.1",
+  "description": "Compartilhamento de tela com audio do sistema entre amigos (P2P mesh)",
+  "author": "Gabriel de Lara",
+  "license": "MIT",
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron .",
+    "empacotar": "electron-builder --win && node scripts/limpar-dist.js",
+    "empacotar:rapido": "electron-builder --win --dir",
+    "nativo:compilar": "npx node-gyp rebuild -C nativo --target=43.4.1 --dist-url=https://electronjs.org/headers --arch=x64",
+    "nuvem": "wrangler dev --config nuvem/wrangler.toml --port 8787 --local",
+    "nuvem:publicar": "wrangler deploy --config nuvem/wrangler.toml",
+    "publicar": "electron-builder --win --publish always && node scripts/limpar-dist.js",
+    "limpar": "node scripts/limpar-dist.js"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
+    "node-addon-api": "^8.9.2",
+    "wrangler": "^4.125.0"
+  },
+  "build": {
+    "appId": "com.gabrieldelara.liveon",
+    "productName": "LiveOn",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "app/**/*",
+      "nativo/indice.js",
+      "nativo/build/Release/*.node",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LiveOn",
+      "artifactName": "LiveOn-${version}-instalador.${ext}"
+    },
+    "asarUnpack": [
+      "nativo/build/Release/*.node"
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gabrielfernandesdelara",
+        "repo": "LiveOn",
+        "releaseType": "release"
+      },
+      {
+        "provider": "github",
+        "owner": "gabrielfernandesdelara",
+        "repo": "LiveOn-releases",
+        "releaseType": "release"
+      }
+    ]
+  }
+}

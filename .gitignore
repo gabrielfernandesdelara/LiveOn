@@ -1,0 +1,30 @@
+# dependencias
+node_modules/
+
+# saida do empacotamento
+dist/
+
+# logs
+*.log
+npm-debug.log*
+
+# lixo de sistema e editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/
+
+# compilacao do addon nativo
+nativo/build/
+
+# temporarios do wrangler. Nunca podem entrar: o cache/cf.json guarda cidade,
+# CEP, latitude, longitude e provedor de quem rodou o wrangler.
+.wrangler/
+
+# ferramentas de desenvolvimento: ficam so na maquina de quem desenvolve.
+# Os testes e o servidor de sinalizacao local servem para ajustar o app, nao
+# para usa-lo, e o CLAUDE.md e o caderno de decisoes do desenvolvimento.
+test/
+signaling/
+CLAUDE.md

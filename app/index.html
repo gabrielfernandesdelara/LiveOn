@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; connect-src wss://liveon.fiv3bullet.workers.dev blob:">
+<title>LiveOn</title>
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+
+<!-- ---------------- tela de entrada ---------------- -->
+<section id="entrada">
+  <div class="cartao-entrada">
+    <div class="marca marca-grande">
+      <span class="marca-icone"><span data-icone="marca" data-tamanho="25"></span></span>
+      <span class="marca-nome">LiveOn</span>
+    </div>
+    <div class="subtitulo">Compartilhe sua tela com os amigos.</div>
+
+    <div class="segmentos">
+      <button id="modo-entrar" class="ativo">Entrar</button>
+      <button id="modo-criar">Criar</button>
+    </div>
+
+    <label for="campo-nome">Seu nome</label>
+    <input id="campo-nome" type="text" maxlength="32" placeholder="Como os outros vão te chamar?">
+
+    <div id="bloco-sala">
+      <label for="campo-sala">Nome da sala</label>
+      <input id="campo-sala" type="text" maxlength="40" placeholder="ex.: Sexta de jogos">
+    </div>
+
+    <div id="bloco-codigo">
+      <label for="campo-codigo">Código da sala</label>
+      <div class="linha-codigo">
+        <input id="campo-codigo" type="text" maxlength="60" placeholder="Código da sala do seu amigo">
+        <button id="btn-gerar-codigo" class="botao-icone oculto" title="Gerar outro código"><span data-icone="atualizar" data-tamanho="16"></span></button>
+        <button id="btn-copiar-codigo" class="oculto" title="Copiar o código">Copiar</button>
+      </div>
+    </div>
+
+    <button id="btn-entrar" class="principal">Criar sala</button>
+
+    <!-- O texto muda com o modo, em definirModo(). -->
+    <div id="dica-entrada" class="dica"></div>
+  </div>
+</section>
+
+<!-- ---------------- sala ---------------- -->
+<section id="sala" class="oculto">
+  <header class="barra">
+    <div class="marca marca-barra">
+      <span class="marca-icone"><span data-icone="marca" data-tamanho="16"></span></span>
+      <span class="marca-nome">LiveOn</span>
+    </div>
+    <span class="divisor"></span>
+    <span class="nome-sala" id="rotulo-sala"></span>
+    <span class="bloco-codigo">
+      <span class="codigo" id="rotulo-codigo" title="Código da sala"></span>
+      <button id="btn-copiar-sala" title="Copiar o código da sala"><span data-icone="copiar" data-tamanho="13" data-traco="2"></span><span class="rotulo-copiar">Copiar</span></button>
+    </span>
+    <span class="pilula oculto" id="rotulo-conexao"></span>
+    <span class="cresce"></span>
+
+    <!-- Quem esta na sala: avatares empilhados no botao, a lista inteira no
+         pop-over. Substitui a lista lateral fixa. -->
+    <div class="ancora-pessoas">
+      <button id="btn-pessoas" title="Quem está na sala" aria-expanded="false" aria-controls="pessoas">
+        <span id="pilha-pessoas" class="pilha"></span>
+        <span id="total-pessoas" class="total"></span>
+      </button>
+      <div id="pessoas" class="popover oculto">
+        <div class="topo-popover">
+          <span class="titulo-popover">Na sala</span>
+          <span id="pop-total" class="total"></span>
+          <span class="cresce"></span>
+          <span id="pop-no-ar" class="resumo-no-ar oculto"><span class="ponto"></span><span id="pop-no-ar-texto"></span></span>
+        </div>
+        <div id="lista-pessoas"></div>
+        <div class="rodape-popover" id="rotulo-versao"></div>
+      </div>
+    </div>
+
+    <!-- Apagado enquanto nao ha transmissao: nao ha o que ajustar. -->
+    <button id="btn-ajustar" disabled title="Disponível durante a transmissão"><span data-icone="ajustes"></span>Ajustar</button>
+    <button id="btn-transmitir" class="principal"><span data-icone="transmitir" data-traco="2"></span>Transmitir tela</button>
+    <button id="btn-parar" class="perigo oculto"><span class="quadrado-parar"></span>Parar transmissão</button>
+    <button id="btn-sair" class="botao-icone" title="Sair da sala"><span data-icone="sair" data-tamanho="16"></span></button>
+  </header>
+  <div class="corpo">
+    <div id="grade" class="sem-foco">
+      <div id="principal"></div>
+      <div id="miniaturas"></div>
+    </div>
+
+    <div id="grade-vazia" class="oculto">
+      <strong>Ninguém está transmitindo</strong>
+      <span>Comece você, ou espere alguém entrar no ar.</span>
+      <button id="btn-transmitir-vazio" class="principal"><span data-icone="transmitir" data-traco="2"></span>Transmitir tela</button>
+    </div>
+  </div>
+</section>
+
+<!-- ---------------- configuracoes da tela de alguem ---------------- -->
+<div id="ajustes" class="dialogo oculto">
+  <div class="painel-dialogo">
+    <h2>Configurações da tela</h2>
+    <p id="ajustes-quem" class="quem-dialogo"></p>
+
+    <div class="duas-colunas">
+      <div class="campo">
+        <label for="ajustes-resolucao">Resolução</label>
+        <span class="caixa-select">
+          <select id="ajustes-resolucao">
+            <option value="0">Automática</option>
+            <option value="1440">1440p</option>
+            <option value="1080">1080p</option>
+            <option value="720">720p</option>
+            <option value="480">480p</option>
+            <option value="360">360p</option>
+          </select>
+        </span>
+      </div>
+      <div class="campo">
+        <label for="ajustes-fps">Fps</label>
+        <span class="caixa-select">
+          <select id="ajustes-fps">
+            <option value="0">Automático</option>
+            <option value="60">60 fps</option>
+            <option value="30">30 fps</option>
+          </select>
+        </span>
+      </div>
+    </div>
+
+    <div class="campo campo-volume">
+      <label for="ajustes-volume">Volume</label>
+      <div class="linha-volume">
+        <input type="range" id="ajustes-volume" min="0" max="100" value="100">
+        <span id="ajustes-nivel">100%</span>
+      </div>
+    </div>
+
+    <p class="nota-dialogo">Vale só para você. Não muda o que a pessoa transmite.</p>
+
+    <div class="acoes-dialogo">
+      <button id="btn-fechar-ajustes" class="principal">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ---------------- seletor de fontes ---------------- -->
+<div id="seletor" class="dialogo oculto">
+  <div class="painel-seletor">
+    <div class="cabecalho-seletor">
+      <h2 id="titulo-seletor">O que você quer compartilhar?</h2>
+      <div class="segmentos segmentos-abas">
+        <button class="aba ativa" data-aba="tela">Telas</button>
+        <button class="aba" data-aba="janela">Janelas</button>
+      </div>
+      <span class="cresce"></span>
+      <button id="btn-atualizar-fontes" class="botao-icone" title="Atualizar a lista"><span data-icone="atualizar"></span></button>
+      <button id="btn-fechar-seletor" class="botao-icone" title="Fechar"><span data-icone="fechar"></span></button>
+    </div>
+
+    <div id="fontes"></div>
+
+    <div class="rodape-seletor">
+      <div class="campo">
+        <label for="campo-audio-modo">Áudio</label>
+        <div class="linha-selects">
+          <!-- As opcoes sao montadas por atualizarOpcoesDeAudio(): elas
+               dependem de estar compartilhando um monitor ou uma janela. -->
+          <span class="caixa-select caixa-audio"><select id="campo-audio-modo"></select></span>
+          <span class="caixa-select caixa-app oculto" id="caixa-audio-app"><select id="campo-audio-app"></select></span>
+        </div>
+      </div>
+      <div class="campo">
+        <label for="campo-resolucao">Qualidade</label>
+        <div class="linha-selects">
+          <span class="caixa-select caixa-resolucao">
+            <select id="campo-resolucao">
+              <option value="360">360p</option>
+              <option value="480">480p</option>
+              <option value="720">720p</option>
+              <option value="1080">1080p</option>
+              <option value="1440">1440p</option>
+            </select>
+          </span>
+          <span class="caixa-select caixa-fps">
+            <select id="campo-fps">
+              <option value="30">30 fps</option>
+              <option value="60">60 fps</option>
+            </select>
+          </span>
+        </div>
+      </div>
+      <div class="avisos-seletor">
+        <!-- So aparece quando e alerta: o que importa e o que pode dar errado. -->
+        <div class="aviso-audio" id="aviso-audio"></div>
+        <div class="aviso-qualidade" id="aviso-qualidade"></div>
+      </div>
+
+      <div class="acoes-seletor">
+        <button id="btn-cancelar-fonte">Cancelar</button>
+        <button id="btn-confirmar-fonte" class="principal" disabled>Transmitir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------------- saida de audio ---------------- -->
+<div id="saida" class="dialogo oculto">
+  <div class="painel-dialogo">
+    <h2>Saída de áudio</h2>
+    <p id="saida-quem" class="quem-dialogo"></p>
+
+    <div class="campo">
+      <label for="campo-saida">Tocar o som em</label>
+      <span class="caixa-select"><select id="campo-saida"></select></span>
+    </div>
+
+    <p class="nota-dialogo">Vale só para o LiveOn. O resto do computador continua usando a saída do Windows.</p>
+
+    <div class="acoes-dialogo">
+      <button id="btn-fechar-saida">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div id="tela-atualizacao" class="oculto">
+  <div class="cartao-atualizacao">
+    <h2 id="titulo-atualizacao">Atualização disponível</h2>
+    <p id="texto-atualizacao"></p>
+    <div class="barra-progresso"><div id="progresso-atualizacao"></div></div>
+    <button id="btn-atualizar" class="principal" disabled>Aguarde...</button>
+  </div>
+</div>
+
+<div id="recado" class="oculto"></div>
+
+<!-- A ORDEM IMPORTA. Sao scripts classicos que dividem o mesmo escopo global,
+     e o que executa no carregamento so enxerga o que ja carregou antes. As
+     funcoes podem se chamar em qualquer direcao, porque so rodam depois que
+     tudo carregou. Arquivo novo entra antes de ligacoes.js e partida.js. -->
+<script src="js/configuracao.js"></script>
+<script src="js/estado.js"></script>
+<script src="js/icones.js"></script>
+<script src="js/tema.js"></script>
+<script src="js/sinalizacao.js"></script>
+<script src="js/malha.js"></script>
+<script src="js/audio-nativo.js"></script>
+<script src="js/transmissao.js"></script>
+<script src="js/seletor.js"></script>
+<script src="js/grade.js"></script>
+<script src="js/destaque.js"></script>
+<script src="js/som.js"></script>
+<script src="js/ajustes.js"></script>
+<script src="js/pessoas.js"></script>
+<script src="js/navegacao.js"></script>
+<script src="js/ligacoes.js"></script>
+<script src="js/partida.js"></script>
+</body>
+</html>

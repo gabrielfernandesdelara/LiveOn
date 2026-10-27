@@ -1,0 +1,42 @@
+name = "liveon"
+main = "src/worker.js"
+compatibility_date = "2026-08-01"
+
+# Cada sala vira uma instancia deste objeto, nomeada pelo CODIGO dela.
+[[durable_objects.bindings]]
+name = "SALA"
+class_name = "Sala"
+
+# Limite de tentativas por origem. Tem que ser por IP e nao por sala: cada
+# codigo errado cai num Durable Object diferente, entao contar dentro da sala
+# nao enxerga varredura nenhuma.
+#
+# 20 por minuto e folgado para gente (entrar na sala custa 1; a reconexao
+# automatica gasta no maximo 8 no primeiro minuto ruim) e mata varredura, que
+# antes fazia 60 codigos em 1,6 s.
+[[ratelimits]]
+name = "LIMITE_ENTRADA"
+namespace_id = "2001"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60
+
+# O plano gratuito so aceita Durable Object com armazenamento SQLite, por
+# isso new_sqlite_classes e nao new_classes.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Sala"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Diretorio"]
+
+# A busca de salas foi removida: ela publicava rotulo e lotacao de todas as
+# salas abertas para qualquer um. O objeto que guardava essa lista morre aqui.
+[[migrations]]
+tag = "v3"
+deleted_classes = ["Diretorio"]
+
+[observability]
+enabled = true

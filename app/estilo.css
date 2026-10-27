@@ -1,0 +1,963 @@
+/* ==========================================================================
+   LiveOn: aparência. Segue o redesign de 10/2026 (handoff em
+   design_handoff_liveon_redesign): uma borda só, 10px nos containers e 7px
+   no que vai dentro deles, ícones de traço, marca nova.
+   ========================================================================== */
+
+/* ---------- fonte do logotipo ----------
+
+   Sora 600, licença OFL (fontes/LICENCA-SORA.txt). Vem empacotada porque a
+   CSP (style-src 'self') não deixa buscar no Google Fonts. Só a marca usa;
+   o resto do app continua na fonte do sistema. */
+@font-face {
+  font-family: "Sora";
+  src: url("fontes/sora-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: block;
+}
+
+/* ---------- cores ----------
+
+   Os 15 primeiros são os neutros, e são só eles que o tema troca. O azul, o
+   vermelho de "no ar" e os derivados ficam iguais em qualquer tema. */
+:root {
+  --fundo: #0e1013;
+  --painel: #15181d;
+  --painel-alto: #1d2128;
+  --painel-hover: #242932;
+  --borda: #262b35;
+  --borda-hover: #323844;
+  --avatar: #2a2f3a;
+  --campo: #0f1216;
+  --apagado: #8b93a4;
+  --texto: #e7eaf0;
+  --fraco: #5a6272;
+  --texto-avatar: #c9cfdb;
+  --listra-1: #13161b;
+  --listra-2: #101317;
+  --anel-escuro: #0b0d11;
+
+  --avatar-lista: var(--painel-hover);
+  --realce: #4f8cff;
+  --realce-hover: #3d7bf0;
+  --no-ar: #ff4d4f;
+  --no-ar-hover: #e63e40;
+  --mudo: #ff8a8b;
+  --vidro: rgba(8, 10, 14, .72);
+  --veu: rgba(0, 0, 0, .7);
+}
+
+/* Temas, na mesma ordem dos neutros acima. Ainda não há onde escolher: o
+   tema.js aplica e guarda, falta só a opção na interface. */
+:root[data-tema="marinho"] {
+  --fundo: #0b0f17; --painel: #111723; --painel-alto: #182030; --painel-hover: #1e2839;
+  --borda: #222c3f; --borda-hover: #2d3a52; --avatar: #253049; --campo: #0a0e16;
+  --apagado: #8a96ad; --texto: #e6ebf5; --fraco: #56627a; --texto-avatar: #c6d0e2;
+  --listra-1: #111725; --listra-2: #0e1320; --anel-escuro: #080b12;
+}
+:root[data-tema="carvao"] {
+  --fundo: #11100f; --painel: #191816; --painel-alto: #211f1d; --painel-hover: #292724;
+  --borda: #2c2a27; --borda-hover: #3a3733; --avatar: #33302c; --campo: #0f0e0d;
+  --apagado: #9a948b; --texto: #ece8e2; --fraco: #625d56; --texto-avatar: #d4cec5;
+  --listra-1: #171513; --listra-2: #131210; --anel-escuro: #0c0b0a;
+}
+:root[data-tema="preto"] {
+  --fundo: #050506; --painel: #0d0e10; --painel-alto: #16171a; --painel-hover: #1d1f23;
+  --borda: #1f2125; --borda-hover: #2b2e33; --avatar: #24262b; --campo: #09090b;
+  --apagado: #8e939c; --texto: #f0f1f3; --fraco: #585c64; --texto-avatar: #cdd0d6;
+  --listra-1: #0c0d0f; --listra-2: #08090a; --anel-escuro: #030304;
+}
+
+/* ---------- base ---------- */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+button, input, select { font: inherit; color: inherit; }
+option { background: var(--painel); color: var(--texto); }
+::selection { background: rgba(79, 140, 255, .35); }
+
+.oculto { display: none !important; }
+.cresce { flex: 1; }
+
+/* ---------- botões ---------- */
+
+button {
+  height: 34px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--painel-alto);
+  color: var(--texto);
+  transition: background .15s, border-color .15s, color .15s;
+}
+button:hover:not(:disabled) { background: var(--painel-hover); border-color: var(--borda-hover); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible { outline: 2px solid var(--realce); outline-offset: 2px; }
+button svg { flex: 0 0 auto; }
+
+button.principal { background: var(--realce); border-color: var(--realce); color: #fff; font-weight: 600; }
+button.principal:hover:not(:disabled) { background: var(--realce-hover); border-color: var(--realce-hover); }
+button.perigo { background: var(--no-ar); border-color: var(--no-ar); color: #fff; font-weight: 600; }
+button.perigo:hover:not(:disabled) { background: var(--no-ar-hover); border-color: var(--no-ar-hover); }
+
+/* Só ícone: quadrado, em tom apagado que acende no hover. */
+button.botao-icone { width: 34px; padding: 0; color: var(--apagado); }
+button.botao-icone:hover:not(:disabled) { color: var(--texto); }
+
+/* O quadradinho branco do "Parar transmissão". */
+.quadrado-parar { width: 8px; height: 8px; border-radius: 2px; background: #fff; flex: 0 0 auto; }
+
+/* ---------- campos ---------- */
+
+label { display: block; font-size: 12px; color: var(--apagado); margin: 0 0 6px; }
+
+input[type=text] {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--borda);
+  background: var(--campo);
+  color: var(--texto);
+  outline: none;
+  user-select: text;
+}
+input[type=text]:focus { border-color: var(--realce); }
+
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 34px;
+  padding: 0 30px 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--borda);
+  background: var(--campo);
+  color: var(--texto);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+select:focus { border-color: var(--realce); }
+select:disabled { opacity: .45; cursor: default; }
+option:disabled { color: var(--fraco); }
+
+/* A seta do select. O appearance: none tira a do sistema; esta vem por
+   máscara para seguir a cor do tema, uma imagem pronta ficaria com a cor
+   fixa. O data: da máscara passa pela CSP como imagem (img-src data:). */
+.caixa-select { position: relative; display: flex; min-width: 0; }
+.caixa-select::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  background: var(--apagado);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  pointer-events: none;
+}
+
+/* Rótulo em cima, campo embaixo. */
+.campo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.campo label { margin: 0; }
+
+/* ---------- segmentado (Entrar | Criar, Telas | Janelas) ---------- */
+
+.segmentos {
+  display: flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.segmentos button {
+  flex: 1;
+  height: 36px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--apagado);
+  font-weight: 600;
+}
+.segmentos button + button { border-left: 1px solid var(--borda); }
+.segmentos button:hover:not(:disabled) { background: transparent; border-color: var(--borda); }
+.segmentos button.ativo,
+.segmentos button.ativa,
+.segmentos button.ativo:hover:not(:disabled),
+.segmentos button.ativa:hover:not(:disabled) { background: var(--realce); color: #fff; }
+
+.segmentos-abas button { flex: 0 0 auto; height: 30px; padding: 0 14px; }
+
+/* ---------- marca ---------- */
+
+.marca { display: flex; align-items: center; flex: 0 0 auto; }
+.marca-icone { display: grid; place-items: center; flex: 0 0 auto; background: #4f8cff; }
+.marca-nome {
+  font-family: "Sora", "Segoe UI", sans-serif;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--texto);
+}
+.marca-grande { gap: 12px; }
+.marca-grande .marca-icone { width: 40px; height: 40px; border-radius: 10px; }
+.marca-grande .marca-nome { font-size: 26px; letter-spacing: -.7px; }
+.marca-barra { gap: 8px; }
+.marca-barra .marca-icone { width: 26px; height: 26px; border-radius: 7px; }
+.marca-barra .marca-nome { font-size: 15px; letter-spacing: -.3px; }
+
+/* ---------- tela de entrada ---------- */
+
+#entrada { height: 100vh; display: grid; place-items: center; padding: 24px; }
+
+.cartao-entrada {
+  width: 100%;
+  max-width: 380px;
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+}
+.subtitulo { color: var(--apagado); font-size: 13px; margin-top: 6px; }
+
+#entrada .segmentos { margin-top: 22px; }
+#entrada label { margin: 16px 0 6px; }
+#entrada .segmentos + label { margin-top: 18px; }
+
+/* Código com os botões de sortear e copiar ao lado. */
+.linha-codigo { display: flex; gap: 8px; }
+.linha-codigo input { flex: 1; min-width: 0; }
+#campo-codigo { font-family: ui-monospace, Consolas, monospace; font-size: 13px; letter-spacing: .3px; }
+#btn-gerar-codigo { width: 40px; height: 40px; color: var(--texto); }
+#btn-copiar-codigo { height: 40px; }
+
+#btn-entrar { margin-top: 24px; height: 42px; font-size: 14px; }
+/* Apagado enquanto falta algo, mas clicável: o clique diz o que falta, e o
+   Enter dos campos continua respondendo. Desabilitar de verdade calaria os
+   dois. */
+#btn-entrar.incompleto { opacity: .45; }
+
+.dica { font-size: 12px; color: var(--apagado); margin-top: 12px; line-height: 1.45; }
+
+/* ---------- sala: barra do topo ---------- */
+
+#sala { height: 100vh; display: flex; flex-direction: column; position: relative; }
+
+.barra {
+  height: 56px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--painel);
+  border-bottom: 1px solid var(--borda);
+  position: relative;
+  z-index: 9;
+}
+.divisor { width: 1px; height: 20px; background: var(--borda); flex: 0 0 auto; }
+.barra .nome-sala {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Código e botão de copiar formam um bloco só: a borda é do bloco. */
+.bloco-codigo {
+  display: flex;
+  align-items: stretch;
+  height: 30px;
+  flex: 0 0 auto;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.bloco-codigo:has(.codigo:empty) { display: none; }
+.bloco-codigo .codigo {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: .3px;
+  /* Selecionável de propósito: o body todo tem user-select: none, e o
+     código está ali para ser copiado e mandado a quem chegou depois. */
+  user-select: text;
+  cursor: text;
+}
+.bloco-codigo button {
+  height: auto;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-left: 1px solid var(--borda);
+  border-radius: 0;
+  background: var(--painel-alto);
+  color: var(--apagado);
+  font-size: 12px;
+}
+.bloco-codigo button:hover:not(:disabled) { background: var(--painel-hover); border-color: var(--borda); color: var(--texto); }
+
+.pilula {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--apagado);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 3px 10px;
+}
+.pilula.ruim { color: #ffb4b5; border-color: #5b2326; background: #2a1416; }
+/* Pílula sem texto virava um quadradinho solto na barra. */
+.pilula:empty { display: none; }
+
+/* ---------- avatar (inicial + ponto de "no ar") ---------- */
+
+.avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  font-weight: 700;
+  color: var(--texto-avatar);
+}
+/* O ponto vermelho é a luz de tally: o sinal de "está no ar". Funcional, não
+   decorativa. O anel em volta tem a cor do que está atrás, para "recortar"
+   o avatar; por isso cada lugar define a própria cor de anel. */
+.ponto { position: absolute; border-radius: 50%; background: var(--no-ar); }
+
+/* ---------- botão de pessoas e pop-over ---------- */
+
+.ancora-pessoas { position: relative; flex: 0 0 auto; }
+
+/* --fundo-botao existe para os avatares: a borda deles tem a cor do botão
+   atrás, e o botão muda de cor no hover e quando está aberto. */
+#btn-pessoas {
+  --fundo-botao: var(--painel-alto);
+  padding: 0 12px 0 6px;
+  background: var(--fundo-botao);
+}
+#btn-pessoas:hover:not(:disabled),
+#btn-pessoas[aria-expanded="true"] { --fundo-botao: var(--painel-hover); background: var(--fundo-botao); }
+#btn-pessoas .total { font-size: 13px; color: var(--apagado); }
+
+.pilha { display: flex; }
+.pilha .avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--avatar);
+  border: 2px solid var(--fundo-botao);
+  font-size: 10px;
+}
+.pilha .avatar + .avatar { margin-left: -7px; }
+.pilha .ponto { right: -3px; top: -3px; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--fundo-botao); }
+
+.popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  z-index: 20;
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.topo-popover {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--borda);
+}
+.titulo-popover { font-size: 13px; font-weight: 600; }
+.topo-popover .total { font-size: 12px; color: var(--apagado); }
+.resumo-no-ar { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--apagado); }
+.resumo-no-ar .ponto { position: static; width: 7px; height: 7px; }
+
+#lista-pessoas {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 360px;
+  overflow: auto;
+}
+.rodape-popover {
+  padding: 9px 14px;
+  border-top: 1px solid var(--borda);
+  font-size: 11px;
+  color: var(--fraco);
+}
+.rodape-popover:empty { display: none; }
+
+.pessoa {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 7px;
+}
+.pessoa:hover { background: var(--painel-alto); }
+.pessoa .avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--avatar-lista);
+  font-size: 11px;
+}
+.pessoa .ponto { right: -2px; top: -2px; width: 9px; height: 9px; box-shadow: 0 0 0 2px var(--painel); }
+.pessoa .textos { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.pessoa .nome { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pessoa.eu .nome { font-weight: 600; }
+.pessoa .sub { font-size: 11px; color: var(--apagado); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pessoa .engrenagem {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--apagado);
+}
+.pessoa .engrenagem:hover:not(:disabled) { background: var(--avatar); color: var(--texto); }
+
+/* Com uma tela expandida, a lista vira o jeito de trocar de transmissão. */
+.pessoa.trocavel { cursor: pointer; }
+.pessoa.em-destaque { background: var(--painel-alto); }
+.pessoa.em-destaque .nome { color: var(--realce); }
+
+/* ---------- grade ---------- */
+
+/* Área abaixo da barra. */
+.corpo { flex: 1; min-height: 0; display: flex; position: relative; }
+
+/* A grade tem duas áreas: as telas grandes e a faixa de miniaturas. A direção
+   muda conforme o foco: a coluna à direita quando há uma tela em destaque,
+   a faixa embaixo quando há duas ou mais. */
+#grade {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  overflow: hidden;
+}
+#principal {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-content: center;
+  justify-content: center;
+}
+#miniaturas { display: flex; gap: 10px; flex: 0 0 auto; overflow: auto; }
+
+#grade.sem-foco #miniaturas { display: none; }
+#grade.foco-lateral { flex-direction: row; }
+#grade.foco-lateral #miniaturas { flex-direction: column; align-items: flex-start; justify-content: center; }
+#grade.foco-inferior { flex-direction: column; }
+#grade.foco-inferior #miniaturas { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+
+/* Ninguém transmitindo: precisa dizer por que, senão parece que o app travou. */
+#grade-vazia {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  text-align: center;
+  pointer-events: none;
+}
+#grade-vazia strong { font-size: 16px; font-weight: 600; color: var(--texto); }
+#grade-vazia span { font-size: 13px; color: var(--apagado); }
+#grade-vazia button { margin-top: 14px; height: 38px; padding: 0 16px; pointer-events: auto; }
+
+/* ---------- card de vídeo ---------- */
+
+.card {
+  position: relative;
+  width: var(--largura, 460px);
+  flex: 0 0 auto;
+  background: #000;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* O palco é sempre 16:9. Fonte com outra proporção entra com barra preta, de
+   propósito: assim a grade não fica com cards de alturas diferentes. */
+.palco {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  min-height: 0;
+}
+/* Enquanto o vídeo não chega: listras em vez de preto chapado, que parecia
+   tela travada. Com vídeo o fundo volta a ser preto, é ele que vira a barra
+   em volta de uma fonte que não é 16:9. */
+.card:not(.com-video) .palco {
+  background: repeating-linear-gradient(135deg, var(--listra-1) 0 14px, var(--listra-2) 14px 28px);
+}
+#miniaturas .card:not(.com-video) .palco {
+  background: repeating-linear-gradient(135deg, var(--listra-1) 0 12px, var(--listra-2) 12px 24px);
+}
+
+/* O vídeo sai do fluxo (position: absolute) de propósito. Enquanto ele
+   participava do layout, o tamanho intrínseco do stream empurrava o palco e
+   anulava o aspect-ratio, uma fonte 4:3 deixava o card 4:3. */
+.palco video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: none;
+}
+
+/* Quem liga o vídeo é a classe com-video, posta pelo JS. Estas três linhas
+   já foram apagadas por engano junto com o CSS do rodapé: sem elas o vídeo
+   fica display:none para sempre e o card inteiro trava em "conectando...",
+   mesmo com a captura funcionando. Não remover. */
+.card.com-video .palco video { display: block; }
+.card.com-video .vazio { display: none; }
+.vazio { color: var(--fraco); font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+
+/* ---------- nome e controles sobre o vídeo ----------
+
+   Nunca numa barra própria: ela roubava altura do card e espremia o nome.
+   Do nome, aparece só a inicial com o ponto de "no ar"; o nome por extenso
+   abre quando o mouse passa no card. */
+
+.selo {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  max-width: calc(100% - 16px);
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--vidro);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+.selo .avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--avatar);
+  font-size: 11px;
+}
+.selo .ponto { right: -3px; top: -3px; width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--anel-escuro); }
+.card:not(.no-ar) .selo .ponto { display: none; }
+.selo .nome {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  max-width: 0;
+  opacity: 0;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  transition: max-width .22s ease, opacity .18s ease, padding .22s ease;
+}
+.selo .quem { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.selo .estado { flex: 0 0 auto; font-weight: 400; color: var(--apagado); }
+.selo .estado:empty { display: none; }
+.card:hover .selo .nome,
+.card:focus-within .selo .nome { max-width: 240px; opacity: 1; padding: 0 8px; }
+
+/* Miniaturas: o mesmo selo, menor, e sem controles. Nelas o gesto é o duplo
+   clique para destacar. */
+#miniaturas .card { cursor: pointer; }
+#miniaturas .selo { left: 6px; bottom: 6px; max-width: calc(100% - 12px); padding: 3px; }
+#miniaturas .selo .avatar { width: 20px; height: 20px; border-radius: 7px; font-size: 10px; }
+#miniaturas .selo .ponto { width: 7px; height: 7px; }
+#miniaturas .selo .nome { font-size: 11px; }
+#miniaturas .controles-flutuantes { display: none; }
+
+.controles-flutuantes {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--vidro);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity .14s;
+}
+/* Só aparecem quando você vai usar. Foco do teclado também revela. */
+.card:hover .controles-flutuantes,
+.card:focus-within .controles-flutuantes { opacity: 1; }
+
+.icone-card {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--texto);
+}
+.icone-card:hover:not(:disabled) { background: rgba(255, 255, 255, .14); border-color: transparent; }
+.icone-card:focus-visible { outline: 2px solid var(--realce); outline-offset: 1px; }
+.icone-card.mudo { color: var(--mudo); }
+
+@media (prefers-reduced-motion: reduce) {
+  .controles-flutuantes, .selo .nome { transition: none; }
+}
+
+/* ---------- volume em barra vertical ----------
+
+   O redesign tinha tirado esta barra e deixado o volume só na engrenagem. Ela
+   ficou a pedido: é o jeito rápido de baixar o volume de alguém sem abrir
+   diálogo. O clique no alto-falante continua silenciando. */
+
+.caixa-som { position: relative; display: flex; }
+.card.minusculo .caixa-som { display: none; }
+.barra-vertical {
+  position: absolute;
+  /* 11px = os 3px de padding do bloco de controles + 8px de folga. */
+  bottom: calc(100% + 11px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 7px;
+  border-radius: 10px;
+  background: rgba(8, 10, 14, .92);
+  border: 1px solid var(--borda);
+
+  /* visibility em vez de display: display não aceita transição, e sem
+     transição não dá para segurar a barra depois que o mouse sai.
+     O atraso vai na OPACIDADE também: atrasar só a visibility mantinha a
+     barra no layout enquanto ela já tinha sumido da vista em 0,12s, o
+     usuário não ganhava tempo nenhum. Agora ela fica inteira por 0,6s,
+     esmaece em 0,18s, e só então sai. */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .18s linear .6s, visibility 0s linear .78s;
+}
+
+/* O vão até o ícone não é área de hover: atravessá-lo tirava o mouse da
+   .caixa-som e a barra sumia na cara do usuário, no meio do caminho. Esta
+   faixa invisível liga os dois. */
+.barra-vertical::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 13px;
+}
+
+/* Abre com o mouse sobre o alto-falante. Sai com 0,6s de atraso: tempo de
+   sair do ícone e alcançar a barra. O focus-within segura enquanto se
+   arrasta, mesmo se o ponteiro escapar. */
+.caixa-som:hover .barra-vertical,
+.caixa-som:focus-within .barra-vertical {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity .12s, visibility 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Sem o esmaecer, mas a espera continua: ela é comodidade, não enfeite. */
+  .barra-vertical { transition: opacity 0s linear .6s, visibility 0s linear .6s; }
+  .caixa-som:hover .barra-vertical,
+  .caixa-som:focus-within .barra-vertical { transition: opacity 0s, visibility 0s; }
+}
+
+.volume {
+  /* Bloco, e nao em linha: em linha o navegador reserva embaixo dele o vao
+     de uma linha de texto, 7px a mais na caixa da barra, e ela passava 1px
+     da borda de cima dos cards entre 120 e 170px de altura. Medido. */
+  display: block;
+  writing-mode: vertical-rl;
+  direction: rtl;
+  width: 4px;
+  /* A altura acompanha o card: ver definirLargura(), em grade.js. */
+  height: var(--altura-barra, 92px);
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--borda-hover);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--texto);
+  cursor: pointer;
+}
+.volume.mudo::-webkit-slider-thumb { background: var(--fraco); }
+
+/* ---------- expandido e tela cheia ----------
+
+   Dois modos de destaque, mesmo visual:
+     .expandido   a transmissão toma a janela do app, que continua janela
+     .tela-cheia  o mesmo, e a janela do sistema vai junto
+   Quase toda regra vale para os dois; só a barra do topo distingue. No
+   expandido ela fica, e é por ela que a pessoa sai e troca de transmissão. */
+
+#sala.tela-cheia .barra { display: none; }
+
+#sala.expandido #grade,
+#sala.tela-cheia #grade { padding: 0; gap: 0; }
+
+#sala.expandido #miniaturas,
+#sala.tela-cheia #miniaturas { display: none; }
+
+#sala.expandido .card,
+#sala.tela-cheia .card {
+  border: none;
+  border-radius: 0;
+  background: #000;
+  /* Toma a área inteira. Sem isto o card continua dimensionado como card
+     16:9 pelo melhorLargura() e sobra fundo do app em volta: no expandido a
+     barra do topo tira altura e a área deixa de ser 16:9. */
+  width: 100%;
+  height: 100%;
+}
+#sala.expandido .palco,
+#sala.tela-cheia .palco {
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+/* ---------- diálogos ---------- */
+
+.dialogo {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--veu);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.painel-dialogo {
+  width: min(400px, 92vw);
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 20px 22px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .5);
+}
+.painel-dialogo h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.quem-dialogo { margin: 2px 0 18px; font-size: 14px; font-weight: 600; color: var(--realce); }
+.painel-dialogo select { height: 36px; }
+.duas-colunas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+
+.campo-volume { margin-top: 14px; }
+.linha-volume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--campo);
+}
+.linha-volume input[type=range] { flex: 1; margin: 0; accent-color: var(--realce); cursor: pointer; }
+#ajustes-nivel {
+  min-width: 36px;
+  font-size: 12px;
+  color: var(--apagado);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.nota-dialogo { margin: 16px 0 0; font-size: 12px; line-height: 1.5; color: var(--apagado); }
+.acoes-dialogo { display: flex; justify-content: flex-end; margin-top: 16px; }
+.acoes-dialogo button { padding: 0 16px; }
+
+/* ---------- seletor de fontes ---------- */
+
+.painel-seletor {
+  width: min(880px, 92vw);
+  max-height: 86vh;
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .5);
+}
+.cabecalho-seletor {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px 14px 20px;
+  border-bottom: 1px solid var(--borda);
+}
+.cabecalho-seletor h2 { margin: 0; font-size: 16px; font-weight: 600; white-space: nowrap; }
+
+#fontes {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  padding: 16px 20px;
+  align-content: start;
+  /* "Nada encontrado aqui." e "Procurando..." caem direto aqui dentro. */
+  font-size: 13px;
+  color: var(--apagado);
+}
+.fonte {
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--painel-alto);
+  cursor: pointer;
+  transition: background .15s;
+}
+.fonte:hover { background: var(--painel-hover); }
+.fonte.escolhida { border-color: var(--realce); box-shadow: 0 0 0 1px var(--realce); }
+.fonte img.previa { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #000; }
+.fonte .rotulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--texto-avatar);
+}
+.fonte .rotulo img { width: 14px; height: 14px; flex: 0 0 auto; }
+.fonte .rotulo svg { flex: 0 0 auto; color: var(--apagado); }
+.fonte .rotulo span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.rodape-seletor {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--borda);
+}
+.linha-selects { display: flex; gap: 8px; }
+.caixa-audio { width: 230px; }
+.caixa-app { width: 190px; }
+.caixa-resolucao { width: 104px; }
+.caixa-fps { width: 100px; }
+
+.avisos-seletor {
+  flex: 1 1 180px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--apagado);
+}
+/* Do áudio só aparece o que é alerta: o resto é explicação que o rótulo da
+   opção já dá. O alerta é o que evita mandar som errado. */
+.aviso-audio:not(.alerta) { display: none; }
+.aviso-audio.alerta { color: #ffcf8b; }
+.aviso-qualidade:empty { display: none; }
+
+/* Os dois botões andam juntos. Soltos no rodapé que quebra linha, o
+   "Transmitir" descia sozinho para a linha de baixo, longe do "Cancelar". */
+.acoes-seletor { display: flex; gap: 8px; margin-left: auto; }
+#btn-confirmar-fonte { padding: 0 16px; }
+
+/* ---------- atualização ---------- */
+
+/* Cobre tudo e não tem como fechar. Só sai atualizando, ou se a atualização
+   falhar, para não trancar o app. */
+#tela-atualizacao {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(8, 10, 13, .93);
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(3px);
+}
+.cartao-atualizacao {
+  width: min(420px, 88vw);
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  padding: 28px;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .5);
+}
+.cartao-atualizacao h2 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+.cartao-atualizacao p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--apagado); }
+.barra-progresso { margin-top: 20px; height: 6px; border-radius: 10px; background: var(--campo); overflow: hidden; }
+.barra-progresso div { height: 100%; width: 0; background: var(--realce); transition: width .25s; }
+#btn-atualizar { width: 100%; height: 42px; margin-top: 22px; font-size: 14px; }
+
+/* ---------- recado ---------- */
+
+#recado {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 40;
+  max-width: 70vw;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #2a1416;
+  border: 1px solid #5b2326;
+  color: #ffb4b5;
+  font-size: 13px;
+}

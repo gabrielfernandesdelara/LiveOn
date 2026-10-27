@@ -1,0 +1,8 @@
+# Normaliza fim de linha: LF no repositorio e na copia de trabalho.
+# Sem isso o Git fica avisando sobre CRLF a cada commit no Windows.
+* text=auto eol=lf
+
+# Binarios nao passam por conversao.
+*.png binary
+*.ico binary
+*.exe binary
