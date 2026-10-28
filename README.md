@@ -26,6 +26,12 @@ App desktop para Windows, com vídeo e som indo direto de um computador para o o
 
 ---
 
+> [!NOTE]
+> Este projeto é criado e ajustado com a ajuda do **Claude**, assistente de IA
+> da Anthropic. Ele participa da escrita do código, das correções e da
+> documentação. As decisões sobre o que o app deve fazer e os testes de uso com
+> os amigos ficam com o autor.
+
 <details>
   <summary><strong>Sumário</strong></summary>
 
@@ -43,12 +49,10 @@ App desktop para Windows, com vídeo e som indo direto de um computador para o o
 
 ## Sobre o projeto
 
-<!-- Salve um print em assets/images/readme/screenshot.png e descomente:
 <div align="center">
-  <img src="assets/images/readme/screenshot.png" alt="Sala do LiveOn com telas compartilhadas" width="80%" />
-  <p><sub><em>Sala com telas compartilhadas. O layout pode sofrer alterações.</em></sub></p>
+  <img src="docs/screenshot.png" alt="Sala do LiveOn com telas compartilhadas" width="80%" />
+  <p><sub><em>Sala do app. O layout pode sofrer alterações.</em></sub></p>
 </div>
--->
 
 O LiveOn nasceu para um grupo de amigos assistir à tela uns dos outros com o
 som do jogo ou do vídeo junto, sem depender de bot do Discord nem de navegador.
@@ -237,9 +241,11 @@ LiveOn/
 - [x] Reconexão que preserva a pessoa e o vídeo
 - [x] Instalador de um clique e atualização automática
 - [x] Redesign da interface
-- [ ] Servidor TURN, para quem está atrás de NAT simétrico conseguir conectar e para não expor o IP
 - [ ] Mostrar a qualidade e o bitrate que estão chegando de cada pessoa
 - [ ] Escolha de tema de cores na interface (as paletas já existem)
+- [ ] Ajustes em como funciona o compartilhamento
+- [ ] Possibilidade de criar uma sala fixa
+- [ ] Versão web
 
 ## Autor
 
