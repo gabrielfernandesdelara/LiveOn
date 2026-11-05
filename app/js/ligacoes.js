@@ -159,6 +159,15 @@ $('#ajustes').onclick = (evento) => {
   if (evento.target === $('#ajustes')) fecharAjustes()
 }
 
+// Configurações da tela de entrada.
+$('#btn-config').onclick = abrirConfig
+$('#btn-fechar-config').onclick = fecharConfig
+$('#campo-video').onchange = trocarVideo
+$('#btn-reiniciar').onclick = () => window.ponte.reiniciar()
+$('#config').onclick = (evento) => {
+  if (evento.target === $('#config')) fecharConfig()
+}
+
 $('#btn-sair').onclick = () => {
   // Marca antes de fechar, senao o onclose acha que caiu e tenta reconectar.
   saindoDeProposito = true

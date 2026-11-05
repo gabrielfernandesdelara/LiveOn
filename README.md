@@ -78,7 +78,9 @@ mídia.
 - **Volume por pessoa** e escolha da **saída de áudio** (fone, caixa ou outro aparelho).
 - **Reconexão automática**: se a conexão com o servidor cai, o app tenta voltar por **105 segundos** e quem volta continua sendo a mesma pessoa, sem derrubar o vídeo. A sala vazia fica de pé por **2 minutos** esperando.
 - **Atualização automática**: o app baixa a versão nova em segundo plano e instala ao reiniciar, sem assistente.
-- **Prioridade alta** de processo, para a transmissão não engasgar quando um jogo disputa a CPU.
+- **Prioridade alta** de processo, para a transmissão não engasgar quando um jogo disputa a CPU. Em computadores com placa AMD ela fica desligada.
+- **Configurações antes de entrar**: escolher se as telas são processadas pela placa de vídeo ou pelo processador.
+- **Registro por sala** em `C:\Users\<seu usuário>\Documents\LiveOn\Logs`, com o nome da sala, data e hora, apagado sozinho depois de **duas semanas**.
 
 ## Privacidade e segurança
 
@@ -87,7 +89,7 @@ Vale ler antes de usar:
 - **Quem está na sala vê o seu IP.** Para a mídia ir direto entre os computadores, cada um precisa saber o endereço dos outros. Só entre em sala de quem você conhece e não passe o código adiante.
 - **O código não se troca** e não existe expulsar alguém. Para tirar uma pessoa, crie uma sala nova.
 - **O servidor vê** seu IP, o nome que você escolheu, o código e quando você entra e sai. **Não vê** vídeo nem áudio, e nada disso fica guardado depois que a sala fecha.
-- **No seu computador** ficam o nome, as preferências e um log em `%APPDATA%\liveon\liveon.log`. O código da sala sai mascarado nele, então mandar o log para alguém não entrega a entrada da sala.
+- **No seu computador** ficam o nome, as preferências e os logs em `C:\Users\<seu usuário>\Documents\LiveOn\Logs`, um por sala, apagados depois de duas semanas. Eles têm o nome da sala, os nomes de quem esteve nela e o modelo da sua placa de vídeo e do processador. O código da sala sai mascarado, então mandar um log para alguém não entrega a entrada da sala.
 
 Do lado da proteção: tentativas de código limitadas a 20 por minuto por IP,
 limite de tamanho e de ritmo de mensagens dentro da sala, CSP estrita, janela

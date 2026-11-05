@@ -52,6 +52,15 @@ contextBridge.exposeInMainWorld('ponte', {
 
   registrarLog: (texto) => ipcRenderer.send('log:registrar', texto),
   caminhoDoLog: () => ipcRenderer.invoke('log:caminho'),
+  // Entrar numa sala dá a ela o próprio arquivo de registro; sair encerra as
+  // medições.
+  logSala: (rotulo) => ipcRenderer.invoke('log:sala', rotulo),
+  logSaiu: () => ipcRenderer.invoke('log:saiu'),
+
+  // --- configurações da tela de entrada ---
+  lerConfig: () => ipcRenderer.invoke('config:ler'),
+  gravarConfig: (config) => ipcRenderer.invoke('config:gravar', config),
+  reiniciar: () => ipcRenderer.invoke('app:reiniciar'),
 
   ambiente: () => ipcRenderer.invoke('ambiente')
 })

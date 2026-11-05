@@ -13,8 +13,8 @@ Ajuda muito mandar:
 - o que você fez, passo a passo;
 - o que esperava que acontecesse, e o que aconteceu;
 - a versão do app (aparece na barra de cima, dentro da sala);
-- o trecho do log, se tiver. Fica em `%APPDATA%\liveon\liveon.log`, e o código
-  da sala já sai mascarado nele.
+- o log, se tiver. Fica em `C:\Users\<seu usuário>\Documents\LiveOn\Logs`, um arquivo por sala, e o
+  código da sala já sai mascarado nele.
 
 ## Versões cobertas
 

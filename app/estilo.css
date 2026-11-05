@@ -233,6 +233,7 @@ option:disabled { color: var(--fraco); }
 #entrada { height: 100vh; display: grid; place-items: center; padding: 24px; }
 
 .cartao-entrada {
+  position: relative;
   width: 100%;
   max-width: 380px;
   background: var(--painel);
@@ -242,6 +243,8 @@ option:disabled { color: var(--fraco); }
   display: flex;
   flex-direction: column;
 }
+/* Engrenagem no canto do cartão, alinhada com a marca. */
+#btn-config { position: absolute; top: 22px; right: 22px; }
 .subtitulo { color: var(--apagado); font-size: 13px; margin-top: 6px; }
 
 #entrada .segmentos { margin-top: 22px; }
@@ -819,7 +822,7 @@ option:disabled { color: var(--fraco); }
 }
 
 .nota-dialogo { margin: 16px 0 0; font-size: 12px; line-height: 1.5; color: var(--apagado); }
-.acoes-dialogo { display: flex; justify-content: flex-end; margin-top: 16px; }
+.acoes-dialogo { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .acoes-dialogo button { padding: 0 16px; }
 
 /* ---------- seletor de fontes ---------- */

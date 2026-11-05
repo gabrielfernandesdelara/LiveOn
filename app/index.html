@@ -12,6 +12,7 @@
 <!-- ---------------- tela de entrada ---------------- -->
 <section id="entrada">
   <div class="cartao-entrada">
+    <button id="btn-config" class="botao-icone" title="Configurações"><span data-icone="ajustes" data-tamanho="16"></span></button>
     <div class="marca marca-grande">
       <span class="marca-icone"><span data-icone="marca" data-tamanho="25"></span></span>
       <span class="marca-nome">LiveOn</span>
@@ -229,6 +230,31 @@
   </div>
 </div>
 
+<!-- ---------------- configuracoes, antes de entrar ---------------- -->
+<div id="config" class="dialogo oculto">
+  <div class="painel-dialogo">
+    <h2>Configurações</h2>
+    <p id="config-placa" class="quem-dialogo"></p>
+
+    <div class="campo">
+      <label for="campo-video">Processar as telas com</label>
+      <span class="caixa-select">
+        <select id="campo-video">
+          <option value="gpu">Placa de vídeo (GPU)</option>
+          <option value="cpu">Processador (CPU)</option>
+        </select>
+      </span>
+    </div>
+
+    <p id="config-nota" class="nota-dialogo"></p>
+
+    <div class="acoes-dialogo">
+      <button id="btn-fechar-config">Fechar</button>
+      <button id="btn-reiniciar" class="principal oculto">Reiniciar agora</button>
+    </div>
+  </div>
+</div>
+
 <div id="tela-atualizacao" class="oculto">
   <div class="cartao-atualizacao">
     <h2 id="titulo-atualizacao">Atualização disponível</h2>
@@ -259,6 +285,8 @@
 <script src="js/ajustes.js"></script>
 <script src="js/pessoas.js"></script>
 <script src="js/navegacao.js"></script>
+<script src="js/diagnostico.js"></script>
+<script src="js/preferencias.js"></script>
 <script src="js/ligacoes.js"></script>
 <script src="js/partida.js"></script>
 </body>

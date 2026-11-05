@@ -212,6 +212,12 @@ function tratar (msg) {
       }
 
       rotuloDaSala = msg.rotulo || 'sala'
+      // Só na entrada de verdade: cada reconexão também recebe 'bemvindo', e
+      // não pode abrir arquivo novo nem reiniciar as medições.
+      if (!reconectou) {
+        try { window.ponte.logSala(rotuloDaSala) } catch { /* sem ponte */ }
+        iniciarDiagnostico()
+      }
       anotar(`sala "${rotuloDaSala}" codigo=${mascararCodigo(sessao.codigo)}: entrei como ${meuId.slice(0, 8)}` +
         `${msg.retomada ? ' (retomada)' : ''}, ${msg.participantes.length} ja estavam la` +
         (msg.participantes.length

@@ -19,7 +19,7 @@ function fecharDialogo () {
     fecharAjustes()
     return true
   }
-  for (const id of ['#saida', '#seletor']) {
+  for (const id of ['#saida', '#seletor', '#config']) {
     if (!$(id).classList.contains('oculto')) {
       $(id).classList.add('oculto')
       return true
@@ -60,6 +60,12 @@ function voltarParaEntrada () {
   sessao = null
   tentativasDeReconexao = 0
   marcarConexao('ok', '')
+
+  pararDiagnostico()
+  if (meuId) {
+    anotar('sai da sala')
+    try { window.ponte.logSaiu() } catch { /* sem ponte */ }
+  }
 
   pararTransmissao()
   for (const par of pares.values()) par.pc.close()

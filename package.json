@@ -1,6 +1,6 @@
 {
   "name": "liveon",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Compartilhamento de tela com audio do sistema entre amigos (P2P mesh)",
   "author": "Gabriel de Lara",
   "license": "MIT",
@@ -71,12 +71,6 @@
         "provider": "github",
         "owner": "gabrielfernandesdelara",
         "repo": "LiveOn",
-        "releaseType": "release"
-      },
-      {
-        "provider": "github",
-        "owner": "gabrielfernandesdelara",
-        "repo": "LiveOn-releases",
         "releaseType": "release"
       }
     ]

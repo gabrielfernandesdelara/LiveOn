@@ -1,7 +1,7 @@
 // Processo principal: janela, seletor de fontes por IPC e o handler de
 // getDisplayMedia, que é onde o áudio do sistema entra (audio: 'loopback').
 
-const { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, session, shell } = require('electron')
+const { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, powerMonitor, session, shell } = require('electron')
 const path = require('node:path')
 const os = require('node:os')
 const fs = require('node:fs')
@@ -65,40 +65,157 @@ function apenasDoApp (tratar) {
   }
 }
 
+// --- preferências que valem desde a abertura ----------------------------------
+//
+// Ficam num arquivo e não no localStorage porque precisam ser lidas ANTES da
+// janela existir: desligar a aceleração por hardware só vale se for pedido
+// antes do app ficar pronto. Por isso mudar exige reiniciar.
+
+const ARQUIVO_CONFIG = path.join(app.getPath('userData'), 'config.json')
+
+function lerConfig () {
+  try { return JSON.parse(fs.readFileSync(ARQUIVO_CONFIG, 'utf8')) || {} } catch { return {} }
+}
+
+function gravarConfig (config) {
+  fs.mkdirSync(path.dirname(ARQUIVO_CONFIG), { recursive: true })
+  fs.writeFileSync(ARQUIVO_CONFIG, JSON.stringify(config, null, 2))
+}
+
+// O que ESTA execução está usando. A escolha gravada pode ser outra, se a
+// pessoa mudou e ainda não reiniciou.
+const videoAtivo = lerConfig().video === 'cpu' ? 'cpu' : 'gpu'
+
+// "Processador" desliga a aceleração do app inteiro, e não só a do vídeo. Os
+// dois switches de vídeo sozinhos quase não mudavam nada: o app negocia VP8,
+// que no Windows já é codificado e decodificado pela CPU. O que a placa faz de
+// verdade no LiveOn é desenhar a janela e os vídeos. Medido nesta máquina: sem
+// aceleração, a captura de tela com áudio continua entregando ~30 fps.
+if (videoAtivo === 'cpu') {
+  app.disableHardwareAcceleration()
+  app.commandLine.appendSwitch('disable-accelerated-video-decode')
+  app.commandLine.appendSwitch('disable-accelerated-video-encode')
+}
+
 // --- registro em arquivo ------------------------------------------------------
 //
 // Existe porque bug que só aparece com dois participantes de verdade não dá
 // para depurar olhando o terminal: no app empacotado não há terminal nenhum.
+//
+// Mora em C:\Users\<nome>\Documents\LiveOn\Logs, onde qualquer um acha para mandar, e cada
+// sala ganha o próprio arquivo, com o nome dela, data e hora. Até entrar numa
+// sala o arquivo se chama "sem sala"; ao entrar, ele é RENOMEADO para o nome
+// da sala, e assim o que aconteceu na abertura (placa de vídeo, prioridade)
+// vai junto. Uma segunda sala na mesma execução ganha arquivo novo, com o
+// cabeçalho da abertura repetido no topo.
+
+// Por quanto tempo um log fica. Uma execução sem sala também gera um, então
+// sem prazo a pasta crescia para sempre. Duas semanas, a pedido do dono:
+// costuma sobrar tempo para o problema ser contado e o arquivo mandado.
+const VALIDADE_DOS_LOGS = 14 * 24 * 60 * 60 * 1000
 
 let arquivoLog = null
+let salaDoLog = null
+const cabecalho = []
+
+// Sempre C:\Users\<nome>\Documents, e NÃO o app.getPath('documents'): com o
+// backup do OneDrive ligado, o Windows aponta os Documentos para
+// OneDrive\Documentos, e o log iria parar na nuvem. Pedido do dono.
+//
+// Os testes apontam para uma pasta temporária, para não sujar os Documentos
+// de quem roda.
+function pastaDosLogs () {
+  return process.env.LIVEON_PASTA_LOGS || path.join(app.getPath('home'), 'Documents', 'LiveOn', 'Logs')
+}
+
+// 2026-11-04 21h35: sem dois-pontos, que o Windows não aceita em nome de
+// arquivo.
+function carimbo (data = new Date()) {
+  const p = (n) => String(n).padStart(2, '0')
+  return `${data.getFullYear()}-${p(data.getMonth() + 1)}-${p(data.getDate())} ` +
+    `${p(data.getHours())}h${p(data.getMinutes())}`
+}
+
+// O nome da sala vem de quem a criou, então é tratado como qualquer dado de
+// fora: sai o que o Windows recusa em nome de arquivo, e os nomes reservados
+// (CON, NUL, COM1...) ganham um prefixo.
+function nomeSeguro (rotulo) {
+  let nome = String(rotulo || '')
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 40)
+    .replace(/[. ]+$/, '')
+  if (!nome) nome = 'sala'
+  if (/^(con|prn|aux|nul|com\d|lpt\d)$/i.test(nome)) nome = 'sala ' + nome
+  return nome
+}
+
+function caminhoLivre (base) {
+  const pasta = pastaDosLogs()
+  let caminho = path.join(pasta, base + '.log')
+  for (let n = 2; fs.existsSync(caminho); n++) caminho = path.join(pasta, `${base} (${n}).log`)
+  return caminho
+}
+
+// Pela data da última escrita, e não da criação: um log de sala que ficou
+// aberta dias conta a partir do fim dela.
+function limparLogsAntigos () {
+  const limite = Date.now() - VALIDADE_DOS_LOGS
+  try {
+    const pasta = pastaDosLogs()
+    for (const nome of fs.readdirSync(pasta)) {
+      if (!nome.endsWith('.log')) continue
+      const caminho = path.join(pasta, nome)
+      try {
+        if (caminho !== arquivoLog && fs.statSync(caminho).mtimeMs < limite) fs.rmSync(caminho, { force: true })
+      } catch { /* um arquivo preso não impede os outros */ }
+    }
+  } catch { /* limpar é bônus */ }
+}
 
 function iniciarLog () {
-  arquivoLog = path.join(app.getPath('userData'), 'liveon.log')
-
-  // Guarda a sessão anterior antes de truncar. Bug que só aparece com dois
-  // participantes costuma ser contado DEPOIS que o app já reabriu, e sem isto
-  // o registro daquela sessão já teria sido perdido.
   try {
-    if (fs.existsSync(arquivoLog)) {
-      fs.copyFileSync(arquivoLog, path.join(app.getPath('userData'), 'liveon-anterior.log'))
-    }
-  } catch { /* sem histórico é melhor que não abrir */ }
+    fs.mkdirSync(pastaDosLogs(), { recursive: true })
+    arquivoLog = caminhoLivre(`sem sala ${carimbo()}`)
+    fs.writeFileSync(arquivoLog, '')
+  } catch {
+    arquivoLog = null // sem log é melhor que não abrir
+  }
+  limparLogsAntigos()
 
-  try {
-    fs.writeFileSync(
-      arquivoLog,
-      `--- LiveOn ${app.getVersion()} | ${new Date().toISOString()} | ${os.release()} ---\n` +
-      // O próprio caminho na primeira linha: já perdi tempo procurando qual
-      // instalação tinha escrito qual arquivo.
-      `--- registro em ${arquivoLog} | empacotado: ${app.isPackaged} ---\n`
-    )
-  } catch { /* sem log é melhor que não abrir */ }
+  registrarCabecalho('inicio', `LiveOn ${app.getVersion()} | ${new Date().toISOString()} | ` +
+    `Windows ${os.release()} | empacotado: ${app.isPackaged}`)
 }
 
 function registrar (origem, texto) {
   const linha = `${new Date().toISOString()} [${origem}] ${texto}\n`
   try { process.stdout.write(linha) } catch { /* sem console no empacotado */ }
   try { if (arquivoLog) fs.appendFileSync(arquivoLog, linha) } catch { /* disco cheio */ }
+}
+
+// Linha que também vai para o topo de cada arquivo novo de sala: é o retrato
+// da máquina, e sem ele o arquivo de uma segunda sala não diria nada da placa.
+function registrarCabecalho (origem, texto) {
+  cabecalho.push(`[${origem}] ${texto}`)
+  registrar(origem, texto)
+}
+
+function abrirLogDaSala (rotulo) {
+  const destino = caminhoLivre(`${nomeSeguro(rotulo)} ${carimbo()}`)
+  try {
+    if (arquivoLog && !salaDoLog) {
+      // Primeira sala desta execução: leva junto o que já foi escrito.
+      fs.renameSync(arquivoLog, destino)
+    } else {
+      fs.writeFileSync(destino, cabecalho.map((linha) => `(abertura) ${linha}\n`).join(''))
+    }
+    arquivoLog = destino
+  } catch (erro) {
+    registrar('log', `nao consegui abrir o arquivo da sala: ${erro.message}`)
+  }
+  salaDoLog = rotulo
+  limparLogsAntigos()
 }
 
 function vigiarJanela (alvo) {
@@ -126,6 +243,49 @@ function vigiarJanela (alvo) {
 
 ipcMain.on('log:registrar', apenasDoApp((_evento, texto) => registrar('app', String(texto).slice(0, 2000))))
 ipcMain.handle('log:caminho', apenasDoApp(() => arquivoLog))
+
+// Entrei numa sala: arquivo com o nome dela, e as medições começam.
+ipcMain.handle('log:sala', apenasDoApp((_evento, rotulo) => {
+  abrirLogDaSala(String(rotulo || '').slice(0, 60))
+  naSala = true
+  return arquivoLog
+}))
+
+ipcMain.handle('log:saiu', apenasDoApp(() => {
+  naSala = false
+  return true
+}))
+
+// --- configurações da tela de entrada -----------------------------------------
+
+ipcMain.handle('config:ler', apenasDoApp(async () => {
+  const placa = await placaPronta
+  return {
+    video: lerConfig().video === 'cpu' ? 'cpu' : 'gpu',
+    videoAtivo,
+    placa: placa.nome,
+    amd: placa.amd
+  }
+}))
+
+ipcMain.handle('config:gravar', apenasDoApp((_evento, { video } = {}) => {
+  if (video !== 'gpu' && video !== 'cpu') return false
+  try {
+    gravarConfig({ ...lerConfig(), video })
+    registrar('config', `video: ${video === 'cpu' ? 'processador' : 'placa de video'} (vale ao reiniciar)`)
+    return true
+  } catch (erro) {
+    registrar('config', `nao consegui gravar: ${erro.message}`)
+    return false
+  }
+}))
+
+ipcMain.handle('app:reiniciar', apenasDoApp(() => {
+  registrar('config', 'reiniciando a pedido')
+  app.relaunch()
+  app.quit()
+  return true
+}))
 
 ipcMain.handle('janela:telaCheia', apenasDoApp((_evento, ligar) => {
   if (!janela) return false
@@ -178,12 +338,62 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 app.commandLine.appendSwitch('disable-background-timer-throttling')
 
+// --- placa de vídeo -------------------------------------------------------------
+//
+// Dois amigos com placa AMD tiveram o PC inteiro travando e voltando sozinho
+// com o LiveOn aberto; ninguém com NVIDIA teve. Até a causa ser confirmada
+// pelo log, quem tem AMD fica sem a prioridade ALTA, que é a suspeita mais
+// barata de tirar.
+
+const FABRICANTES = { 0x10de: 'NVIDIA', 0x1002: 'AMD', 0x8086: 'Intel' }
+// O "Microsoft Basic Render Driver" aparece em toda máquina e não é placa.
+const SEM_PLACA = 0x1414
+
+let placaPronta = Promise.resolve({ nome: 'desconhecida', amd: false, lista: [] })
+
+async function lerPlaca () {
+  // O 'complete' é o que diz qual placa está ATIVA; o 'basic' marca todas
+  // como inativas (medido aqui, Electron 43). Fica de reserva.
+  let info
+  try { info = await app.getGPUInfo('complete') } catch { /* tenta o básico */ }
+  if (!info || !info.gpuDevice) {
+    try { info = await app.getGPUInfo('basic') } catch { info = {} }
+  }
+
+  const lista = (info.gpuDevice || [])
+    .filter((p) => p.vendorId !== SEM_PLACA)
+    // A mesma placa aparece repetida, uma por preferência de desempenho.
+    .filter((p, i, todas) => todas.findIndex((q) => q.deviceId === p.deviceId && q.vendorId === p.vendorId) === i)
+    .map((p) => ({
+      nome: p.deviceString || `0x${Number(p.deviceId).toString(16)}`,
+      fabricante: FABRICANTES[p.vendorId] || `0x${Number(p.vendorId).toString(16)}`,
+      driver: p.driverVersion || '?',
+      ativa: Boolean(p.active)
+    }))
+
+  const principal = lista.find((p) => p.ativa) || lista[0]
+  return {
+    nome: principal ? principal.nome : 'desconhecida',
+    // QUALQUER AMD na máquina conta, e não só a ativa: num notebook com Ryzen
+    // e NVIDIA, a integrada da AMD também desenha coisa. Tirar a prioridade
+    // a mais só devolve o comportamento de antes da 1.2.0.
+    amd: lista.some((p) => p.fabricante === 'AMD'),
+    lista
+  }
+}
+
 // ALTA, e não tempo real. Medido nesta máquina: sem ser administrador o
 // Windows aceita o pedido de tempo real e devolve ALTA do mesmo jeito, então
 // pedir mais seria mentira. E é bom que seja assim: tempo real passa na frente
 // do driver de áudio e engasga o som e o mouse do sistema inteiro. ALTA já
 // passa na frente do jogo, que roda em normal.
-function priorizar (motivo) {
+async function priorizar (motivo) {
+  const placa = await placaPronta
+  if (placa.amd) {
+    registrar('app', `prioridade normal, sem subir: placa AMD (${motivo})`)
+    return
+  }
+
   const processos = app.getAppMetrics()
   let subiram = 0
   const falhas = []
@@ -201,6 +411,49 @@ function priorizar (motivo) {
 
   registrar('app', `prioridade ALTA em ${subiram}/${processos.length} processos (${motivo})` +
     (falhas.length ? `, falhou em ${falhas.join('; ')}` : ''))
+}
+
+// --- medições para o registro -------------------------------------------------
+//
+// O travamento das placas AMD é o PC inteiro parando e voltando. Para o log
+// mostrar isso, um relógio de 1s confere se ele mesmo atrasou: se o processo
+// principal ficou parado vários segundos, o sistema todo provavelmente ficou.
+// E enquanto há sala, a cada 30s, quanto de CPU e memória cada processo do app
+// está usando, para ver se o travamento vem com o app pesado ou do nada.
+
+const ATRASO_SUSPEITO = 2000
+const INTERVALO_MEDICAO = 30000
+
+let naSala = false
+
+function vigiarTravamentos () {
+  let ultima = Date.now()
+  setInterval(() => {
+    const agora = Date.now()
+    const atraso = agora - ultima - 1000
+    ultima = agora
+    if (atraso > ATRASO_SUSPEITO) {
+      registrar('TRAVOU', `o app ficou ${(atraso / 1000).toFixed(1)} s sem rodar ` +
+        '(o PC travou, ou dormiu)')
+    }
+  }, 1000)
+
+  // Dormir também aparece como atraso; estes dois separam uma coisa da outra.
+  powerMonitor.on('suspend', () => registrar('energia', 'o PC vai dormir'))
+  powerMonitor.on('resume', () => registrar('energia', 'o PC acordou'))
+
+  setInterval(() => {
+    if (!naSala) return
+    const porTipo = new Map()
+    let memoria = 0
+    for (const p of app.getAppMetrics()) {
+      porTipo.set(p.type, (porTipo.get(p.type) || 0) + (p.cpu ? p.cpu.percentCPUUsage : 0))
+      memoria += p.memory ? p.memory.workingSetSize : 0
+    }
+    const cpu = [...porTipo].map(([tipo, uso]) => `${tipo} ${Math.round(uso)}%`).join(', ')
+    registrar('medicao', `CPU: ${cpu} | memoria do app: ${Math.round(memoria / 1024)} MB | ` +
+      `livre no PC: ${Math.round(os.freemem() / 1048576)} MB`)
+  }, INTERVALO_MEDICAO)
 }
 
 // A escolha da fonte acontece na nossa própria UI (grade de miniaturas), então
@@ -448,16 +701,42 @@ app.on('child-process-gone', (_evento, detalhes) => {
   registrar('CRASH', `processo ${detalhes.type} morreu: ${detalhes.reason}`)
 })
 
-app.whenReady().then(() => {
-  iniciarLog()
-  registrar('app', `Electron ${process.versions.electron}, Chrome ${process.versions.chrome}`)
+// O retrato da máquina no topo do registro. Com ele, um log mandado por um
+// amigo já diz que placa, que driver e que modo estavam em uso.
+async function descreverMaquina () {
+  registrarCabecalho('app', `Electron ${process.versions.electron}, Chrome ${process.versions.chrome}`)
+
+  const cpus = os.cpus()
+  registrarCabecalho('maquina', `CPU: ${cpus[0] ? cpus[0].model.trim() : '?'} (${cpus.length} threads) | ` +
+    `RAM: ${(os.totalmem() / 1073741824).toFixed(1)} GB`)
+
+  const placa = await placaPronta
+  for (const p of placa.lista) {
+    registrarCabecalho('maquina', `placa de video: ${p.nome} (${p.fabricante}, driver ${p.driver})` +
+      (p.ativa ? ' [ativa]' : ''))
+  }
+  if (placa.lista.length === 0) registrarCabecalho('maquina', 'placa de video: nao identificada')
+
+  const estado = app.getGPUFeatureStatus()
+  registrarCabecalho('maquina', `video: ${videoAtivo === 'cpu' ? 'PROCESSADOR (aceleracao desligada)' : 'placa de video'} | ` +
+    `composicao=${estado.gpu_compositing} decodificar=${estado.video_decode} codificar=${estado.video_encode}`)
+  registrarCabecalho('maquina', placa.amd
+    ? 'prioridade: normal (placa AMD)'
+    : 'prioridade: ALTA')
 
   // Diz de cara se a captura por processo esta disponivel, e a primeira coisa
   // que se quer saber quando o audio sai errado.
   const audioNativo = capturaProcesso.disponivel()
-  registrar('app', audioNativo.ok
+  registrarCabecalho('app', audioNativo.ok
     ? 'captura de audio por processo: disponivel'
     : `captura de audio por processo: INDISPONIVEL (${audioNativo.motivo})`)
+}
+
+app.whenReady().then(() => {
+  iniciarLog()
+  placaPronta = lerPlaca().catch(() => ({ nome: 'desconhecida', amd: false, lista: [] }))
+  descreverMaquina().catch((erro) => registrar('app', `nao consegui descrever a maquina: ${erro.message}`))
+  vigiarTravamentos()
 
   if (versaoElectron < VERSAO_MINIMA) {
     console.warn(
