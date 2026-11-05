@@ -64,7 +64,15 @@ async function abrirSeletor (modo = 'iniciar') {
     if ([...campo.options].some((o) => o.value === audioAtual.modo)) {
       campo.value = audioAtual.modo
     }
-    if (audioAtual.pid) $('#campo-audio-app').value = String(audioAtual.pid)
+    // O pid so e "o app excluido" no modo sem-app. No so-janela ele e o DONO
+    // da janela transmitida: restaurado aqui, quem trocava de janela para tela
+    // inteira passava a excluir o jogo e mandava o Discord de volta em eco.
+    // Sem isso, fica o Discord que o desenharAplicativosDeAudio ja marcou.
+    const campoApp = $('#campo-audio-app')
+    const pid = String(audioAtual.pid)
+    if (audioAtual.modo === 'sem-app' && [...campoApp.options].some((o) => o.value === pid)) {
+      campoApp.value = pid
+    }
     atualizarOpcoesDeAudio()
   }
 
