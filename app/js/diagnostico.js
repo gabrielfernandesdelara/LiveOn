@@ -31,6 +31,7 @@ async function registrarDesempenho () {
       anotar(`video ${id.slice(0, 8)}: nao consegui medir: ${erro.message}`)
     }
   }
+  registrarUploadTotal([...pares.values()].map((p) => p.kbpsEnviado).filter((k) => k !== null && k !== undefined))
 }
 
 // O quanto mudou desde a última medição. Os contadores do WebRTC só crescem,
@@ -51,7 +52,9 @@ async function descreverPar (par) {
   const stats = await par.pc.getStats()
   let envio = null
   let recebe = null
+  let rede = null
   stats.forEach((r) => {
+    if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') rede = r
     if (r.kind !== 'video') return
     if (r.type === 'outbound-rtp') envio = r
     if (r.type === 'inbound-rtp') recebe = r
@@ -69,9 +72,12 @@ async function descreverPar (par) {
 
   const partes = []
 
+  par.kbpsEnviado = null
   if (envio && envio.bytesSent) {
+    const enviados = diferenca(par, 'enviados', envio.bytesSent)
+    if (enviados !== null) par.kbpsEnviado = Math.round(enviados * 8 / INTERVALO_DIAGNOSTICO)
     partes.push(`envio ${codec(envio)} ${envio.frameWidth || '?'}x${envio.frameHeight || '?'} ` +
-      `${Math.round(envio.framesPerSecond || 0)}fps${kbps(diferenca(par, 'enviados', envio.bytesSent))}` +
+      `${Math.round(envio.framesPerSecond || 0)}fps${kbps(enviados)}` +
       quem(envio.encoderImplementation, envio.powerEfficientEncoder) +
       // 'cpu' aqui é o WebRTC baixando a qualidade porque o processador não
       // está dando conta de codificar.
@@ -90,5 +96,25 @@ async function descreverPar (par) {
       (congelou ? ` congelou=${congelou}x` : ''))
   }
 
+  // O que a rede aguenta, na conta do proprio WebRTC. Em malha cada amigo e
+  // uma copia a mais no upload, e a internet saturada derruba todos os pares
+  // no mesmo segundo e o microfone do Discord junto (log de 05/11/2026). O
+  // tempo de ida e volta subindo antes da queda e a assinatura disso.
+  if (rede && partes.length) {
+    const rtt = rede.currentRoundTripTime
+    const cabe = rede.availableOutgoingBitrate
+    partes.push('rede' +
+      (rtt !== undefined ? ` ida e volta ${Math.round(rtt * 1000)}ms` : '') +
+      (cabe ? ` upload estimado ${Math.round(cabe / 1000)}kbps` : ''))
+  }
+
   return partes.join(' | ')
+}
+
+// Soma do que sai para todos os amigos: e esse total que disputa o upload da
+// casa com o Discord e com o jogo.
+function registrarUploadTotal (kbpsPorPar) {
+  if (kbpsPorPar.length < 2) return
+  const total = kbpsPorPar.reduce((a, b) => a + b, 0)
+  anotar(`upload total: ${(total / 1000).toFixed(1)} Mbps para ${kbpsPorPar.length} amigos`)
 }

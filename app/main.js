@@ -263,16 +263,27 @@ ipcMain.handle('config:ler', apenasDoApp(async () => {
   return {
     video: lerConfig().video === 'cpu' ? 'cpu' : 'gpu',
     videoAtivo,
+    prioridade: prioridadeEscolhida(),
     placa: placa.nome,
     amd: placa.amd
   }
 }))
 
-ipcMain.handle('config:gravar', apenasDoApp((_evento, { video } = {}) => {
-  if (video !== 'gpu' && video !== 'cpu') return false
+// Grava UMA escolha por vez. O vídeo só vale ao reiniciar; a prioridade vale
+// na hora, porque dá para mudar a classe de um processo que já está rodando.
+ipcMain.handle('config:gravar', apenasDoApp((_evento, { video, prioridade } = {}) => {
+  const soVideo = (video === 'gpu' || video === 'cpu') && prioridade === undefined
+  const soPrioridade = (prioridade === 'normal' || prioridade === 'alta') && video === undefined
+  if (!soVideo && !soPrioridade) return false
   try {
-    gravarConfig({ ...lerConfig(), video })
-    registrar('config', `video: ${video === 'cpu' ? 'processador' : 'placa de video'} (vale ao reiniciar)`)
+    if (soVideo) {
+      gravarConfig({ ...lerConfig(), video })
+      registrar('config', `video: ${video === 'cpu' ? 'processador' : 'placa de video'} (vale ao reiniciar)`)
+    } else {
+      gravarConfig({ ...lerConfig(), prioridade })
+      registrar('config', `prioridade: ${prioridade}`)
+      priorizar('configuracao')
+    }
     return true
   } catch (erro) {
     registrar('config', `nao consegui gravar: ${erro.message}`)
@@ -333,7 +344,8 @@ let janela = null
 //    `backgroundThrottling: false` da janela é parente disto, mas cuida só dos
 //    timers; estes cuidam da prioridade do processo.
 // 2. O Windows reparte CPU por classe de prioridade, e o app nasce em normal,
-//    a mesma do jogo.
+//    a mesma do jogo. Desde a 1.4.3 o app FICA em normal, e a ALTA virou
+//    escolha nas configurações (ver priorizar()).
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows')
 app.commandLine.appendSwitch('disable-background-timer-throttling')
@@ -341,9 +353,9 @@ app.commandLine.appendSwitch('disable-background-timer-throttling')
 // --- placa de vídeo -------------------------------------------------------------
 //
 // Dois amigos com placa AMD tiveram o PC inteiro travando e voltando sozinho
-// com o LiveOn aberto; ninguém com NVIDIA teve. Até a causa ser confirmada
-// pelo log, quem tem AMD fica sem a prioridade ALTA, que é a suspeita mais
-// barata de tirar.
+// com o LiveOn aberto; ninguém com NVIDIA teve. A placa vai para o log, que é
+// o que vai dizer se a causa é dela. A prioridade já não depende disto: é
+// normal para todo mundo, e ALTA só para quem escolher.
 
 const FABRICANTES = { 0x10de: 'NVIDIA', 0x1002: 'AMD', 0x8086: 'Intel' }
 // O "Microsoft Basic Render Driver" aparece em toda máquina e não é placa.
@@ -351,19 +363,31 @@ const SEM_PLACA = 0x1414
 
 let placaPronta = Promise.resolve({ nome: 'desconhecida', amd: false, lista: [] })
 
+// Placa de verdade: nem o Basic Render Driver, nem o 0x0 que o 'complete'
+// devolve no modo processador.
+function placasReais (info) {
+  return ((info && info.gpuDevice) || [])
+    .filter((p) => p.vendorId && p.vendorId !== SEM_PLACA)
+    // A mesma placa aparece repetida, uma por preferência de desempenho.
+    .filter((p, i, todas) => todas.findIndex((q) => q.deviceId === p.deviceId && q.vendorId === p.vendorId) === i)
+}
+
 async function lerPlaca () {
   // O 'complete' é o que diz qual placa está ATIVA; o 'basic' marca todas
   // como inativas (medido aqui, Electron 43). Fica de reserva.
-  let info
-  try { info = await app.getGPUInfo('complete') } catch { /* tenta o básico */ }
-  if (!info || !info.gpuDevice) {
-    try { info = await app.getGPUInfo('basic') } catch { info = {} }
+  //
+  // No modo processador (aceleração desligada) o 'complete' devolve UMA placa
+  // falsa, 0x0. Até a 1.4.2 isso contava como "tem placa", o básico nunca era
+  // consultado e a AMD passava despercebida: justo quem escolheu processador
+  // por causa do travamento ficava em prioridade ALTA. O 'basic' continua
+  // vendo a placa de verdade nesse modo (medido).
+  let dispositivos = []
+  try { dispositivos = placasReais(await app.getGPUInfo('complete')) } catch { /* tenta o básico */ }
+  if (dispositivos.length === 0) {
+    try { dispositivos = placasReais(await app.getGPUInfo('basic')) } catch { /* fica vazia */ }
   }
 
-  const lista = (info.gpuDevice || [])
-    .filter((p) => p.vendorId !== SEM_PLACA)
-    // A mesma placa aparece repetida, uma por preferência de desempenho.
-    .filter((p, i, todas) => todas.findIndex((q) => q.deviceId === p.deviceId && q.vendorId === p.vendorId) === i)
+  const lista = dispositivos
     .map((p) => ({
       nome: p.deviceString || `0x${Number(p.deviceId).toString(16)}`,
       fabricante: FABRICANTES[p.vendorId] || `0x${Number(p.vendorId).toString(16)}`,
@@ -375,8 +399,8 @@ async function lerPlaca () {
   return {
     nome: principal ? principal.nome : 'desconhecida',
     // QUALQUER AMD na máquina conta, e não só a ativa: num notebook com Ryzen
-    // e NVIDIA, a integrada da AMD também desenha coisa. Tirar a prioridade
-    // a mais só devolve o comportamento de antes da 1.2.0.
+    // e NVIDIA, a integrada da AMD também desenha coisa. Hoje só serve para a
+    // tela de configurações reforçar o aviso da prioridade ALTA.
     amd: lista.some((p) => p.fabricante === 'AMD'),
     lista
   }
@@ -387,12 +411,24 @@ async function lerPlaca () {
 // pedir mais seria mentira. E é bom que seja assim: tempo real passa na frente
 // do driver de áudio e engasga o som e o mouse do sistema inteiro. ALTA já
 // passa na frente do jogo, que roda em normal.
+//
+// Desde a 1.4.3 a ALTA é ESCOLHA, nas configurações, e o padrão é normal.
+// Ela deixava a transmissão mais lisa com jogo aberto, mas os amigos com PC
+// travando (e um que desligou sozinho, em 05/11/2026) estavam todos em ALTA,
+// e na 1.4.2 a trava da AMD falhava no modo processador. Em vez de adivinhar
+// quem aguenta, quem quiser liga, com o aviso na tela.
+//
+// Aplica a classe escolhida nos dois sentidos: voltar para normal também tem
+// que rebaixar os processos que já estavam em ALTA, sem reiniciar.
+function prioridadeEscolhida () {
+  return lerConfig().prioridade === 'alta' ? 'alta' : 'normal'
+}
+
 async function priorizar (motivo) {
-  const placa = await placaPronta
-  if (placa.amd) {
-    registrar('app', `prioridade normal, sem subir: placa AMD (${motivo})`)
-    return
-  }
+  const escolhida = prioridadeEscolhida()
+  const classe = escolhida === 'alta'
+    ? os.constants.priority.PRIORITY_HIGH
+    : os.constants.priority.PRIORITY_NORMAL
 
   const processos = app.getAppMetrics()
   let subiram = 0
@@ -400,7 +436,7 @@ async function priorizar (motivo) {
 
   for (const { pid, type } of processos) {
     try {
-      os.setPriority(pid, os.constants.priority.PRIORITY_HIGH)
+      os.setPriority(pid, classe)
       subiram++
     } catch (erro) {
       // Processo pode ter morrido entre listar e ajustar. Não é motivo para
@@ -409,7 +445,7 @@ async function priorizar (motivo) {
     }
   }
 
-  registrar('app', `prioridade ALTA em ${subiram}/${processos.length} processos (${motivo})` +
+  registrar('app', `prioridade ${escolhida === 'alta' ? 'ALTA' : 'normal'} em ${subiram}/${processos.length} processos (${motivo})` +
     (falhas.length ? `, falhou em ${falhas.join('; ')}` : ''))
 }
 
@@ -720,9 +756,9 @@ async function descreverMaquina () {
   const estado = app.getGPUFeatureStatus()
   registrarCabecalho('maquina', `video: ${videoAtivo === 'cpu' ? 'PROCESSADOR (aceleracao desligada)' : 'placa de video'} | ` +
     `composicao=${estado.gpu_compositing} decodificar=${estado.video_decode} codificar=${estado.video_encode}`)
-  registrarCabecalho('maquina', placa.amd
-    ? 'prioridade: normal (placa AMD)'
-    : 'prioridade: ALTA')
+  registrarCabecalho('maquina', prioridadeEscolhida() === 'alta'
+    ? 'prioridade: ALTA (escolhida nas configuracoes)'
+    : 'prioridade: normal')
 
   // Diz de cara se a captura por processo esta disponivel, e a primeira coisa
   // que se quer saber quando o audio sai errado.

@@ -78,8 +78,7 @@ mídia.
 - **Volume por pessoa** e escolha da **saída de áudio** (fone, caixa ou outro aparelho).
 - **Reconexão automática**: se a conexão com o servidor cai, o app tenta voltar por **105 segundos** e quem volta continua sendo a mesma pessoa, sem derrubar o vídeo. A sala vazia fica de pé por **2 minutos** esperando.
 - **Atualização automática**: o app baixa a versão nova em segundo plano e instala ao reiniciar, sem assistente.
-- **Prioridade alta** de processo, para a transmissão não engasgar quando um jogo disputa a CPU. Em computadores com placa AMD ela fica desligada.
-- **Configurações antes de entrar**: escolher se as telas são processadas pela placa de vídeo ou pelo processador.
+- **Configurações antes de entrar**: escolher se as telas são processadas pela placa de vídeo ou pelo processador, e ligar a **prioridade alta** do processo. Ela pode deixar a transmissão mais fluida quando um jogo disputa a CPU, mas trava alguns computadores, por isso vem desligada e vale na hora, sem reiniciar.
 - **Registro por sala** em `C:\Users\<seu usuário>\Documents\LiveOn\Logs`, com o nome da sala, data e hora, apagado sozinho depois de **duas semanas**.
 
 ## Privacidade e segurança

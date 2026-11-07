@@ -23,6 +23,9 @@ function garantirPar (id) {
     // conexao falhou: sem srflx, o STUN nao respondeu; com srflx dos dois
     // lados e ainda assim falha, e NAT simetrico e so o TURN resolve.
     candidatos: { host: 0, srflx: 0, prflx: 0, relay: 0 },
+    // Ja chegou a conectar alguma vez. Par que conectou direto e depois caiu
+    // NAO e NAT simetrico: o caminho existia, foi a rede (ou o PC) que parou.
+    jaConectou: false,
     // O teto que ESTE amigo pediu para receber. null = manda como esta.
     qualidadePedida: null
   }
@@ -92,16 +95,22 @@ function garantirPar (id) {
     anotar(`par ${id.slice(0, 8)}: ${estado}`)
 
     if (estado === 'connected') {
+      par.jaConectou = true
       // So da para mexer nos parametros depois que a transceiver negociou.
       for (const remetente of par.remetentes) aplicarQualidade(par, remetente)
       registrarCaminho(id, pc)
     }
     if (estado === 'failed') {
       const c = par.candidatos
+      // Caiu TODO mundo no mesmo segundo (log de 05/11/2026, 4 pares): isso
+      // e a rede de quem anota parando, nao NAT. A mensagem de TURN ali
+      // mandava procurar no lugar errado.
       anotar(`par ${id.slice(0, 8)} FALHOU: host=${c.host} srflx=${c.srflx} relay=${c.relay}. ` +
-        (c.relay === 0
-          ? 'Sem TURN configurado: se os dois lados estao atras de NAT simetrico, nao existe caminho direto.'
-          : 'Nem pelo relay passou.'))
+        (par.jaConectou
+          ? 'Ja tinha conectado: a conexao caiu (rede saturada, internet oscilando ou PC travado), nao e NAT.'
+          : c.relay === 0
+            ? 'Sem TURN configurado: se os dois lados estao atras de NAT simetrico, nao existe caminho direto.'
+            : 'Nem pelo relay passou.'))
       pc.restartIce()
     }
     if (estado === 'disconnected' || estado === 'failed') {

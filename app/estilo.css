@@ -822,6 +822,8 @@ option:disabled { color: var(--fraco); }
 }
 
 .nota-dialogo { margin: 16px 0 0; font-size: 12px; line-height: 1.5; color: var(--apagado); }
+.nota-dialogo.alerta { color: #ffcf8b; }
+.campo-config { margin-top: 20px; }
 .acoes-dialogo { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .acoes-dialogo button { padding: 0 16px; }
 

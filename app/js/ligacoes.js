@@ -163,6 +163,7 @@ $('#ajustes').onclick = (evento) => {
 $('#btn-config').onclick = abrirConfig
 $('#btn-fechar-config').onclick = fecharConfig
 $('#campo-video').onchange = trocarVideo
+$('#campo-prioridade').onchange = trocarPrioridade
 $('#btn-reiniciar').onclick = () => window.ponte.reiniciar()
 $('#config').onclick = (evento) => {
   if (evento.target === $('#config')) fecharConfig()
