@@ -449,6 +449,35 @@ async function priorizar (motivo) {
     (falhas.length ? `, falhou em ${falhas.join('; ')}` : ''))
 }
 
+// O priorizar() da abertura chega CEDO DEMAIS para o processo da GPU: no
+// did-finish-load ele ainda nem aparece no getAppMetrics(), e nasce uns 200ms
+// depois já em "acima do normal", que é o padrão do Chromium no Windows (o do
+// Discord está igual). Medido: normalizado nessa hora, ele fica em acima do
+// normal para sempre; normalizado depois de nascer, fica em normal. Quem viu
+// foi o dono, no gerenciador de tarefas, em 07/11/2026.
+//
+// Em vez de acertar o tempo, uma conferência leve a cada 5s devolve à classe
+// escolhida qualquer processo fora dela. Pega também o processo da GPU que
+// renasce depois de o driver cair, e que voltaria em acima do normal.
+const INTERVALO_PRIORIDADE = 5000
+const NOMES_PRIORIDADE = { [-14]: 'alta', [-7]: 'acima do normal', 0: 'normal', 7: 'abaixo do normal', 19: 'baixa' }
+
+function vigiarPrioridade () {
+  setInterval(() => {
+    const classe = prioridadeEscolhida() === 'alta'
+      ? os.constants.priority.PRIORITY_HIGH
+      : os.constants.priority.PRIORITY_NORMAL
+    for (const { pid, type } of app.getAppMetrics()) {
+      try {
+        const atual = os.getPriority(pid)
+        if (atual === classe) continue
+        os.setPriority(pid, classe)
+        registrar('app', `prioridade de ${type}/${pid} corrigida: ${NOMES_PRIORIDADE[atual] || atual} -> ${NOMES_PRIORIDADE[classe]}`)
+      } catch { /* processo morreu entre listar e ajustar */ }
+    }
+  }, INTERVALO_PRIORIDADE)
+}
+
 // --- medições para o registro -------------------------------------------------
 //
 // O travamento das placas AMD é o PC inteiro parando e voltando. Para o log
@@ -773,6 +802,7 @@ app.whenReady().then(() => {
   placaPronta = lerPlaca().catch(() => ({ nome: 'desconhecida', amd: false, lista: [] }))
   descreverMaquina().catch((erro) => registrar('app', `nao consegui descrever a maquina: ${erro.message}`))
   vigiarTravamentos()
+  vigiarPrioridade()
 
   if (versaoElectron < VERSAO_MINIMA) {
     console.warn(
