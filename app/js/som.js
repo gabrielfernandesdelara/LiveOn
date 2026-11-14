@@ -141,7 +141,7 @@ async function aplicarSaidaEm (video) {
 }
 
 function aplicarSaidaEmTodos () {
-  for (const video of document.querySelectorAll('.palco video')) aplicarSaidaEm(video)
+  for (const video of document.querySelectorAll('.palco > video')) aplicarSaidaEm(video)
 }
 
 // Medido dentro do Electron: os nomes vem completos, sem precisar de permissao

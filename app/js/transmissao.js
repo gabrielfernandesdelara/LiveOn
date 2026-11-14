@@ -102,7 +102,7 @@ async function iniciarTransmissao (fonteId, configAudio) {
 
   for (const id of participantes.keys()) adicionarTrilhas(garantirPar(id))
 
-  enviar({ tipo: 'estado', transmitindo: true })
+  anunciarEstado()
 
   $('#btn-transmitir').classList.add('oculto')
   $('#btn-parar').classList.remove('oculto')
@@ -235,7 +235,7 @@ function pararTransmissao () {
   // Fecha a captura nativa, se estava em uso.
   pararTrilhaDeProcesso()
 
-  enviar({ tipo: 'estado', transmitindo: false })
+  anunciarEstado()
 
   fonteAtual = null
   audioAtual = null

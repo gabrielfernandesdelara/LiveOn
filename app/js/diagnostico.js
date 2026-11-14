@@ -25,7 +25,7 @@ function pararDiagnostico () {
 async function registrarDesempenho () {
   for (const [id, par] of pares) {
     try {
-      const linha = await descreverPar(par)
+      const linha = await descreverPar(id, par)
       if (linha) anotar(`video ${id.slice(0, 8)}: ${linha}`)
     } catch (erro) {
       anotar(`video ${id.slice(0, 8)}: nao consegui medir: ${erro.message}`)
@@ -48,53 +48,87 @@ function kbps (bytes) {
   return bytes === null ? '' : ` ${Math.round(bytes * 8 / INTERVALO_DIAGNOSTICO)}kbps`
 }
 
-async function descreverPar (par) {
+// O relatorio de UM remetente ou receptor, em vez do da conexao inteira. Com a
+// webcam cada conexao passou a levar dois videos, e no relatorio geral nao da
+// para saber qual linha e a tela e qual e a webcam. Perguntando a cada
+// remetente, nao ha o que confundir.
+async function rtpDe (ponta, tipo) {
+  if (!ponta || !ponta.track) return null
+  const stats = await ponta.getStats()
+  let achado = null
+  stats.forEach((r) => { if (r.type === tipo && r.kind === 'video') achado = r })
+  return achado ? { r: achado, stats } : null
+}
+
+function descreverEnvio (par, chave, rotulo, medida) {
+  if (!medida || !medida.r.bytesSent) return null
+  const { r, stats } = medida
+  const enviados = diferenca(par, chave, r.bytesSent)
+  if (enviados !== null) par.kbpsEnviado = (par.kbpsEnviado || 0) + Math.round(enviados * 8 / INTERVALO_DIAGNOSTICO)
+
+  return `${rotulo} ${codecDe(r, stats)} ${r.frameWidth || '?'}x${r.frameHeight || '?'} ` +
+    `${Math.round(r.framesPerSecond || 0)}fps${kbps(enviados)}` +
+    quemProcessa(r.encoderImplementation, r.powerEfficientEncoder) +
+    // 'cpu' aqui é o WebRTC baixando a qualidade porque o processador não
+    // está dando conta de codificar.
+    (r.qualityLimitationReason && r.qualityLimitationReason !== 'none'
+      ? ` limitado por ${r.qualityLimitationReason}`
+      : '')
+}
+
+function descreverRecebimento (par, chave, rotulo, medida) {
+  if (!medida || !medida.r.bytesReceived) return null
+  const { r, stats } = medida
+  const perdidos = diferenca(par, chave + '-descartados', r.framesDropped)
+  const congelou = diferenca(par, chave + '-congelamentos', r.freezeCount)
+
+  return `${rotulo} ${codecDe(r, stats)} ${r.frameWidth || '?'}x${r.frameHeight || '?'} ` +
+    `${Math.round(r.framesPerSecond || 0)}fps${kbps(diferenca(par, chave, r.bytesReceived))}` +
+    quemProcessa(r.decoderImplementation, r.powerEfficientDecoder) +
+    (perdidos ? ` quadros descartados=${perdidos}` : '') +
+    (congelou ? ` congelou=${congelou}x` : '')
+}
+
+function codecDe (r, stats) {
+  const c = r.codecId && stats.get(r.codecId)
+  return c ? c.mimeType.replace('video/', '') : '?'
+}
+
+// O Chromium só revela o nome do codificador/decodificador em algumas
+// situações; quando revela, "powerEfficient" diz se é a placa de vídeo.
+function quemProcessa (nome, naPlaca) {
+  return nome
+    ? ` ${nome}${naPlaca === true ? ' (placa)' : naPlaca === false ? ' (CPU)' : ''}`
+    : ''
+}
+
+async function descreverPar (id, par) {
   const stats = await par.pc.getStats()
-  let envio = null
-  let recebe = null
   let rede = null
   stats.forEach((r) => {
     if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') rede = r
-    if (r.kind !== 'video') return
-    if (r.type === 'outbound-rtp') envio = r
-    if (r.type === 'inbound-rtp') recebe = r
   })
 
-  const codec = (r) => {
-    const c = r && r.codecId && stats.get(r.codecId)
-    return c ? c.mimeType.replace('video/', '') : '?'
+  // Quem recebe o que: o receptor cuja trilha e a do stream guardado.
+  const receptores = par.pc.getReceivers()
+  const receptorDe = (stream) => {
+    const trilha = stream && stream.getVideoTracks()[0]
+    return trilha ? receptores.find((r) => r.track === trilha) : null
   }
-  // O Chromium só revela o nome do codificador/decodificador em algumas
-  // situações; quando revela, "powerEfficient" diz se é a placa de vídeo.
-  const quem = (nome, naPlaca) => nome
-    ? ` ${nome}${naPlaca === true ? ' (placa)' : naPlaca === false ? ' (CPU)' : ''}`
-    : ''
 
-  const partes = []
-
+  // Zera antes: descreverEnvio soma aqui a tela e a webcam.
   par.kbpsEnviado = null
-  if (envio && envio.bytesSent) {
-    const enviados = diferenca(par, 'enviados', envio.bytesSent)
-    if (enviados !== null) par.kbpsEnviado = Math.round(enviados * 8 / INTERVALO_DIAGNOSTICO)
-    partes.push(`envio ${codec(envio)} ${envio.frameWidth || '?'}x${envio.frameHeight || '?'} ` +
-      `${Math.round(envio.framesPerSecond || 0)}fps${kbps(enviados)}` +
-      quem(envio.encoderImplementation, envio.powerEfficientEncoder) +
-      // 'cpu' aqui é o WebRTC baixando a qualidade porque o processador não
-      // está dando conta de codificar.
-      (envio.qualityLimitationReason && envio.qualityLimitationReason !== 'none'
-        ? ` limitado por ${envio.qualityLimitationReason}`
-        : ''))
-  }
 
-  if (recebe && recebe.bytesReceived) {
-    const perdidos = diferenca(par, 'descartados', recebe.framesDropped)
-    const congelou = diferenca(par, 'congelamentos', recebe.freezeCount)
-    partes.push(`recebo ${codec(recebe)} ${recebe.frameWidth || '?'}x${recebe.frameHeight || '?'} ` +
-      `${Math.round(recebe.framesPerSecond || 0)}fps${kbps(diferenca(par, 'recebidos', recebe.bytesReceived))}` +
-      quem(recebe.decoderImplementation, recebe.powerEfficientDecoder) +
-      (perdidos ? ` quadros descartados=${perdidos}` : '') +
-      (congelou ? ` congelou=${congelou}x` : ''))
-  }
+  const partes = [
+    descreverEnvio(par, 'enviados', 'envio',
+      await rtpDe(par.remetentePorTipo.get('video'), 'outbound-rtp')),
+    descreverEnvio(par, 'cam-enviados', 'webcam envio',
+      await rtpDe(par.remetenteCamera, 'outbound-rtp')),
+    descreverRecebimento(par, 'recebidos', 'recebo',
+      await rtpDe(receptorDe(streamsRecebidos.get(id)), 'inbound-rtp')),
+    descreverRecebimento(par, 'cam-recebidos', 'webcam recebo',
+      await rtpDe(receptorDe(camerasRecebidas.get(id)), 'inbound-rtp'))
+  ].filter(Boolean)
 
   // O que a rede aguenta, na conta do proprio WebRTC. Em malha cada amigo e
   // uma copia a mais no upload, e a internet saturada derruba todos os pares

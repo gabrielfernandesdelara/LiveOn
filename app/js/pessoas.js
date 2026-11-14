@@ -27,28 +27,42 @@ function criarAvatar (nome, noAr = true) {
 
 // TODO mundo na sala, inclusive quem não está transmitindo, que é justamente
 // quem não aparece na grade. Eu sempre primeiro.
+//
+// `transmitindo` é a tela, `camera` é a webcam, e `noAr` é qualquer uma das
+// duas: é o que acende o ponto vermelho e dá um card na grade. A grade usa
+// esta mesma função, para as duas nunca discordarem sobre quem está no ar.
 function quemEstaNaSala () {
-  return [
-    { id: meuId, nome: meuNome, souEu: true, transmitindo: Boolean(streamLocal) },
-    ...[...participantes.values()].map((p) => ({
-      ...p,
-      souEu: false,
-      // Mesma regra da grade: o vídeo pode chegar antes do aviso.
-      transmitindo: p.transmitindo || streamsRecebidos.has(p.id)
-    }))
-  ]
+  const eu = {
+    id: meuId,
+    nome: meuNome,
+    souEu: true,
+    transmitindo: Boolean(streamLocal),
+    camera: Boolean(streamCamera)
+  }
+  const outros = [...participantes.values()].map((p) => ({
+    id: p.id,
+    nome: p.nome,
+    souEu: false,
+    // O vídeo pode chegar antes do aviso: os dois caminhos são independentes.
+    transmitindo: Boolean(p.transmitindo) || streamsRecebidos.has(p.id),
+    camera: Boolean(p.camera) || camerasRecebidas.has(p.id)
+  }))
+
+  return [eu, ...outros].map((p) => ({ ...p, noAr: p.transmitindo || p.camera }))
 }
 
 // O que aparece embaixo do nome. Só da minha transmissão eu sei o nome da
 // fonte: o dos outros não viaja pela sala, o protocolo não manda. E é melhor
 // assim, título de janela costuma ter nome de documento ou assunto de e-mail.
 function legendaDe (pessoa) {
-  if (!pessoa.transmitindo) return 'assistindo'
+  if (!pessoa.transmitindo) return pessoa.camera ? 'com a câmera ligada' : 'assistindo'
+
+  let texto = 'transmitindo'
   if (pessoa.souEu) {
     const fonte = fontesCarregadas.find((f) => f.id === fonteAtual)
-    if (fonte) return 'transmitindo · ' + fonte.nome
+    if (fonte) texto += ' · ' + fonte.nome
   }
-  return 'transmitindo'
+  return pessoa.camera ? texto + ' · câmera' : texto
 }
 
 function criarEngrenagem (titulo, aoClicar) {
@@ -66,12 +80,12 @@ function criarEngrenagem (titulo, aoClicar) {
 
 function desenharPessoas () {
   const todos = quemEstaNaSala()
-  const noAr = todos.filter((p) => p.transmitindo).length
+  const noAr = todos.filter((p) => p.noAr).length
 
   // O botão: até três avatares empilhados, e o total.
   const pilha = $('#pilha-pessoas')
   pilha.textContent = ''
-  for (const pessoa of todos.slice(0, 3)) pilha.appendChild(criarAvatar(pessoa.nome, pessoa.transmitindo))
+  for (const pessoa of todos.slice(0, 3)) pilha.appendChild(criarAvatar(pessoa.nome, pessoa.noAr))
   $('#total-pessoas').textContent = String(todos.length)
 
   // O cabeçalho do pop-over.
@@ -99,13 +113,13 @@ function desenharPessoas () {
     sub.textContent = legendaDe(pessoa)
 
     textos.append(nome, sub)
-    linha.append(criarAvatar(pessoa.nome, pessoa.transmitindo), textos)
+    linha.append(criarAvatar(pessoa.nome, pessoa.noAr), textos)
 
     // No modo expandido as miniaturas somem, então a lista vira o único jeito
     // de trocar de transmissão sem sair do destaque. O pop-over fica aberto
     // depois da troca, para dar para ir passando de uma em uma.
     const emDestaque = Boolean(idTelaCheia) && idTelaCheia === pessoa.id
-    const trocavel = Boolean(idTelaCheia) && pessoa.transmitindo && !emDestaque
+    const trocavel = Boolean(idTelaCheia) && pessoa.noAr && !emDestaque
     linha.classList.toggle('em-destaque', emDestaque)
     linha.classList.toggle('trocavel', trocavel)
     if (trocavel) {

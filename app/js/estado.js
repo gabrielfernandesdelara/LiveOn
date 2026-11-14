@@ -10,6 +10,10 @@ let meuNome = ''
 
 let streamLocal = null
 
+// A minha webcam, quando ligada. E um stream SEPARADO do da tela, de proposito:
+// quem recebe distingue os dois pelo id do stream, que eu aviso pela sala.
+let streamCamera = null
+
 // 'criar' abre uma sala nova; 'entrar' usa nome + codigo; 'buscar' lista.
 // Entrar na frente de criar: na prática uma sala é criada uma vez e todo mundo
 // entra nela, então o caminho comum tem que ser o que já está aberto.
@@ -67,6 +71,12 @@ const pares = new Map()
 // e sem guardar aqui o stream se perderia quando o card ainda nao existe.
 const streamsRecebidos = new Map()
 
+// id -> MediaStream da WEBCAM de quem ligou a dela. Separado do mapa das telas:
+// a pessoa pode ter os dois, so um, ou nenhum. Um stream entra aqui quando o
+// id dele bate com o `camera` que a pessoa anunciou; o que chega sem aviso vai
+// para o mapa das telas e e movido para ca se o aviso vier depois.
+const camerasRecebidas = new Map()
+
 // O que EU escolhi receber de cada um. So minha: nao mexe no que os outros
 // recebem, nem no que a pessoa esta transmitindo. Zero em qualquer um dos dois
 // significa "como vier", resolucao e fps sao escolhidos separado.
@@ -82,7 +92,8 @@ const volumeAntesDeMudo = new Map()
 // De quem e o painel de ajustes aberto agora.
 let ajustesAbertos = null
 
-// id -> { id, nome, transmitindo }   (so os outros; eu tenho card a parte)
+// id -> { id, nome, transmitindo, camera }   (so os outros; eu tenho card a
+// parte). `camera` e o id do stream da webcam da pessoa, ou '' sem webcam.
 const participantes = new Map()
 
 const $ = (sel) => document.querySelector(sel)

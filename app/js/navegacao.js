@@ -19,6 +19,12 @@ function fecharDialogo () {
     fecharAjustes()
     return true
   }
+  // Fechar a camera tambem apaga a previa: so esconder deixaria a luz dela
+  // acesa.
+  if (cameraAberta()) {
+    fecharCamera()
+    return true
+  }
   for (const id of ['#saida', '#seletor', '#config']) {
     if (!$(id).classList.contains('oculto')) {
       $(id).classList.add('oculto')
@@ -46,6 +52,7 @@ function voltarParaEntrada () {
   }
   focados.clear()
   streamsRecebidos.clear()
+  camerasRecebidas.clear()
   qualidadePorId.clear()
   volumePorId.clear()
   aguardandoEntrada = false
@@ -68,6 +75,9 @@ function voltarParaEntrada () {
   }
 
   pararTransmissao()
+  // Sair da sala apaga a webcam junto: ninguem espera continuar sendo filmado
+  // na tela de entrada.
+  desligarCamera()
   for (const par of pares.values()) par.pc.close()
   pares.clear()
   participantes.clear()

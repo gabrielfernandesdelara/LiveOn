@@ -111,6 +111,16 @@ $('#btn-ajustar').onclick = () => abrirSeletor('ajustar')
 
 $('#btn-parar').onclick = pararTransmissao
 
+// Ligar passa pela previa: a pessoa se ve antes de ir ao ar. Desligar e na
+// hora, sem perguntar nada.
+$('#btn-camera').onclick = () => (streamCamera ? desligarCamera() : abrirCamera())
+$('#btn-ligar-camera').onclick = ligarCamera
+$('#btn-cancelar-camera').onclick = fecharCamera
+$('#campo-camera').onchange = trocarCamera
+$('#camera').onclick = (evento) => {
+  if (evento.target === $('#camera')) fecharCamera()
+}
+
 $('#btn-pessoas').onclick = alternarPessoas
 
 // Clicar fora fecha o pop-over. Isso cobre também abrir um diálogo por fora

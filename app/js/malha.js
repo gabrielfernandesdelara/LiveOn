@@ -19,6 +19,9 @@ function garantirPar (id) {
     // Mesmo remetente indexado por tipo. Serve ao replaceTrack: um remetente
     // que teve a trilha trocada por null nao tem mais kind para ser achado.
     remetentePorTipo: new Map(),
+    // O remetente da MINHA webcam para este par. Fica fora das duas listas
+    // acima, que sao so da tela (ver adicionarCamera(), em camera.js).
+    remetenteCamera: null,
     // Tipos de candidato ICE que este par juntou. E o que diz POR QUE a
     // conexao falhou: sem srflx, o STUN nao respondeu; com srflx dos dois
     // lados e ainda assim falha, e NAT simetrico e so o TURN resolve.
@@ -57,9 +60,18 @@ function garantirPar (id) {
   }
 
   pc.ontrack = ({ track, streams }) => {
-    if (!streams[0]) return
+    const stream = streams[0]
+    if (!stream) return
 
-    streamsRecebidos.set(id, streams[0])
+    // Tela ou webcam? As duas chegam como video nesta mesma conexao, e o que
+    // separa e o id do stream: a pessoa anuncia qual e o da webcam dela. O
+    // aviso sai antes das trilhas e passa pelo mesmo socket, entao ja esta
+    // aqui. Se nao estiver (cliente antigo), cai como tela e o aviso, quando
+    // vier, move para o lugar certo.
+    const dono = participantes.get(id)
+    const daCamera = Boolean(dono && dono.camera && dono.camera === stream.id)
+    if (daCamera) camerasRecebidas.set(id, stream)
+    else streamsRecebidos.set(id, stream)
 
     // O card so existe para quem esta transmitindo, e o video pode chegar
     // antes do aviso, entao a grade e refeita aqui.
@@ -68,12 +80,21 @@ function garantirPar (id) {
 
     // Transmissao nova, remetentes novos do outro lado: o teto que eu pedi
     // precisa ser dito outra vez, senao volta calado para a qualidade cheia.
-    if (qualidadePorId.has(id)) pedirQualidade(id)
+    // So para a tela: a webcam tem teto fixo, de quem manda.
+    if (!daCamera && qualidadePorId.has(id)) pedirQualidade(id)
 
     // Rede de seguranca para o quadro congelado: se o aviso de "parei" nao
     // chegar, os proprios eventos da trilha limpam a tela.
     if (track.kind === 'video') {
-      track.addEventListener('ended', () => limparVideo(id))
+      // Decide na hora do evento, e nao agora: o stream pode ter sido movido
+      // de tela para webcam depois. E so limpa se ESTE stream ainda for o que
+      // esta em uso: o fim da webcam nao pode apagar a tela da pessoa.
+      const limpar = () => {
+        if (camerasRecebidas.get(id) === stream) limparCamera(id)
+        else if (streamsRecebidos.get(id) === stream) limparVideo(id)
+      }
+
+      track.addEventListener('ended', limpar)
 
       // 'mute' tambem acontece num solucinho de RTP, e nao so quando a pessoa
       // para de verdade: trocar a fonte no ar (replaceTrack) pode causar um.
@@ -83,7 +104,7 @@ function garantirPar (id) {
       let sumindo = null
       track.addEventListener('mute', () => {
         clearTimeout(sumindo)
-        sumindo = setTimeout(() => limparVideo(id), ESPERA_ANTES_DE_LIMPAR)
+        sumindo = setTimeout(limpar, ESPERA_ANTES_DE_LIMPAR)
       })
       track.addEventListener('unmute', () => clearTimeout(sumindo))
     }
@@ -98,6 +119,7 @@ function garantirPar (id) {
       par.jaConectou = true
       // So da para mexer nos parametros depois que a transceiver negociou.
       for (const remetente of par.remetentes) aplicarQualidade(par, remetente)
+      limitarCamera(par)
       registrarCaminho(id, pc)
     }
     if (estado === 'failed') {
@@ -190,6 +212,13 @@ function adicionarTrilhas (par) {
     // teto ficava sem ser aplicado, calado.
     aplicarQualidade(par, remetente)
   }
+}
+
+// Tudo o que eu estou mandando, para um par que acabou de aparecer (alguem
+// entrou, ou eu reconectei): a tela e a webcam, o que houver.
+function adicionarMidia (par) {
+  adicionarTrilhas(par)
+  adicionarCamera(par)
 }
 
 // Aplica, SO NESTE par, o teto que aquele amigo pediu.

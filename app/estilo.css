@@ -656,7 +656,128 @@ option:disabled { color: var(--fraco); }
 .icone-card.mudo { color: var(--mudo); }
 
 @media (prefers-reduced-motion: reduce) {
-  .controles-flutuantes, .selo .nome { transition: none; }
+  .controles-flutuantes, .selo .nome, .cam { transition: none; }
+}
+
+/* ---------- webcam sobre a tela ----------
+
+   A webcam de quem TAMBÉM transmite a tela. Um card por pessoa: a tela é o
+   vídeo principal e a webcam vai por cima, pequena. Quem ligou só a webcam
+   não passa por aqui, ela vira o vídeo principal do card (classe so-cam).
+
+   Dois formatos, escolha de quem assiste (clique na webcam troca):
+   - canto: um retângulo no canto de CIMA à direita. Embaixo ficam o selo do
+     nome e os controles, e a barra de volume abre para cima.
+   - selo (#grade.cam-selo): redonda, no lugar da inicial, e cresce com o
+     mouse em cima. */
+
+.cam {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: none;
+  width: 24%;
+  min-width: 64px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background: #000;
+  box-shadow: 0 0 0 1px var(--anel-escuro), 0 4px 14px rgba(0, 0, 0, .45);
+  cursor: pointer;
+  transition: width .18s ease, height .18s ease;
+}
+.card.com-cam .cam { display: block; }
+
+/* O .palco video é absoluto e nasce escondido, para a tela. O vídeo da webcam
+   mora dentro do .cam e precisa do contrário. Vem DEPOIS da regra do
+   com-video de propósito: as duas têm o mesmo peso, e a ordem desempata. */
+.card .palco .cam video {
+  position: static;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+.cam .ponto { display: none; }
+
+/* Pequena demais para se ver alguém: na miniatura e no card minúsculo a
+   webcam sobreposta some, e o selo continua com a inicial. */
+#miniaturas .card.com-cam .cam,
+.card.minusculo.com-cam .cam { display: none; }
+
+/* A minha webcam aparece espelhada para mim, como num espelho. Os outros a
+   recebem direita: o espelho é só na minha tela. */
+.card.eu .cam video,
+.card.eu.so-cam .palco > video { transform: scaleX(-1); }
+
+/* Formato redondo. Só nos cards grandes: é onde a webcam sobreposta aparece. */
+#grade.cam-selo #principal .card.com-cam:not(.minusculo) .cam {
+  top: auto;
+  right: auto;
+  left: 8px;
+  bottom: 8px;
+  width: 40px;
+  min-width: 0;
+  height: 40px;
+  aspect-ratio: auto;
+  border-radius: 50%;
+}
+#grade.cam-selo #principal .card.com-cam:not(.minusculo) .cam:hover { width: 136px; height: 136px; }
+
+/* A webcam toma o lugar da inicial, então o selo perde o avatar e vira só o
+   nome, ao lado dela. Fica por cima da webcam: quando ela cresce com o mouse,
+   o nome continua legível. */
+#grade.cam-selo #principal .card.com-cam:not(.minusculo) .selo {
+  left: 54px;
+  bottom: 14px;
+  z-index: 3;
+  max-width: calc(100% - 62px);
+  padding: 4px 0;
+}
+#grade.cam-selo #principal .card.com-cam:not(.minusculo) .selo .avatar { display: none; }
+
+/* O ponto de "no ar" ia embora junto com a inicial. Este é o substituto. */
+#grade.cam-selo #principal .card.com-cam.no-ar:not(.minusculo) .cam .ponto {
+  display: block;
+  right: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 0 2px var(--anel-escuro);
+}
+
+/* ---------- botão e prévia da webcam ---------- */
+
+#btn-camera.ligada { background: var(--no-ar); border-color: var(--no-ar); color: #fff; }
+#btn-camera.ligada:hover:not(:disabled) { background: var(--no-ar-hover); border-color: var(--no-ar-hover); color: #fff; }
+
+.previa-camera {
+  position: relative;
+  display: grid;
+  place-items: center;
+  margin-top: 14px;
+  aspect-ratio: 16 / 9;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #000;
+}
+/* Espelhada, como a pessoa se vê no espelho. */
+.previa-camera video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scaleX(-1);
+}
+#estado-camera {
+  position: relative;
+  padding: 0 16px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--apagado);
 }
 
 /* ---------- volume em barra vertical ----------

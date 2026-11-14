@@ -84,6 +84,7 @@
     </div>
 
     <!-- Apagado enquanto nao ha transmissao: nao ha o que ajustar. -->
+    <button id="btn-camera" class="botao-icone" title="Ligar a câmera"><span data-icone="camera" data-tamanho="16"></span></button>
     <button id="btn-ajustar" disabled title="Disponível durante a transmissão"><span data-icone="ajustes"></span>Ajustar</button>
     <button id="btn-transmitir" class="principal"><span data-icone="transmitir" data-traco="2"></span>Transmitir tela</button>
     <button id="btn-parar" class="perigo oculto"><span class="quadrado-parar"></span>Parar transmissão</button>
@@ -267,6 +268,34 @@
   </div>
 </div>
 
+<!-- ---------------- webcam ---------------- -->
+<div id="camera" class="dialogo oculto">
+  <div class="painel-dialogo">
+    <h2>Câmera</h2>
+
+    <!-- A pessoa se ve antes de ir ao ar: o que aparece aqui e o que os
+         amigos vao receber. -->
+    <div class="previa-camera">
+      <video id="previa-camera" autoplay playsinline muted></video>
+      <span id="estado-camera"></span>
+    </div>
+
+    <div class="campo campo-config">
+      <label for="campo-camera">Qual câmera</label>
+      <span class="caixa-select">
+        <select id="campo-camera"></select>
+      </span>
+    </div>
+
+    <p class="nota-dialogo">Vai só a imagem, sem som.</p>
+
+    <div class="acoes-dialogo">
+      <button id="btn-cancelar-camera">Cancelar</button>
+      <button id="btn-ligar-camera" class="principal" disabled>Ligar câmera</button>
+    </div>
+  </div>
+</div>
+
 <div id="tela-atualizacao" class="oculto">
   <div class="cartao-atualizacao">
     <h2 id="titulo-atualizacao">Atualização disponível</h2>
@@ -290,6 +319,7 @@
 <script src="js/malha.js"></script>
 <script src="js/audio-nativo.js"></script>
 <script src="js/transmissao.js"></script>
+<script src="js/camera.js"></script>
 <script src="js/seletor.js"></script>
 <script src="js/grade.js"></script>
 <script src="js/destaque.js"></script>

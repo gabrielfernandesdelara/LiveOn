@@ -6,15 +6,50 @@ function cardDe (id) {
   return document.querySelector('.card[data-id="' + id + '"]')
 }
 
-// Liga o stream guardado ao card, se os dois existirem.
+// Poe a tela e a webcam de alguem no card dele. Serve para os outros e para
+// mim (a previa do que estou mandando).
+//
+// Um card por pessoa, sempre. O video principal e a TELA; a webcam vai por
+// cima dela, pequena. Quem ligou so a webcam nao tem tela para ficar por cima,
+// entao a webcam vira o video principal e ocupa o card inteiro.
+//
+// Devolve o video principal quando ele acabou de ganhar um stream novo, que e
+// quando vale a pena mandar tocar.
+function mostrarNoCard (card, tela, camera) {
+  const principal = tela || camera || null
+  const sobreposta = tela && camera ? camera : null
+
+  // O principal e sempre o PRIMEIRO video do card. O da webcam sobreposta vem
+  // depois, dentro de .cam, e o resto do codigo conta com essa ordem quando
+  // faz card.querySelector('video').
+  const video = card.querySelector('video')
+  const mudou = video.srcObject !== principal
+  if (mudou) {
+    video.srcObject = principal
+    // Sem isto o ultimo quadro fica congelado no elemento.
+    if (!principal) video.load()
+  }
+  card.classList.toggle('com-video', Boolean(principal))
+  card.classList.toggle('so-cam', Boolean(camera) && !tela)
+
+  const cam = card.querySelector('.cam video')
+  if (cam.srcObject !== sobreposta) {
+    cam.srcObject = sobreposta
+    if (sobreposta) cam.play().catch(() => {})
+    else cam.load()
+  }
+  card.classList.toggle('com-cam', Boolean(sobreposta))
+
+  return mudou && principal ? video : null
+}
+
+// Liga ao card de alguem o que chegou dele: a tela, a webcam, ou as duas.
 function aplicarVideo (id) {
   const card = cardDe(id)
-  const stream = streamsRecebidos.get(id)
-  if (!card || !stream) return
+  if (!card) return
 
-  const video = card.querySelector('video')
-  if (video.srcObject !== stream) video.srcObject = stream
-  card.classList.add('com-video')
+  const video = mostrarNoCard(card, streamsRecebidos.get(id), camerasRecebidas.get(id))
+  if (!video) return
 
   // Agora que a pessoa tem trilha, a saida escolhida pode ser aplicada. Se o
   // card nasceu sem audio, esta e a segunda chance dele.
@@ -31,19 +66,13 @@ function aplicarVideo (id) {
   })
 }
 
-// Quem parou de transmitir some da grade. Sem isso o card ficava com o ultimo
-// quadro congelado, parecendo que a pessoa continuava no ar.
+// Quem parou de transmitir a TELA. Sem isso o card ficava com o ultimo quadro
+// congelado, parecendo que a pessoa continuava no ar. Se a webcam dela segue
+// ligada, o card continua e a webcam passa a ocupar ele inteiro; senao, a
+// grade o remove.
 function limparVideo (id) {
   streamsRecebidos.delete(id)
-
-  const card = cardDe(id)
-  if (card) {
-    const video = card.querySelector('video')
-    video.srcObject = null
-    video.load()
-    card.classList.remove('com-video')
-  }
-
+  aplicarVideo(id)
   sincronizarGrade()
 }
 
@@ -240,7 +269,8 @@ window.addEventListener('resize', distribuir)
 
 function criarCard (id, nome, souEu) {
   const card = document.createElement('article')
-  card.className = 'card'
+  // 'eu' espelha a minha webcam, como num espelho. Os outros me veem direito.
+  card.className = souEu ? 'card eu' : 'card'
   card.dataset.id = id
 
   const palco = document.createElement('div')
@@ -336,7 +366,29 @@ function criarCard (id, nome, souEu) {
 
   flutuantes.append(botaoExpandir, botaoCheia)
 
-  palco.append(selo, flutuantes)
+  // A webcam de quem tambem transmite a tela, por cima dela. Fica escondida
+  // ate ter o que mostrar (classe com-cam). Sempre muda: webcam vai sem som.
+  const cam = document.createElement('div')
+  cam.className = 'cam'
+  cam.title = 'Clique para trocar o formato da webcam'
+
+  const videoDaCam = document.createElement('video')
+  videoDaCam.autoplay = true
+  videoDaCam.playsInline = true
+  videoDaCam.muted = true
+
+  // No formato redondo a webcam cobre a inicial, e com ela o ponto de "no
+  // ar". Este e o substituto dele.
+  const pontoDaCam = document.createElement('span')
+  pontoDaCam.className = 'ponto'
+
+  cam.append(videoDaCam, pontoDaCam)
+  cam.onclick = alternarFormatoDaCamera
+  // O duplo clique do palco destaca o card; em cima da webcam ele seria so
+  // dois cliques de trocar o formato.
+  cam.addEventListener('dblclick', (evento) => evento.stopPropagation())
+
+  palco.append(selo, cam, flutuantes)
 
   // Focar e so por duplo clique: o botao proprio saiu, era mais um item
   // disputando espaco na sobreposicao.
@@ -349,19 +401,10 @@ function criarCard (id, nome, souEu) {
 function sincronizarGrade () {
   const grade = $('#grade')
 
-  // So quem esta transmitindo ganha um card. Quem esta na sala sem compartilhar
-  // nada nao ocupa espaco na grade, aparece so na contagem da barra.
-  //
-  // "tem stream" entra na conta porque o video pode chegar antes do aviso; sem
-  // isso a tela ficaria de fora ate a mensagem alcancar.
-  const esperados = [
-    { id: meuId, nome: meuNome, souEu: true, transmitindo: Boolean(streamLocal) },
-    ...[...participantes.values()].map((p) => ({
-      ...p,
-      souEu: false,
-      transmitindo: p.transmitindo || streamsRecebidos.has(p.id)
-    }))
-  ].filter((pessoa) => pessoa.transmitindo)
+  // So quem esta mandando alguma coisa ganha um card: a tela, a webcam, ou as
+  // duas. Quem esta na sala sem mandar nada nao ocupa espaco na grade, aparece
+  // so na contagem da barra. A regra e a mesma da lista de pessoas.
+  const esperados = quemEstaNaSala().filter((pessoa) => pessoa.noAr)
 
   // Remove cards de quem saiu. Busca por .card e nao por filhos diretos,
   // porque no modo foco parte deles vive dentro da faixa de miniaturas.
@@ -380,19 +423,10 @@ function sincronizarGrade () {
         aplicarVolume(pessoa.id, volumeDe(pessoa.id))
       }
     }
-    card.classList.toggle('no-ar', Boolean(pessoa.transmitindo))
+    card.classList.toggle('no-ar', pessoa.noAr)
 
     // O meu card mostra a previa do que estou mandando.
-    if (pessoa.souEu) {
-      const video = card.querySelector('video')
-      if (streamLocal) {
-        if (video.srcObject !== streamLocal) video.srcObject = streamLocal
-        card.classList.add('com-video')
-      } else {
-        video.srcObject = null
-        card.classList.remove('com-video')
-      }
-    }
+    if (pessoa.souEu) mostrarNoCard(card, streamLocal, streamCamera)
   }
 
   // A contagem de gente e os avatares do botao saem daqui tambem.

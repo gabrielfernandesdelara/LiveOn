@@ -153,6 +153,18 @@ function enviar (msg) {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg))
 }
 
+// O que eu estou mandando agora, dito de uma vez so: se a tela esta no ar e
+// qual e o stream da webcam ('' sem webcam). Vai sempre inteiro, porque o
+// servidor guarda o ultimo aviso para contar a quem entrar depois: mandar so
+// a parte que mudou apagaria a outra.
+function anunciarEstado () {
+  enviar({
+    tipo: 'estado',
+    transmitindo: Boolean(streamLocal),
+    camera: streamCamera ? streamCamera.id : ''
+  })
+}
+
 function tratar (msg) {
   switch (msg.tipo) {
     case 'ping':
@@ -185,13 +197,14 @@ function tratar (msg) {
           if (par) { par.pc.close(); pares.delete(id) }
           participantes.delete(id)
           streamsRecebidos.delete(id)
+          camerasRecebidas.delete(id)
         }
 
         for (const p of msg.participantes) {
           const novo = !participantes.has(p.id)
           participantes.set(p.id, p)
           // Chegou enquanto eu estava fora: nunca recebeu minhas trilhas.
-          if (novo && streamLocal) adicionarTrilhas(garantirPar(p.id))
+          if (novo && (streamLocal || streamCamera)) adicionarMidia(garantirPar(p.id))
         }
       } else {
         // Entrada de verdade: os outros me viram sair (ou nunca me viram).
@@ -199,16 +212,19 @@ function tratar (msg) {
         for (const par of pares.values()) par.pc.close()
         pares.clear()
         participantes.clear()
+        // As webcams dos outros vinham pelos pares que acabaram de morrer.
+        camerasRecebidas.clear()
         for (const p of msg.participantes) participantes.set(p.id, p)
       }
 
       // Se eu estava no ar, volto no ar, sem o usuario ter que escolher a
-      // fonte de novo.
-      if (streamLocal) {
+      // fonte de novo. Vale igual para a webcam. O aviso vai antes das
+      // trilhas, para a webcam nao chegar do outro lado como se fosse tela.
+      if (streamLocal || streamCamera) {
+        anunciarEstado()
         if (!msg.retomada) {
-          for (const id of participantes.keys()) adicionarTrilhas(garantirPar(id))
+          for (const id of participantes.keys()) adicionarMidia(garantirPar(id))
         }
-        enviar({ tipo: 'estado', transmitindo: true })
       }
 
       rotuloDaSala = msg.rotulo || 'sala'
@@ -221,7 +237,7 @@ function tratar (msg) {
       anotar(`sala "${rotuloDaSala}" codigo=${mascararCodigo(sessao.codigo)}: entrei como ${meuId.slice(0, 8)}` +
         `${msg.retomada ? ' (retomada)' : ''}, ${msg.participantes.length} ja estavam la` +
         (msg.participantes.length
-          ? ': ' + msg.participantes.map((p) => `${p.nome}/${p.id.slice(0, 8)}${p.transmitindo ? ' (no ar)' : ''}`).join(', ')
+          ? ': ' + msg.participantes.map((p) => `${p.nome}/${p.id.slice(0, 8)}${p.transmitindo ? ' (no ar)' : ''}${p.camera ? ' (camera)' : ''}`).join(', ')
           : ''))
       marcarConexao('ok', '')
       if (reconectou) avisar('Reconectado.')
@@ -231,9 +247,10 @@ function tratar (msg) {
 
     case 'entrou': {
       anotar(`${msg.nome}/${msg.id.slice(0, 8)} entrou na sala`)
-      participantes.set(msg.id, { id: msg.id, nome: msg.nome, transmitindo: false })
+      participantes.set(msg.id, { id: msg.id, nome: msg.nome, transmitindo: false, camera: '' })
       // Se eu ja estou no ar, o recem-chegado precisa receber minhas trilhas.
-      if (streamLocal) adicionarTrilhas(garantirPar(msg.id))
+      // Ele ja sabe da minha webcam: veio na lista do 'bemvindo' dele.
+      if (streamLocal || streamCamera) adicionarMidia(garantirPar(msg.id))
       sincronizarGrade()
       break
     }
@@ -244,6 +261,7 @@ function tratar (msg) {
       const par = pares.get(msg.id)
       if (par) { par.pc.close(); pares.delete(msg.id) }
       streamsRecebidos.delete(msg.id)
+      camerasRecebidas.delete(msg.id)
       // qualidadePorId e volumePorId ficam de proposito: quem cai volta com o
       // MESMO id, e perder o volume ajustado de alguem toda vez que a internet
       // dela oscila e pior do que guardar uma entrada a toa. Some tudo junto
@@ -270,21 +288,47 @@ function tratar (msg) {
     case 'ice': receberIce(msg.de, msg.candidato); break
 
     case 'estado': {
-      const dele = participantes.get(msg.de)
-      anotar(`${dele ? dele.nome : '?'}/${msg.de.slice(0, 8)} ` +
-        (msg.transmitindo ? 'entrou no ar' : 'saiu do ar'))
       const p = participantes.get(msg.de)
       if (!p) break
-      const comecouAgora = msg.transmitindo && !p.transmitindo
-      p.transmitindo = msg.transmitindo
+
+      // Cliente antigo nao manda `camera`: para ele e sempre sem webcam.
+      const camera = typeof msg.camera === 'string' ? msg.camera : ''
+      const transmitindo = Boolean(msg.transmitindo)
+      const telaMudou = transmitindo !== Boolean(p.transmitindo)
+      const cameraMudou = camera !== (p.camera || '')
+
+      // O aviso leva as duas coisas, entao cada linha do log diz so o que
+      // mudou de verdade: ligar a webcam nao e "entrou no ar" de novo.
+      const quem = `${p.nome}/${msg.de.slice(0, 8)}`
+      if (telaMudou) anotar(`${quem} ${transmitindo ? 'entrou no ar' : 'saiu do ar'}`)
+      if (cameraMudou) anotar(`${quem} ${camera ? 'ligou a camera' : 'desligou a camera'}`)
+
+      const comecouAgora = transmitindo && !p.transmitindo
+      p.transmitindo = transmitindo
+      p.camera = camera
 
       // Aviso sonoro so na virada: quem ja estava no ar quando entrei nao
       // dispara nada, senao seria uma saraivada ao abrir a sala.
       if (comecouAgora) tocarAviso()
 
-      // Sem isso o card fica congelado no ultimo quadro de quem parou.
-      if (!msg.transmitindo) limparVideo(msg.de)
-      sincronizarGrade()
+      if (camera) {
+        // O video chegou antes do aviso e foi guardado como tela: e a webcam.
+        const solto = streamsRecebidos.get(msg.de)
+        if (solto && solto.id === camera) {
+          streamsRecebidos.delete(msg.de)
+          camerasRecebidas.set(msg.de, solto)
+        }
+      } else {
+        camerasRecebidas.delete(msg.de)
+      }
+
+      // Sem isso o card fica congelado no ultimo quadro de quem parou. O
+      // limparVideo ja refaz o card e a grade; no outro caso, faz aqui.
+      if (!transmitindo) limparVideo(msg.de)
+      else {
+        aplicarVideo(msg.de)
+        sincronizarGrade()
+      }
       break
     }
 

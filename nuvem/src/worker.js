@@ -63,6 +63,14 @@ function limpar (texto, tamanho) {
   return String(texto || '').trim().slice(0, tamanho)
 }
 
+// A webcam e um segundo video na mesma conexao, e quem recebe so sabe qual dos
+// dois e a webcam porque o dono avisa o id do stream dela. O valor e repassado
+// para a sala inteira e guardado para quem entrar depois, entao so passa o que
+// tem cara de id de MediaStream. Qualquer outra coisa vira "sem camera".
+function cameraValida (valor) {
+  return typeof valor === 'string' && /^[\w{}-]{1,64}$/.test(valor) ? valor : ''
+}
+
 // Conta uma mensagem na janela atual. A primeira acima do limite ganha
 // resposta, para quem estiver do outro lado entender o que houve; as
 // seguintes são descartadas caladas, senão o próprio aviso virava enxurrada.
@@ -298,17 +306,19 @@ export class Sala {
       // dá para retomar sem que a sala perceba nada.
       let retomada = false
       let transmitindo = false
+      let camera = ''
 
       if (velho) {
         const antigos = this.dados(velho)
         retomada = true
         transmitindo = Boolean(antigos && antigos.transmitindo)
+        camera = (antigos && antigos.camera) || ''
         velho.serializeAttachment(null)
         try { velho.close(4001, 'substituído pela reconexão') } catch { /* já morreu */ }
       }
 
       return this.acomodar(ws, conhecido.nome, rotulo, {
-        id: conhecido.id, credencial, retomada, transmitindo
+        id: conhecido.id, credencial, retomada, transmitindo, camera
       })
     }
 
@@ -335,15 +345,16 @@ export class Sala {
     const credencial = retorno ? retorno.credencial : crypto.randomUUID()
     const retomada = Boolean(retorno && retorno.retomada)
     const transmitindo = Boolean(retorno && retorno.transmitindo)
+    const camera = (retorno && retorno.camera) || ''
 
     const participantes = this.outros(ws).map((outro) => {
       const d = this.dados(outro)
-      return { id: d.id, nome: d.nome, transmitindo: d.transmitindo }
+      return { id: d.id, nome: d.nome, transmitindo: d.transmitindo, camera: d.camera || '' }
     })
 
     // entrouEm existe para o alarme: quem acabou de chegar ainda não pingou
     // nenhuma vez, e não pode ser recolhido por causa disso.
-    ws.serializeAttachment({ id, nome, credencial, transmitindo, entrouEm: Date.now() })
+    ws.serializeAttachment({ id, nome, credencial, transmitindo, camera, entrouEm: Date.now() })
 
     // Reinsere para ficar no fim da fila: quem some primeiro é quem entrou
     // há mais tempo, não quem acabou de voltar.
@@ -461,10 +472,11 @@ export class Sala {
     if (!meu) return
 
     meu.transmitindo = Boolean(msg.transmitindo)
+    meu.camera = cameraValida(msg.camera)
     ws.serializeAttachment(meu)
 
     for (const outro of this.outros(ws)) {
-      this.enviar(outro, { tipo: 'estado', de: meu.id, transmitindo: meu.transmitindo })
+      this.enviar(outro, { tipo: 'estado', de: meu.id, transmitindo: meu.transmitindo, camera: meu.camera })
     }
   }
 

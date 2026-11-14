@@ -75,6 +75,7 @@ mídia.
 - **Cada um escolhe o que recebe**: quem assiste pode pedir menos resolução ou fps só para si, sem mudar o que a pessoa transmite nem o que os outros recebem.
 - **Ajustar a transmissão no ar**: trocar de tela, resolução ou fps sem parar de transmitir.
 - **Grade calculada**: as telas se redimensionam para caber, sempre em 16:9, com duplo clique para destacar, modo expandido e tela cheia.
+- **Webcam**, opcional e sem som: cada um liga a sua, com prévia antes de ir ao ar. Ela aparece por cima da tela de quem transmite, num canto ou redonda junto do nome (um clique troca), e quem liga só a webcam ganha um card inteiro. Vai em **360p**, para não pesar no upload.
 - **Volume por pessoa** e escolha da **saída de áudio** (fone, caixa ou outro aparelho).
 - **Reconexão automática**: se a conexão com o servidor cai, o app tenta voltar por **105 segundos** e quem volta continua sendo a mesma pessoa, sem derrubar o vídeo. A sala vazia fica de pé por **2 minutos** esperando.
 - **Atualização automática**: o app baixa a versão nova em segundo plano e instala ao reiniciar, sem assistente.
@@ -86,6 +87,7 @@ mídia.
 Vale ler antes de usar:
 
 - **Quem está na sala vê o seu IP.** Para a mídia ir direto entre os computadores, cada um precisa saber o endereço dos outros. Só entre em sala de quem você conhece e não passe o código adiante.
+- **A webcam só liga quando você manda**, depois de uma prévia, e desliga ao sair da sala. Ela vai sem som: o LiveOn não abre o seu microfone.
 - **O código não se troca** e não existe expulsar alguém. Para tirar uma pessoa, crie uma sala nova.
 - **O servidor vê** seu IP, o nome que você escolheu, o código e quando você entra e sai. **Não vê** vídeo nem áudio, e nada disso fica guardado depois que a sala fecha.
 - **No seu computador** ficam o nome, as preferências e os logs em `C:\Users\<seu usuário>\Documents\LiveOn\Logs`, um por sala, apagados depois de duas semanas. Eles têm o nome da sala, os nomes de quem esteve nela e o modelo da sua placa de vídeo e do processador. O código da sala sai mascarado, então mandar um log para alguém não entrega a entrada da sala.
@@ -215,6 +217,7 @@ LiveOn/
 │       ├── malha.js         # Uma conexão WebRTC por par e o teto de qualidade
 │       ├── audio-nativo.js  # Áudio por processo, do addon até virar trilha
 │       ├── transmissao.js   # Começar, ajustar no ar e parar
+│       ├── camera.js        # Webcam: prévia, ligar, desligar e formato
 │       ├── seletor.js       # Escolha de tela ou janela, qualidade e áudio
 │       ├── grade.js         # Os cards e o cálculo do tamanho deles
 │       └── ...              # Destaque, som, ajustes, pessoas, ícones, tema
@@ -242,6 +245,7 @@ LiveOn/
 - [x] Reconexão que preserva a pessoa e o vídeo
 - [x] Instalador de um clique e atualização automática
 - [x] Redesign da interface
+- [x] Webcam, junto com a tela ou sozinha
 - [ ] Mostrar a qualidade e o bitrate que estão chegando de cada pessoa
 - [ ] Escolha de tema de cores na interface (as paletas já existem)
 - [ ] Ajustes em como funciona o compartilhamento
