@@ -75,7 +75,7 @@ mídia.
 - **Cada um escolhe o que recebe**: quem assiste pode pedir menos resolução ou fps só para si, sem mudar o que a pessoa transmite nem o que os outros recebem.
 - **Ajustar a transmissão no ar**: trocar de tela, resolução ou fps sem parar de transmitir.
 - **Grade calculada**: as telas se redimensionam para caber, sempre em 16:9, com duplo clique para destacar, modo expandido e tela cheia.
-- **Webcam**, opcional e sem som: cada um liga a sua, com prévia antes de ir ao ar. Ela aparece por cima da tela de quem transmite, num canto ou redonda junto do nome (um clique troca), e quem liga só a webcam ganha um card inteiro. Vai em **360p**, para não pesar no upload.
+- **Webcam**, opcional e sem som: cada um liga a sua, com prévia antes de ir ao ar. Ela aparece por cima da tela de quem transmite, num canto ou redonda junto do nome (um clique troca), e quem liga só a webcam ganha um card inteiro. Com uma tela em destaque, as webcams dos outros ficam numa faixa de bolhas sobre ela, que dá para esconder. Vai em **360p**, para não pesar no upload.
 - **Volume por pessoa** e escolha da **saída de áudio** (fone, caixa ou outro aparelho).
 - **Reconexão automática**: se a conexão com o servidor cai, o app tenta voltar por **105 segundos** e quem volta continua sendo a mesma pessoa, sem derrubar o vídeo. A sala vazia fica de pé por **2 minutos** esperando.
 - **Atualização automática**: o app baixa a versão nova em segundo plano e instala ao reiniciar, sem assistente.

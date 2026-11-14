@@ -241,4 +241,109 @@ function alternarFormatoDaCamera () {
   aplicarFormatoDaCamera()
 }
 
+// --- faixa de webcams sobre a tela em destaque -------------------------------
+//
+// Com uma tela em destaque (duplo clique, expandido ou tela cheia), as webcams
+// dos outros podem sumir: no expandido e na tela cheia nao ha miniaturas, e na
+// miniatura de quem tem tela E webcam a webcam e escondida, de tao pequena.
+// Foi o que o dono viu em 15/11/2026: focou a propria tela e perdeu as
+// webcams de duas amigas.
+//
+// A faixa e uma fileira de bolhas no canto de cima a ESQUERDA do primeiro
+// card em destaque. A esquerda porque o canto de cima a direita ja e da
+// webcam da propria pessoa em destaque, e embaixo ficam o nome e os controles.
+//
+// Regra do que entra: so a webcam que NAO esta visivel de outro jeito. Quem
+// esta so de webcam e aparece como miniatura fica de fora, a miniatura e
+// maior que a bolha. Quem esta em destaque tambem: a webcam dele ja esta no
+// proprio card.
+
+// Escolha de quem assiste, guardada. O botao fica nos controles do card que
+// hospeda a faixa.
+let faixaVisivel = lembrar('liveon:camera-faixa') !== '0'
+
+const faixaDeCameras = document.createElement('div')
+faixaDeCameras.className = 'faixa-cams'
+// O duplo clique do palco tira o destaque; em cima de uma bolha nao.
+faixaDeCameras.addEventListener('dblclick', (evento) => evento.stopPropagation())
+
+// id -> a bolha da pessoa. Guardadas para nao recriar o <video> a cada
+// reorganizacao da grade, o que faria a imagem piscar.
+const bolhas = new Map()
+
+function criarBolha (pessoa) {
+  const bolha = document.createElement('div')
+  bolha.className = pessoa.souEu ? 'bolha eu' : 'bolha'
+  bolha.title = pessoa.souEu ? pessoa.nome + ' (você)' : pessoa.nome
+
+  const video = document.createElement('video')
+  video.autoplay = true
+  video.playsInline = true
+  video.muted = true
+  bolha.appendChild(video)
+  return bolha
+}
+
+// Chamada pelo organizarGrade(), que e quem sabe quem esta em destaque.
+function atualizarFaixa (grandes, haDestaque) {
+  // No expandido e na tela cheia as miniaturas somem.
+  const miniaturasVisiveis = !idTelaCheia
+  const emDestaque = new Set(grandes.map((card) => card.dataset.id))
+
+  const pessoas = !haDestaque ? [] : quemEstaNaSala().filter((p) => {
+    if (!p.camera || emDestaque.has(p.id)) return false
+    if (!(p.souEu ? streamCamera : camerasRecebidas.get(p.id))) return false
+    // So de webcam e com miniatura a vista: ja aparece, e maior.
+    return !(miniaturasVisiveis && !p.transmitindo)
+  })
+
+  for (const [id, bolha] of bolhas) {
+    if (!pessoas.some((p) => p.id === id)) {
+      bolha.querySelector('video').srcObject = null
+      bolha.remove()
+      bolhas.delete(id)
+    }
+  }
+
+  for (const pessoa of pessoas) {
+    let bolha = bolhas.get(pessoa.id)
+    if (!bolha) {
+      bolha = criarBolha(pessoa)
+      bolhas.set(pessoa.id, bolha)
+    }
+    const stream = pessoa.souEu ? streamCamera : camerasRecebidas.get(pessoa.id)
+    const video = bolha.querySelector('video')
+    if (video.srcObject !== stream) video.srcObject = stream
+    if (bolha.parentNode !== faixaDeCameras) faixaDeCameras.appendChild(bolha)
+  }
+
+  for (const card of document.querySelectorAll('.card.com-faixa')) card.classList.remove('com-faixa')
+
+  const anfitriao = pessoas.length ? grandes[0] : null
+  if (!anfitriao) {
+    faixaDeCameras.remove()
+    return
+  }
+
+  anfitriao.classList.add('com-faixa')
+  faixaDeCameras.classList.toggle('oculta', !faixaVisivel)
+
+  const botao = anfitriao.querySelector('.btn-faixa')
+  botao.classList.toggle('mudo', !faixaVisivel)
+  botao.title = faixaVisivel ? 'Esconder as webcams' : 'Mostrar as webcams'
+
+  const palco = anfitriao.querySelector('.palco')
+  if (faixaDeCameras.parentNode !== palco) palco.appendChild(faixaDeCameras)
+  // Mover um <video> no DOM pode pausar a reproducao; retomar e barato.
+  for (const video of faixaDeCameras.querySelectorAll('video')) {
+    if (video.paused) video.play().catch(() => {})
+  }
+}
+
+function alternarFaixa () {
+  faixaVisivel = !faixaVisivel
+  guardar('liveon:camera-faixa', faixaVisivel ? '1' : '0')
+  organizarGrade()
+}
+
 aplicarFormatoDaCamera()

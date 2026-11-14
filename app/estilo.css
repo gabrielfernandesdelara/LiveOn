@@ -656,7 +656,7 @@ option:disabled { color: var(--fraco); }
 .icone-card.mudo { color: var(--mudo); }
 
 @media (prefers-reduced-motion: reduce) {
-  .controles-flutuantes, .selo .nome, .cam { transition: none; }
+  .controles-flutuantes, .selo .nome, .cam, .bolha { transition: none; }
 }
 
 /* ---------- webcam sobre a tela ----------
@@ -746,6 +746,51 @@ option:disabled { color: var(--fraco); }
   height: 10px;
   box-shadow: 0 0 0 2px var(--anel-escuro);
 }
+
+/* ---------- faixa de webcams sobre a tela em destaque ----------
+
+   Com uma tela em destaque, as webcams que sumiriam (não há miniaturas no
+   expandido e na tela cheia) viram bolhas no canto de cima à ESQUERDA do
+   card em destaque. À esquerda porque o de cima à direita já é da webcam da
+   própria pessoa em destaque, e embaixo ficam o nome e os controles. */
+
+.faixa-cams {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.faixa-cams.oculta,
+.card.minusculo .faixa-cams { display: none; }
+
+.bolha {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #000;
+  box-shadow: 0 0 0 1px var(--anel-escuro), 0 4px 14px rgba(0, 0, 0, .45);
+  transition: width .18s ease, height .18s ease;
+}
+.bolha:hover { width: 136px; height: 136px; }
+
+/* Mesmo motivo do vídeo do .cam: o .palco video nasce absoluto e escondido. */
+.card .palco .bolha video {
+  position: static;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
+.bolha.eu video { transform: scaleX(-1); }
+
+/* O botão de esconder a faixa só existe onde a faixa está. */
+.card:not(.com-faixa) .btn-faixa { display: none; }
 
 /* ---------- botão e prévia da webcam ---------- */
 

@@ -215,6 +215,9 @@ function organizarGrade () {
   for (const card of grandes) card.removeAttribute('title')
   for (const card of pequenos) card.title = 'Duplo clique para destacar'
 
+  // As webcams que o destaque esconderia vao para a faixa de bolhas.
+  atualizarFaixa(grandes, emFoco.length > 0)
+
   distribuir()
 }
 
@@ -364,7 +367,15 @@ function criarCard (id, nome, souEu) {
   botaoCheia.appendChild(icone('telaCheia'))
   botaoCheia.onclick = () => alternarTelaCheia(id)
 
-  flutuantes.append(botaoExpandir, botaoCheia)
+  // Mostra ou esconde a faixa de webcams. So aparece no card que hospeda a
+  // faixa (classe com-faixa), o CSS esconde nos outros.
+  const botaoFaixa = document.createElement('button')
+  botaoFaixa.className = 'icone-card btn-faixa'
+  botaoFaixa.title = 'Esconder as webcams'
+  botaoFaixa.appendChild(icone('camera'))
+  botaoFaixa.onclick = alternarFaixa
+
+  flutuantes.append(botaoFaixa, botaoExpandir, botaoCheia)
 
   // A webcam de quem tambem transmite a tela, por cima dela. Fica escondida
   // ate ter o que mostrar (classe com-cam). Sempre muda: webcam vai sem som.
