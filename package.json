@@ -1,6 +1,6 @@
 {
   "name": "liveon",
-  "version": "1.5.1",
+  "version": "1.5.4",
   "description": "Compartilhamento de tela com audio do sistema entre amigos (P2P mesh)",
   "author": "Gabriel de Lara",
   "license": "MIT",
@@ -35,6 +35,7 @@
     "files": [
       "app/**/*",
       "nativo/indice.js",
+      "nativo/hdr.js",
       "nativo/build/Release/*.node",
       "package.json"
     ],
