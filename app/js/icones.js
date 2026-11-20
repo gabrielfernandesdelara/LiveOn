@@ -48,6 +48,38 @@ const DESENHOS = {
   janela: [
     ['rect', { x: 2, y: 4, width: 20, height: 16, rx: 2 }],
     ['path', { d: 'M2 9h20' }]
+  ],
+  // Configuracoes do app. Diferente do 'ajustes' (os controles deslizantes),
+  // que e o do botao Ajustar e o dos ajustes de cada pessoa: na barra da sala
+  // os dois ficam lado a lado e nao podiam ser o mesmo desenho.
+  engrenagem: [
+    ['path', { d: 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z' }],
+    ['circle', { cx: 12, cy: 12, r: 3 }]
+  ],
+  pincel: [
+    ['path', { d: 'm14.6 3.4 6 6-8.3 8.3a2 2 0 0 1-2.8 0l-3.2-3.2a2 2 0 0 1 0-2.8z' }],
+    ['path', { d: 'M5.5 14.5 3 21l6.5-2.5' }]
+  ],
+  desempenho: [
+    ['path', { d: 'm12 14 4-4' }],
+    ['path', { d: 'M3.34 19a10 10 0 1 1 17.32 0' }]
+  ],
+  mais: [['path', { d: 'M12 5v14M5 12h14' }]],
+  lapis: [
+    ['path', { d: 'M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z' }],
+    ['path', { d: 'm15 5 4 4' }]
+  ],
+  lixeira: [
+    ['path', { d: 'M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2' }],
+    ['path', { d: 'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6' }]
+  ],
+  // Barras de sinal. Cada barra tem classe propria: o CSS apaga as de cima
+  // conforme o sinal piora (ver .sinal em estilo.css).
+  sinal: [
+    ['path', { d: 'M4 20v-3', class: 'barra-1' }],
+    ['path', { d: 'M9.33 20v-7', class: 'barra-2' }],
+    ['path', { d: 'M14.67 20v-11', class: 'barra-3' }],
+    ['path', { d: 'M20 20v-15', class: 'barra-4' }]
   ]
 }
 

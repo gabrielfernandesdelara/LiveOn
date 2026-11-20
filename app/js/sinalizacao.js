@@ -251,6 +251,7 @@ function tratar (msg) {
       if (!reconectou) {
         try { window.ponte.logSala(rotuloDaSala) } catch { /* sem ponte */ }
         iniciarDiagnostico()
+        iniciarSinal()
       }
       anotar(`sala "${rotuloDaSala}" codigo=${mascararCodigo(sessao.codigo)}: entrei como ${meuId.slice(0, 8)}` +
         `${msg.retomada ? ' (retomada)' : ''}, ${msg.participantes.length} ja estavam la` +

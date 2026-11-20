@@ -5,6 +5,7 @@
 ;(async () => {
   // Primeiro de tudo, para a tela nao nascer num tema e trocar para outro.
   aplicarTema(lembrar('liveon:tema'))
+  aplicarNomeNoCard()
 
   // Nome e qualidade voltam entre sessoes. O codigo da sala nao: e o segredo
   // dela, e sala nova ganha codigo novo.
@@ -28,6 +29,7 @@
     // A versao na cara: sem isso nao da para saber qual build esta rodando.
     $('#rotulo-versao').textContent = 'LiveOn ' + amb.versao
     $('#rotulo-versao').title = `Electron ${amb.electron} / Chrome ${amb.chrome}`
+    $('#config-versao').textContent = 'LiveOn ' + amb.versao
     anotar(`iniciando LiveOn ${amb.versao}`)
     if (!amb.loopbackNativo) {
       avisar('Electron ' + amb.electron + ': o áudio do sistema exige a versão 39 ou maior.')

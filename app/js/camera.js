@@ -236,7 +236,12 @@ function aplicarFormatoDaCamera () {
 }
 
 function alternarFormatoDaCamera () {
-  formatoDaCamera = formatoDaCamera === 'selo' ? 'canto' : 'selo'
+  definirFormatoDaCamera(formatoDaCamera === 'selo' ? 'canto' : 'selo')
+}
+
+// O clique na webcam alterna; as configuracoes escolhem direto.
+function definirFormatoDaCamera (formato) {
+  formatoDaCamera = formato === 'selo' ? 'selo' : 'canto'
   guardar('liveon:camera-formato', formatoDaCamera)
   aplicarFormatoDaCamera()
 }

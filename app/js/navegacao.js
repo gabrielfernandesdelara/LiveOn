@@ -25,7 +25,13 @@ function fecharDialogo () {
     fecharCamera()
     return true
   }
-  for (const id of ['#saida', '#seletor', '#config']) {
+  // As configuracoes fecham pelo fecharConfig(): ele desfaz a previa de um
+  // tema que estava sendo editado.
+  if (!$('#config').classList.contains('oculto')) {
+    fecharConfig()
+    return true
+  }
+  for (const id of ['#saida', '#seletor']) {
     if (!$(id).classList.contains('oculto')) {
       $(id).classList.add('oculto')
       return true
@@ -69,6 +75,7 @@ function voltarParaEntrada () {
   marcarConexao('ok', '')
 
   pararDiagnostico()
+  pararSinal()
   if (meuId) {
     anotar('sai da sala')
     try { window.ponte.logSaiu() } catch { /* sem ponte */ }

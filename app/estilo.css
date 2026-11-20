@@ -20,8 +20,13 @@
 /* ---------- cores ----------
 
    Os 15 primeiros são os neutros, e são só eles que o tema troca. O azul, o
-   vermelho de "no ar" e os derivados ficam iguais em qualquer tema. */
-:root {
+   vermelho de "no ar" e os derivados ficam iguais em qualquer tema.
+
+   Cada paleta vale também para a classe amostra-*: é ela que pinta a
+   miniatura de cada tema nas configurações com as cores dele, seja qual for
+   o tema em uso. */
+:root,
+.amostra-grafite {
   --fundo: #0e1013;
   --painel: #15181d;
   --painel-alto: #1d2128;
@@ -44,25 +49,30 @@
   --no-ar: #ff4d4f;
   --no-ar-hover: #e63e40;
   --mudo: #ff8a8b;
+  /* O ambar dos alertas: aviso de audio, sinal fraco. */
+  --alerta: #ffcf8b;
   --vidro: rgba(8, 10, 14, .72);
   --veu: rgba(0, 0, 0, .7);
 }
 
 /* Temas, na mesma ordem dos neutros acima. Ainda não há onde escolher: o
    tema.js aplica e guarda, falta só a opção na interface. */
-:root[data-tema="marinho"] {
+:root[data-tema="marinho"],
+.amostra-marinho {
   --fundo: #0b0f17; --painel: #111723; --painel-alto: #182030; --painel-hover: #1e2839;
   --borda: #222c3f; --borda-hover: #2d3a52; --avatar: #253049; --campo: #0a0e16;
   --apagado: #8a96ad; --texto: #e6ebf5; --fraco: #56627a; --texto-avatar: #c6d0e2;
   --listra-1: #111725; --listra-2: #0e1320; --anel-escuro: #080b12;
 }
-:root[data-tema="carvao"] {
+:root[data-tema="carvao"],
+.amostra-carvao {
   --fundo: #11100f; --painel: #191816; --painel-alto: #211f1d; --painel-hover: #292724;
   --borda: #2c2a27; --borda-hover: #3a3733; --avatar: #33302c; --campo: #0f0e0d;
   --apagado: #9a948b; --texto: #ece8e2; --fraco: #625d56; --texto-avatar: #d4cec5;
   --listra-1: #171513; --listra-2: #131210; --anel-escuro: #0c0b0a;
 }
-:root[data-tema="preto"] {
+:root[data-tema="preto"],
+.amostra-preto {
   --fundo: #050506; --painel: #0d0e10; --painel-alto: #16171a; --painel-hover: #1d1f23;
   --borda: #1f2125; --borda-hover: #2b2e33; --avatar: #24262b; --campo: #09090b;
   --apagado: #8e939c; --texto: #f0f1f3; --fraco: #585c64; --texto-avatar: #cdd0d6;
@@ -584,7 +594,17 @@ option:disabled { color: var(--fraco); }
   background: var(--vidro);
   backdrop-filter: blur(6px);
   pointer-events: none;
+  /* Escondido ate o mouse mexer em cima do card (classe mexendo, posta pelo
+     grade.js e tirada 2,5 s depois de o mouse parar). Com o sinal fraco aceso
+     (com-sinal) ele fica a vista: e um alerta, e esconder o alerta seria o
+     contrario do que ele existe para fazer. */
+  opacity: 0;
+  transition: opacity .14s;
 }
+.card.mexendo .selo,
+.card:focus-within .selo,
+.card.com-sinal .selo,
+#grade.selo-sempre .selo { opacity: 1; }
 .selo .avatar {
   width: 22px;
   height: 22px;
@@ -613,6 +633,22 @@ option:disabled { color: var(--fraco); }
 .selo .estado:empty { display: none; }
 .card:hover .selo .nome,
 .card:focus-within .selo .nome { max-width: 240px; opacity: 1; padding: 0 8px; }
+
+/* Sinal fraco (sinal.js): logo depois da inicial, só enquanto a conexão
+   atrapalha a imagem. Fraco apaga as duas barras de cima; muito fraco deixa
+   só a primeira. Âmbar, o mesmo dos alertas do seletor, e nunca vermelho:
+   vermelho é a luz de "no ar". O selo inteiro ignora o mouse; o ícone não,
+   para o title explicar o que ele quer dizer. */
+.selo .sinal {
+  display: flex;
+  margin: 0 3px 0 6px;
+  color: var(--alerta);
+  pointer-events: auto;
+}
+.selo .sinal .barra-3,
+.selo .sinal .barra-4,
+.selo .sinal.muito-fraco .barra-2 { stroke: var(--apagado); opacity: .45; }
+#miniaturas .selo .sinal svg { width: 15px; height: 15px; }
 
 /* Miniaturas: o mesmo selo, menor, e sem controles. Nelas o gesto é o duplo
    clique para destacar. */
@@ -656,7 +692,7 @@ option:disabled { color: var(--fraco); }
 .icone-card.mudo { color: var(--mudo); }
 
 @media (prefers-reduced-motion: reduce) {
-  .controles-flutuantes, .selo .nome, .cam, .bolha { transition: none; }
+  .controles-flutuantes, .selo, .selo .nome, .cam, .bolha { transition: none; }
 }
 
 /* ---------- webcam sobre a tela ----------
@@ -988,10 +1024,222 @@ option:disabled { color: var(--fraco); }
 }
 
 .nota-dialogo { margin: 16px 0 0; font-size: 12px; line-height: 1.5; color: var(--apagado); }
-.nota-dialogo.alerta { color: #ffcf8b; }
+.nota-dialogo.alerta { color: var(--alerta); }
 .campo-config { margin-top: 20px; }
 .acoes-dialogo { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .acoes-dialogo button { padding: 0 16px; }
+
+/* ---------- configurações ----------
+
+   Quase do tamanho da janela, com as abas numa lateral. Em janela muito
+   grande ela para de crescer: um painel de 1900px com meia dúzia de opções
+   ficaria vazio. */
+
+#config { padding: 32px; }
+.painel-config {
+  position: relative;
+  display: flex;
+  width: min(1100px, 100%);
+  height: min(760px, 100%);
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .5);
+  overflow: hidden;
+}
+
+.lateral-config {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 22px 14px 16px;
+  background: var(--fundo);
+  border-right: 1px solid var(--borda);
+}
+.lateral-config h2 { margin: 0 10px 16px; font-size: 16px; font-weight: 600; }
+.aba-config {
+  justify-content: flex-start;
+  height: 36px;
+  padding: 0 10px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--apagado);
+  font-weight: 600;
+}
+.aba-config:hover:not(:disabled) { background: var(--painel); border-color: transparent; color: var(--texto); }
+.aba-config.ativa,
+.aba-config.ativa:hover:not(:disabled) { background: var(--painel-alto); border-color: var(--borda); color: var(--texto); }
+.versao-config { margin: 0 10px; font-size: 11px; color: var(--fraco); }
+
+.conteudo-config {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 28px 40px 32px;
+}
+.fechar-config { position: absolute; top: 18px; right: 18px; }
+.secao-config { max-width: 660px; }
+.secao-config h3 { margin: 0; font-size: 20px; font-weight: 600; }
+.descricao-config { margin: 4px 0 22px; font-size: 13px; color: var(--apagado); }
+.secao-config .quem-dialogo { margin: 4px 0 22px; }
+.secao-config select { height: 36px; }
+.secao-config .campo { max-width: 380px; }
+.secao-config .nota-dialogo { margin-top: 10px; }
+#btn-reiniciar { margin-top: 14px; }
+
+.grupo-config { padding: 20px 0; border-top: 1px solid var(--borda); }
+.titulo-grupo { font-size: 13px; font-weight: 600; }
+.descricao-opcao { margin: 2px 0 0; font-size: 12px; color: var(--apagado); }
+.linha-opcao { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+
+/* As miniaturas de tema: um pedaço do app desenhado com as cores de cada um
+   (a classe amostra-* troca as variáveis só ali dentro). */
+.temas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.tema {
+  height: auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
+  background: var(--painel);
+  border: 1px solid var(--borda);
+}
+.tema:hover:not(:disabled) { background: var(--painel); border-color: var(--borda-hover); }
+.tema.ativo,
+.tema.ativo:hover:not(:disabled) { border-color: var(--realce); box-shadow: 0 0 0 1px var(--realce); }
+.previa-tema {
+  display: flex;
+  flex-direction: column;
+  height: 78px;
+  border: 1px solid var(--borda);
+  border-radius: 7px;
+  background: var(--fundo);
+  overflow: hidden;
+}
+.previa-barra { flex: 0 0 14px; background: var(--painel); border-bottom: 1px solid var(--borda); }
+.previa-cards { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 6px; }
+.previa-cards span { position: relative; border: 1px solid var(--borda); border-radius: 4px; background: var(--painel-alto); }
+.previa-cards span:first-child::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--no-ar);
+}
+.nome-tema {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--texto);
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+/* Seus temas. O lugar vazio é tracejado e chama para criar; o ocupado tem
+   editar e apagar no canto, que aparecem com o mouse. Ficam por cima do botão
+   do tema, e não dentro dele: botão dentro de botão não existe. */
+.tema-vazio,
+.tema-vazio:hover:not(:disabled) { border-style: dashed; background: transparent; }
+.tema-vazio .nome-tema { color: var(--apagado); }
+.tema-vazio:hover:not(:disabled) .nome-tema { color: var(--texto); }
+.previa-vazia {
+  display: grid;
+  place-items: center;
+  height: 78px;
+  border: 1px dashed var(--borda);
+  border-radius: 7px;
+  color: var(--apagado);
+}
+.tema-vazio:hover:not(:disabled) .previa-vazia { color: var(--texto); border-color: var(--borda-hover); }
+
+.lugar-tema { position: relative; display: flex; min-width: 0; }
+.lugar-tema .tema { flex: 1; min-width: 0; }
+.acoes-tema {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity .14s;
+}
+.lugar-tema:hover .acoes-tema,
+.lugar-tema:focus-within .acoes-tema,
+.acoes-tema:has(.confirmar) { opacity: 1; }
+.botao-mini {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: var(--vidro);
+  color: #fff;
+}
+.botao-mini:hover:not(:disabled) { background: rgba(0, 0, 0, .85); border-color: transparent; }
+.botao-mini.apagar.confirmar,
+.botao-mini.apagar.confirmar:hover:not(:disabled) { background: var(--no-ar); }
+
+/* Editor de tema. */
+.editor-topo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.cores-tema { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.cor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  background: var(--campo);
+  cursor: pointer;
+}
+.cor:hover { border-color: var(--borda-hover); }
+.cor input[type=color] {
+  width: 100%;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+}
+.cor input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.cor input[type=color]::-webkit-color-swatch { border: 1px solid rgba(255, 255, 255, .12); border-radius: 7px; }
+.nome-cor { font-size: 12px; font-weight: 600; color: var(--texto); }
+.hex-cor { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--apagado); }
+.acoes-editor { display: flex; justify-content: flex-end; gap: 8px; padding-top: 20px; border-top: 1px solid var(--borda); }
+.acoes-editor button { padding: 0 16px; }
+#aviso-contraste:empty { display: none; }
+
+/* Janela estreita: as abas sobem para uma faixa em cima. */
+@media (max-width: 720px) {
+  #config { padding: 16px; }
+  .painel-config { flex-direction: column; }
+  .lateral-config {
+    flex: 0 0 auto;
+    flex-direction: row;
+    align-items: center;
+    padding: 12px 56px 12px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--borda);
+  }
+  .lateral-config h2 { margin: 0 10px 0 4px; }
+  .versao-config { display: none; }
+  .conteudo-config { position: static; padding: 20px; }
+  .linha-opcao { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .editor-topo { grid-template-columns: minmax(0, 1fr); }
+  .cores-tema { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 
 /* ---------- seletor de fontes ---------- */
 
@@ -1080,7 +1328,7 @@ option:disabled { color: var(--fraco); }
 /* Do áudio só aparece o que é alerta: o resto é explicação que o rótulo da
    opção já dá. O alerta é o que evita mandar som errado. */
 .aviso-audio:not(.alerta) { display: none; }
-.aviso-audio.alerta { color: #ffcf8b; }
+.aviso-audio.alerta { color: var(--alerta); }
 .aviso-qualidade:empty { display: none; }
 
 /* "Forçar SDR". Alinha pela base com os selects ao lado, que têm 36px. */

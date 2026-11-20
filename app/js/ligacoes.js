@@ -171,6 +171,16 @@ $('#ajustes').onclick = (evento) => {
 
 // Configurações da tela de entrada.
 $('#btn-config').onclick = abrirConfig
+$('#btn-config-sala').onclick = abrirConfig
+for (const aba of document.querySelectorAll('.aba-config')) aba.onclick = () => mostrarAbaConfig(aba.dataset.aba)
+for (const tema of document.querySelectorAll('.tema')) tema.onclick = () => escolherTema(tema.dataset.tema)
+for (const botao of document.querySelectorAll('#opcao-camera button')) botao.onclick = () => escolherFormatoDaCamera(botao.dataset.valor)
+for (const botao of document.querySelectorAll('#opcao-selo button')) botao.onclick = () => definirNomeNoCard(botao.dataset.valor)
+for (const campo of document.querySelectorAll('.cores-tema input')) campo.oninput = () => mudarCorDoEditor(campo)
+$('#campo-base-tema').onchange = mudarBaseDoTema
+$('#btn-salvar-tema').onclick = salvarTema
+$('#btn-cancelar-tema').onclick = () => mostrarAbaConfig('aparencia')
+$('#campo-nome-tema').onkeydown = (evento) => { if (evento.key === 'Enter') salvarTema() }
 $('#btn-fechar-config').onclick = fecharConfig
 $('#campo-video').onchange = trocarVideo
 $('#campo-prioridade').onchange = trocarPrioridade

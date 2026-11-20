@@ -96,6 +96,10 @@ const PROPORCAO = 16 / 9
 
 const FOLGA = 14
 
+// Quanto tempo o selo (a inicial com o ponto de "no ar") continua a vista
+// depois que o mouse para em cima do card.
+const SELO_PARADO = 2500
+
 const focados = new Set()
 
 function definirLargura (card, largura) {
@@ -404,6 +408,21 @@ function criarCard (id, nome, souEu) {
   // Focar e so por duplo clique: o botao proprio saiu, era mais um item
   // disputando espaco na sobreposicao.
   palco.addEventListener('dblclick', () => alternarFoco(id))
+
+  // O selo so aparece com o mouse mexendo em cima do card, como os controles
+  // de um player de video: parado ali por SELO_PARADO, ele some de novo, e
+  // qualquer movimento traz de volta. Pedido do dono, para a inicial nao
+  // ficar em cima da tela de ninguem o tempo todo.
+  let parado = null
+  palco.addEventListener('mousemove', () => {
+    card.classList.add('mexendo')
+    clearTimeout(parado)
+    parado = setTimeout(() => card.classList.remove('mexendo'), SELO_PARADO)
+  })
+  palco.addEventListener('mouseleave', () => {
+    clearTimeout(parado)
+    card.classList.remove('mexendo')
+  })
 
   card.appendChild(palco)
   return card

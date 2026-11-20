@@ -12,7 +12,7 @@
 <!-- ---------------- tela de entrada ---------------- -->
 <section id="entrada">
   <div class="cartao-entrada">
-    <button id="btn-config" class="botao-icone" title="Configurações"><span data-icone="ajustes" data-tamanho="16"></span></button>
+    <button id="btn-config" class="botao-icone" title="Configurações"><span data-icone="engrenagem" data-tamanho="16"></span></button>
     <div class="marca marca-grande">
       <span class="marca-icone"><span data-icone="marca" data-tamanho="25"></span></span>
       <span class="marca-nome">LiveOn</span>
@@ -88,6 +88,7 @@
     <button id="btn-ajustar" disabled title="Disponível durante a transmissão"><span data-icone="ajustes"></span>Ajustar</button>
     <button id="btn-transmitir" class="principal"><span data-icone="transmitir" data-traco="2"></span>Transmitir tela</button>
     <button id="btn-parar" class="perigo oculto"><span class="quadrado-parar"></span>Parar transmissão</button>
+    <button id="btn-config-sala" class="botao-icone" title="Configurações"><span data-icone="engrenagem" data-tamanho="16"></span></button>
     <button id="btn-sair" class="botao-icone" title="Sair da sala"><span data-icone="sair" data-tamanho="16"></span></button>
   </header>
   <div class="corpo">
@@ -236,39 +237,136 @@
   </div>
 </div>
 
-<!-- ---------------- configuracoes, antes de entrar ---------------- -->
+<!-- ---------------- configuracoes ----------------
+     Abre pela engrenagem da tela de entrada e pela da barra da sala. Quase do
+     tamanho da janela, com abas na lateral: Aparencia (gosto de cada um, vale
+     na hora) e Desempenho (o tecnico, com os avisos de risco). -->
 <div id="config" class="dialogo oculto">
-  <div class="painel-dialogo">
-    <h2>Configurações</h2>
-    <p id="config-placa" class="quem-dialogo"></p>
+  <div class="painel-config" role="dialog" aria-labelledby="titulo-config">
+    <nav class="lateral-config">
+      <h2 id="titulo-config">Configurações</h2>
+      <button class="aba-config ativa" data-aba="aparencia"><span data-icone="pincel"></span>Aparência</button>
+      <button class="aba-config" data-aba="desempenho"><span data-icone="desempenho"></span>Desempenho</button>
+      <span class="cresce"></span>
+      <span id="config-versao" class="versao-config"></span>
+    </nav>
 
-    <div class="campo">
-      <label for="campo-video">Processar as telas com</label>
-      <span class="caixa-select">
-        <select id="campo-video">
-          <option value="gpu">Placa de vídeo (GPU)</option>
-          <option value="cpu">Processador (CPU)</option>
-        </select>
-      </span>
-    </div>
+    <div class="conteudo-config">
+      <button id="btn-fechar-config" class="botao-icone fechar-config" title="Fechar (Esc)"><span data-icone="fechar" data-tamanho="16"></span></button>
 
-    <p id="config-nota" class="nota-dialogo"></p>
+      <section class="secao-config" data-secao="aparencia">
+        <h3>Aparência</h3>
+        <p class="descricao-config">Muda só o que você vê. Cada amigo escolhe o dele.</p>
 
-    <div class="campo campo-config">
-      <label for="campo-prioridade">Prioridade do LiveOn</label>
-      <span class="caixa-select">
-        <select id="campo-prioridade">
-          <option value="normal">Normal</option>
-          <option value="alta">Alta</option>
-        </select>
-      </span>
-    </div>
+        <div class="grupo-config">
+          <div class="titulo-grupo">Temas prontos</div>
+          <!-- Cada amostra recebe as cores do proprio tema pela classe
+               amostra-*, definida junto das paletas no estilo.css. -->
+          <div class="temas">
+            <button class="tema amostra-grafite" data-tema="grafite"><span class="previa-tema"><span class="previa-barra"></span><span class="previa-cards"><span></span><span></span></span></span><span class="nome-tema">Grafite</span></button>
+            <button class="tema amostra-marinho" data-tema="marinho"><span class="previa-tema"><span class="previa-barra"></span><span class="previa-cards"><span></span><span></span></span></span><span class="nome-tema">Marinho</span></button>
+            <button class="tema amostra-carvao" data-tema="carvao"><span class="previa-tema"><span class="previa-barra"></span><span class="previa-cards"><span></span><span></span></span></span><span class="nome-tema">Carvão</span></button>
+            <button class="tema amostra-preto" data-tema="preto"><span class="previa-tema"><span class="previa-barra"></span><span class="previa-cards"><span></span><span></span></span></span><span class="nome-tema">Preto</span></button>
+          </div>
+        </div>
 
-    <p id="config-nota-prioridade" class="nota-dialogo"></p>
+        <div class="grupo-config">
+          <div class="titulo-grupo">Seus temas</div>
+          <!-- Quatro lugares, montados por desenharTemasPessoais(), em
+               preferencias.js: vazio vira "Criar tema", ocupado vira a
+               miniatura com editar e apagar. -->
+          <div id="temas-pessoais" class="temas"></div>
+        </div>
 
-    <div class="acoes-dialogo">
-      <button id="btn-fechar-config">Fechar</button>
-      <button id="btn-reiniciar" class="principal oculto">Reiniciar agora</button>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Webcam dos amigos</div>
+            <p class="descricao-opcao">Por cima da tela de quem também transmite.</p>
+          </div>
+          <div id="opcao-camera" class="segmentos segmentos-abas">
+            <button data-valor="canto">No canto</button>
+            <button data-valor="selo">Redonda</button>
+          </div>
+        </div>
+
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Inicial do nome no card</div>
+            <p class="descricao-opcao">Com o mouse, ela some quando ele para.</p>
+          </div>
+          <div id="opcao-selo" class="segmentos segmentos-abas">
+            <button data-valor="mouse">Com o mouse</button>
+            <button data-valor="sempre">Sempre</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Editor de tema: so as cinco cores, o resto e calculado
+           (derivarPaleta, em tema.js). O app inteiro muda enquanto a pessoa
+           escolhe; Cancelar volta ao tema de antes. -->
+      <section class="secao-config oculto" data-secao="editor">
+        <h3 id="titulo-editor">Novo tema</h3>
+        <p class="descricao-config">O LiveOn muda enquanto você escolhe.</p>
+
+        <div class="grupo-config editor-topo">
+          <div class="campo">
+            <label for="campo-nome-tema">Nome</label>
+            <input id="campo-nome-tema" type="text" maxlength="24" placeholder="ex.: Roxo">
+          </div>
+          <div id="bloco-base-tema" class="campo">
+            <label for="campo-base-tema">Começar de</label>
+            <span class="caixa-select"><select id="campo-base-tema"></select></span>
+          </div>
+        </div>
+
+        <div class="grupo-config">
+          <div class="cores-tema">
+            <label class="cor"><input type="color" data-cor="fundo"><span class="nome-cor">Fundo</span><span class="hex-cor"></span></label>
+            <label class="cor"><input type="color" data-cor="painel"><span class="nome-cor">Painéis</span><span class="hex-cor"></span></label>
+            <label class="cor"><input type="color" data-cor="borda"><span class="nome-cor">Bordas</span><span class="hex-cor"></span></label>
+            <label class="cor"><input type="color" data-cor="texto"><span class="nome-cor">Texto</span><span class="hex-cor"></span></label>
+            <label class="cor"><input type="color" data-cor="destaque"><span class="nome-cor">Destaque</span><span class="hex-cor"></span></label>
+          </div>
+          <p id="aviso-contraste" class="nota-dialogo alerta"></p>
+        </div>
+
+        <div class="acoes-editor">
+          <button id="btn-cancelar-tema">Cancelar</button>
+          <button id="btn-salvar-tema" class="principal">Salvar tema</button>
+        </div>
+      </section>
+
+      <section class="secao-config oculto" data-secao="desempenho">
+        <h3>Desempenho</h3>
+        <p id="config-placa" class="quem-dialogo"></p>
+
+        <div class="grupo-config">
+          <div class="campo">
+            <label for="campo-video">Processar as telas com</label>
+            <span class="caixa-select">
+              <select id="campo-video">
+                <option value="gpu">Placa de vídeo (GPU)</option>
+                <option value="cpu">Processador (CPU)</option>
+              </select>
+            </span>
+          </div>
+          <p id="config-nota" class="nota-dialogo"></p>
+          <button id="btn-reiniciar" class="principal oculto">Reiniciar agora</button>
+        </div>
+
+        <div class="grupo-config">
+          <div class="campo">
+            <label for="campo-prioridade">Prioridade do LiveOn</label>
+            <span class="caixa-select">
+              <select id="campo-prioridade">
+                <option value="normal">Normal</option>
+                <option value="alta">Alta</option>
+              </select>
+            </span>
+          </div>
+          <p id="config-nota-prioridade" class="nota-dialogo"></p>
+        </div>
+      </section>
     </div>
   </div>
 </div>
@@ -333,6 +431,7 @@
 <script src="js/pessoas.js"></script>
 <script src="js/navegacao.js"></script>
 <script src="js/diagnostico.js"></script>
+<script src="js/sinal.js"></script>
 <script src="js/preferencias.js"></script>
 <script src="js/ligacoes.js"></script>
 <script src="js/partida.js"></script>
