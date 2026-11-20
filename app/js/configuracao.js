@@ -6,9 +6,18 @@
 // STUN publico resolve a maioria dos casos. O TURN NAO e opcional: sem ele,
 // pares atras de NAT simetrico simplesmente nao conectam, e o sintoma parece
 // bug de codigo. Preencher quando houver um servidor TURN.
+//
+// O STUN da Cloudflare fica junto do Google de proposito: o do Google atende
+// numa porta incomum (19302), que roteador com "protecao contra conexao
+// desconhecida" pode barrar, e sem STUN o PC nao descobre o proprio endereco
+// publico e quase nenhum par consegue se achar. A 3478 e a porta padrao do
+// STUN. E gratis e sem limite. Entrou na 1.5.8 por dois primos que so viam a
+// tela de quem tinha roteador aberto, e que conseguiam assistir se entrassem
+// por outro wifi e voltassem para o deles depois (20/11/2026).
 const ICE = {
   iceServers: [
-    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+    { urls: 'stun:stun.cloudflare.com:3478' }
     // { urls: 'turn:SEU-SERVIDOR:3478', username: 'usuario', credential: 'senha' }
   ],
   bundlePolicy: 'max-bundle'
