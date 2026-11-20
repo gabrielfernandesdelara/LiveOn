@@ -216,8 +216,6 @@ $('#campo-fps').onchange = () => {
 
 $('#campo-audio-modo').onchange = atualizarOpcoesDeAudio
 
-$('#campo-sdr').onchange = () => guardar('liveon:forcar-sdr', $('#campo-sdr').checked ? '1' : '0')
-
 $('#campo-audio-app').onchange = atualizarOpcoesDeAudio
 
 $('#btn-confirmar-fonte').onclick = async () => {
@@ -244,7 +242,6 @@ for (const aba of document.querySelectorAll('.aba')) {
     }
     desenharFontes()
     atualizarOpcoesDeAudio()
-    mostrarOpcaoSdr()
   }
 }
 

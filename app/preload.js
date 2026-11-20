@@ -1,37 +1,7 @@
 // Ponte entre a UI e o processo principal. contextIsolation continua ligado:
 // o renderer não enxerga ipcRenderer, só estas três funções.
 
-const { contextBridge, ipcRenderer, sharedTexture } = require('electron')
-
-// Quadros do "Forçar SDR". O processo principal manda cada quadro como textura
-// de placa de vídeo, e aqui ele vira um VideoFrame para a página. O receptor
-// fica registrado desde o começo: o envio desiste em 1 s se não houver quem
-// receba. Sem ninguém pedindo, o quadro é fechado na hora.
-//
-// A página COPIA o quadro na hora (ver capturarSdr, em transmissao.js) e o
-// fecha antes de voltar daqui, e só então a textura é liberada. Nada mais na
-// página toca a textura importada. Medido em 19/11/2026: deixar o VideoFrame
-// da textura ir direto para o <video> da prévia derrubava a página (liberando
-// cedo) ou travava a placa de vídeo ao parar (liberando tarde), porque o
-// <video> segura o último quadro por um tempo que daqui não dá para saber.
-let receberQuadroSdr = null
-
-if (sharedTexture && sharedTexture.setSharedTextureReceiver) {
-  sharedTexture.setSharedTextureReceiver(async ({ importedSharedTexture }) => {
-    try {
-      const quadro = importedSharedTexture.getVideoFrame()
-      if (receberQuadroSdr) {
-        try { receberQuadroSdr(quadro) } finally { quadro.close() }
-      } else {
-        quadro.close()
-      }
-    } catch { /* quadro perdido: vem outro */ } finally {
-      importedSharedTexture.release()
-    }
-  })
-}
-
-let ouvinteFimSdr = null
+const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('ponte', {
   // Miniaturas de monitores e janelas para a grade do seletor.
@@ -92,19 +62,5 @@ contextBridge.exposeInMainWorld('ponte', {
   gravarConfig: (config) => ipcRenderer.invoke('config:gravar', config),
   reiniciar: () => ipcRenderer.invoke('app:reiniciar'),
 
-  ambiente: () => ipcRenderer.invoke('ambiente'),
-
-  // --- forçar SDR (captura HDR convertida, addon nativo) ---
-  sdrDisponivel: () => ipcRenderer.invoke('sdr:disponivel'),
-  sdrIniciar: (opcoes) => ipcRenderer.invoke('sdr:iniciar', opcoes),
-  sdrParar: () => ipcRenderer.invoke('sdr:parar'),
-  // null desliga: os quadros que ainda chegarem são fechados aqui.
-  // O callback recebe o quadro emprestado: tem que usar na hora, sem guardar.
-  aoQuadroSdr: (callback) => { receberQuadroSdr = typeof callback === 'function' ? callback : null },
-  // A captura parou sozinha (o Windows interrompeu, a resolução mudou).
-  aoFimSdr: (callback) => {
-    if (ouvinteFimSdr) ipcRenderer.removeListener('sdr:fim', ouvinteFimSdr)
-    ouvinteFimSdr = (_evento, motivo) => callback(motivo)
-    ipcRenderer.on('sdr:fim', ouvinteFimSdr)
-  }
+  ambiente: () => ipcRenderer.invoke('ambiente')
 })

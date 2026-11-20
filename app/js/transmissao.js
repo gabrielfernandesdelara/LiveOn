@@ -26,124 +26,8 @@ async function ajustarDimensoes (video) {
   }
 }
 
-// --- forçar SDR ---------------------------------------------------------------
-//
-// Com a opção marcada, a imagem da tela não vem do getDisplayMedia: vem do
-// addon, que captura o monitor em HDR e converte para SDR na placa de vídeo
-// (ver o "forçar SDR" do main.js). Cada quadro chega pela ponte como
-// VideoFrame e é escrito num MediaStreamTrackGenerator, que para o resto do
-// app é uma trilha de vídeo como qualquer outra.
-
-// Se a imagem no ar agora é a convertida.
-let sdrAtual = false
-
-// Sem nenhum quadro nesse tempo, a conversão não está funcionando nesta
-// máquina (por exemplo, o monitor ligado numa placa e o Chromium em outra).
-const ESPERA_PRIMEIRO_QUADRO_SDR = 3000
-
-async function capturarSdr (fonteId, qualidade) {
-  const gerador = new MediaStreamTrackGenerator({ kind: 'video' })
-  const escritor = gerador.writable.getWriter()
-  let escrevendo = false
-  let avisarPrimeiro = null
-  const primeiro = new Promise((resolver) => { avisarPrimeiro = resolver })
-
-  // O quadro chega EMPRESTADO: ele aponta para uma textura do addon, que a
-  // ponte libera assim que esta funcao volta. Por isso ele e copiado na hora
-  // para um canvas nosso (copia de placa de video, barata), e e a copia que
-  // segue para a previa e para os amigos. Sem a copia, o <video> da previa
-  // segurava o quadro alem da vida da textura: medido em 19/11/2026, a pagina
-  // caia ou a placa de video travava ao parar.
-  let tela = null
-  let desenho = null
-  window.ponte.aoQuadroSdr((quadro) => {
-    // Codificador atrasado: descarta em vez de acumular atraso.
-    if (escrevendo || gerador.readyState === 'ended') return
-    const largura = quadro.displayWidth
-    const altura = quadro.displayHeight
-    if (!tela || tela.width !== largura || tela.height !== altura) {
-      tela = new OffscreenCanvas(largura, altura)
-      desenho = tela.getContext('2d', { alpha: false })
-    }
-    desenho.drawImage(quadro, 0, 0)
-    const copia = new VideoFrame(tela, { timestamp: quadro.timestamp })
-    escrevendo = true
-    avisarPrimeiro(true)
-    escritor.write(copia)
-      .catch(() => copia.close())
-      .finally(() => { escrevendo = false })
-  })
-
-  const desistir = (motivo) => {
-    window.ponte.aoQuadroSdr(null)
-    gerador.stop()
-    if (motivo) {
-      anotar(`Forcar SDR nao funcionou: ${motivo}`)
-      avisar(`Forçar SDR não funcionou (${motivo}). Transmitindo do jeito normal.`)
-    }
-    return null
-  }
-
-  let resposta
-  try {
-    resposta = await window.ponte.sdrIniciar({
-      fonteId,
-      largura: qualidade.largura,
-      altura: qualidade.altura,
-      fps: qualidade.fps
-    })
-  } catch (erro) {
-    resposta = { ok: false, motivo: erro.message }
-  }
-
-  if (!resposta || !resposta.ok) {
-    // Monitor sem HDR: a captura de sempre já sai certa, nada a avisar.
-    if (resposta && resposta.semHdr) {
-      anotar('Forcar SDR: esse monitor nao esta em HDR, captura normal')
-      return desistir()
-    }
-    return desistir((resposta && resposta.motivo) || 'erro desconhecido')
-  }
-
-  const veio = await Promise.race([
-    primeiro,
-    new Promise((resolver) => setTimeout(() => resolver(false), ESPERA_PRIMEIRO_QUADRO_SDR))
-  ])
-  if (!veio) {
-    window.ponte.sdrParar()
-    return desistir('a imagem convertida não chegou')
-  }
-
-  gerador.contentHint = 'motion'
-  anotar(`Forcar SDR: ${resposta.monitor} em HDR, convertendo para ${resposta.largura}x${resposta.altura}`)
-  return gerador
-}
-
-function pararSdr () {
-  if (!sdrAtual) return
-  sdrAtual = false
-  try {
-    window.ponte.sdrParar()
-    window.ponte.aoQuadroSdr(null)
-  } catch { /* sem ponte */ }
-}
-
-// A captura convertida parou sozinha (o Windows interrompeu, a resolução do
-// monitor mudou): a transmissão segue, pela captura de sempre.
-try {
-  window.ponte.aoFimSdr((motivo) => {
-    if (!sdrAtual || !streamLocal) return
-    anotar(`Forcar SDR parou: ${motivo}`)
-    // Janela fechada: é o mesmo que o 'ended' da captura de sempre, a
-    // transmissão acaba. Não há para onde voltar.
-    if (/janela foi fechada/.test(motivo)) return pararTransmissao()
-    avisar('A conversão do HDR parou. Voltando para a captura normal.')
-    ajustarTransmissao(fonteAtual, audioAtual, { semSdr: true })
-  })
-} catch { /* sem ponte */ }
-
 // Captura video e audio conforme o que o seletor escolheu, e devolve o stream
-// pronto para entrar na malha, e se a imagem e a convertida (sdr).
+// pronto para entrar na malha.
 //
 // Esta parte e comum a COMECAR e a AJUSTAR uma transmissao. Estava dentro do
 // iniciarTransmissao; saiu para ca porque duplicar o preparo seria garantia de
@@ -151,66 +35,31 @@ try {
 // o contentHint, o 'ended' da barra do sistema).
 //
 // Estoura em vez de avisar: quem chamou decide o que dizer ao usuario.
-async function capturarFonte (fonteId, configAudio, qualidade, sdr) {
+async function capturarFonte (fonteId, configAudio, qualidade) {
   // So o modo "tudo" usa o loopback do Chromium. Os outros pegam o audio pelo
   // addon nativo, ou nao pegam audio nenhum.
   const usaLoopback = configAudio.modo === 'tudo'
 
-  // Enquanto a captura convertida roda, o Windows tira aquele monitor da lista
-  // do Chromium (medido em 19/11/2026), e qualquer getDisplayMedia nele falha.
-  // Ela para ANTES de qualquer captura nova: custa um instante de imagem
-  // parada para quem assiste, so no ajuste.
-  if (sdrAtual) {
-    try { await window.ponte.sdrParar() } catch { /* sem ponte */ }
-  }
+  // Ordem importa: o processo principal precisa saber qual fonte foi escolhida
+  // ANTES do getDisplayMedia, porque e o handler de la que responde ao pedido.
+  await window.ponte.escolherFonte(fonteId, usaLoopback)
 
-  let video = null
-  let audioDoLoopback = []
-  const querConvertida = sdr && /^(screen|window):/.test(String(fonteId))
+  const stream = await navigator.mediaDevices.getDisplayMedia({
+    video: {
+      width: { ideal: qualidade.largura },
+      height: { ideal: qualidade.altura },
+      frameRate: { ideal: qualidade.fps, max: qualidade.fps }
+    },
+    // Precisa pedir audio aqui, senao o 'loopback' do main.js nao e entregue.
+    audio: usaLoopback
+  })
 
-  // O som do sistema so vem pelo getDisplayMedia, e por isso ANTES da captura
-  // convertida comecar. A imagem que vem junto e descartada.
-  if (querConvertida && usaLoopback) {
-    await window.ponte.escolherFonte(fonteId, true)
-    const soSom = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
-    for (const trilha of soSom.getVideoTracks()) trilha.stop()
-    audioDoLoopback = soSom.getAudioTracks()
-  }
+  const video = stream.getVideoTracks()[0]
+  video.contentHint = 'motion'
+  // Parar pela barra nativa do sistema, ou fechar a janela capturada.
+  video.addEventListener('ended', pararTransmissao)
 
-  if (querConvertida) video = await capturarSdr(fonteId, qualidade)
-  const convertida = Boolean(video)
-
-  // Nao deu (monitor sem HDR, ou falhou) e o som ja veio: a captura de sempre
-  // pede o som de novo, entao o primeiro sai.
-  if (!convertida && audioDoLoopback.length) {
-    for (const trilha of audioDoLoopback) trilha.stop()
-    audioDoLoopback = []
-  }
-
-  if (!convertida) {
-    // Ordem importa: o processo principal precisa saber qual fonte foi
-    // escolhida ANTES do getDisplayMedia, porque e o handler de la que
-    // responde ao pedido.
-    await window.ponte.escolherFonte(fonteId, usaLoopback)
-
-    const stream = await navigator.mediaDevices.getDisplayMedia({
-      video: {
-        width: { ideal: qualidade.largura },
-        height: { ideal: qualidade.altura },
-        frameRate: { ideal: qualidade.fps, max: qualidade.fps }
-      },
-      // Precisa pedir audio aqui, senao o 'loopback' do main.js nao e entregue.
-      audio: usaLoopback
-    })
-
-    video = stream.getVideoTracks()[0]
-    video.contentHint = 'motion'
-    // Parar pela barra nativa do sistema, ou fechar a janela capturada.
-    video.addEventListener('ended', pararTransmissao)
-
-    await ajustarDimensoes(video)
-    audioDoLoopback = stream.getAudioTracks()
-  }
+  await ajustarDimensoes(video)
 
   // Fecha a captura nativa anterior ANTES de abrir outra. No comeco isto e
   // inofensivo, nao ha nada aberto; no ajuste e obrigatorio, senao a escuta
@@ -220,10 +69,11 @@ async function capturarFonte (fonteId, configAudio, qualidade, sdr) {
   const trilhas = [video]
 
   if (usaLoopback) {
-    if (audioDoLoopback.length === 0) {
+    const audio = stream.getAudioTracks()
+    if (audio.length === 0) {
       avisar('A fonte veio sem áudio.')
     }
-    trilhas.push(...audioDoLoopback)
+    trilhas.push(...audio)
   } else if (configAudio.modo !== 'nenhum') {
     // Sem audio o video continua valendo, entao aqui a falha so avisa.
     try {
@@ -234,22 +84,19 @@ async function capturarFonte (fonteId, configAudio, qualidade, sdr) {
     }
   }
 
-  return { stream: new MediaStream(trilhas), sdr: convertida }
+  return new MediaStream(trilhas)
 }
 
 async function iniciarTransmissao (fonteId, configAudio) {
   const qualidade = configuracaoDeVideo()
   qualidadeLocal = { altura: qualidade.altura, fps: qualidade.fps }
 
-  let captura
   try {
-    captura = await capturarFonte(fonteId, configAudio, qualidade, querSdr())
+    streamLocal = await capturarFonte(fonteId, configAudio, qualidade)
   } catch (erro) {
     return avisar('Não consegui capturar essa fonte: ' + erro.message)
   }
 
-  streamLocal = captura.stream
-  sdrAtual = captura.sdr
   fonteAtual = fonteId
   audioAtual = configAudio
 
@@ -275,21 +122,16 @@ async function iniciarTransmissao (fonteId, configAudio) {
 //   replaceTrack troca a trilha POR DENTRO do remetente que ja existe, entao
 //   tambem nao renegocia. addTrack, que e o que o comeco usa, criaria um
 //   remetente novo e obrigaria uma rodada de SDP.
-//
-// Com o "Forçar SDR" no ar, ou ligando/desligando ele, e sempre captura nova:
-// a imagem convertida sai do addon ja no tamanho e no fps pedidos, e mudar
-// isso e recomecar a captura de la.
-async function ajustarTransmissao (fonteId, configAudio, opcoes = {}) {
+async function ajustarTransmissao (fonteId, configAudio) {
   if (!streamLocal) return
 
   const qualidade = configuracaoDeVideo()
   const mesmaFonte = fonteId === fonteAtual
   const mesmoAudio = JSON.stringify(configAudio) === JSON.stringify(audioAtual)
-  const sdr = opcoes.semSdr ? false : querSdr()
 
   qualidadeLocal = { altura: qualidade.altura, fps: qualidade.fps }
 
-  const video = mesmaFonte && mesmoAudio && !sdr && !sdrAtual ? streamLocal.getVideoTracks()[0] : null
+  const video = mesmaFonte && mesmoAudio ? streamLocal.getVideoTracks()[0] : null
 
   if (video) {
     try {
@@ -312,16 +154,14 @@ async function ajustarTransmissao (fonteId, configAudio, opcoes = {}) {
   }
 
   const antigo = streamLocal
-  const eraSdr = sdrAtual
-  let captura
+  let novo
   try {
-    captura = await capturarFonte(fonteId, configAudio, qualidade, sdr)
+    novo = await capturarFonte(fonteId, configAudio, qualidade)
   } catch (erro) {
     return avisar('Não consegui capturar essa fonte: ' + erro.message)
   }
 
-  streamLocal = captura.stream
-  sdrAtual = captura.sdr
+  streamLocal = novo
   fonteAtual = fonteId
   audioAtual = configAudio
 
@@ -330,14 +170,6 @@ async function ajustarTransmissao (fonteId, configAudio, opcoes = {}) {
   // Para as trilhas velhas SO depois da troca: parar antes deixaria um vao sem
   // imagem no meio do caminho.
   for (const trilha of antigo.getTracks()) trilha.stop()
-
-  // Saiu da imagem convertida: a captura do addon para junto.
-  if (eraSdr && !sdrAtual) {
-    try {
-      window.ponte.sdrParar()
-      window.ponte.aoQuadroSdr(null)
-    } catch { /* sem ponte */ }
-  }
 
   reaplicarQualidade()
   anotar(`fonte trocada no ar: ${qualidade.altura}p @ ${qualidade.fps}fps`)
@@ -399,9 +231,6 @@ function pararTransmissao () {
 
   for (const trilha of streamLocal.getTracks()) trilha.stop()
   streamLocal = null
-
-  // A captura convertida do addon, se era ela.
-  pararSdr()
 
   // Fecha a captura nativa, se estava em uso.
   pararTrilhaDeProcesso()
