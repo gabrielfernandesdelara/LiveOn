@@ -1,7 +1,7 @@
 // Processo principal: janela, seletor de fontes por IPC e o handler de
 // getDisplayMedia, que é onde o áudio do sistema entra (audio: 'loopback').
 
-const { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, powerMonitor, session, shell } = require('electron')
+const { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, powerMonitor, screen, session, shell } = require('electron')
 const path = require('node:path')
 const os = require('node:os')
 const fs = require('node:fs')
@@ -741,6 +741,45 @@ ipcMain.handle('audio:sessoes', apenasDoApp(() => capturaProcesso.listarSessoes(
 // Descobre o processo dono da janela escolhida, para capturar só o áudio dela.
 ipcMain.handle('audio:pidDaFonte', apenasDoApp((_evento, idDaFonte) =>
   capturaProcesso.pidDaFonte(idDaFonte)))
+
+// --- janela pelo recorte da tela ----------------------------------------------
+//
+// Reserva da captura de janela. No Windows 10 de um amigo o Chromium recusava
+// TODA janela em 8 ms ("Could not start video source", 20/11/2026) e capturava
+// tela normalmente. Aqui sai onde a janela está e qual fonte de TELA do
+// Chromium é o monitor dela; a página captura essa tela e recorta.
+//
+// O monitor do Windows e o display do Electron são casados pelo canto, em
+// pixels reais: o addon devolve o monitor em pixels reais, e o
+// dipToScreenRect leva o display do Electron para a mesma régua.
+let telaDoMonitor = new Map()   // "x,y" do monitor -> id da fonte de tela
+
+ipcMain.handle('janela:recorte', apenasDoApp(async (_evento, idDaFonte) => {
+  const j = capturaProcesso.janelaNaTela(idDaFonte)
+  if (!j) return null
+  if (!j.monitor) return { ...j, telaId: null }
+
+  const chave = `${j.monitor.x},${j.monitor.y}`
+  if (!telaDoMonitor.has(chave)) {
+    const display = screen.getAllDisplays().find((d) => {
+      const real = screen.dipToScreenRect(null, d.bounds)
+      return real.x === j.monitor.x && real.y === j.monitor.y
+    })
+    if (!display) return { ...j, telaId: null }
+    const telas = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } })
+    const tela = telas.find((t) => String(t.display_id) === String(display.id))
+    if (!tela) return { ...j, telaId: null }
+    telaDoMonitor.set(chave, tela.id)
+  }
+  return { ...j, telaId: telaDoMonitor.get(chave) }
+}))
+
+// Monitor ligado, desligado ou trocado de lugar: o casamento é refeito.
+app.whenReady().then(() => {
+  for (const evento of ['display-added', 'display-removed', 'display-metrics-changed']) {
+    screen.on(evento, () => { telaDoMonitor = new Map() })
+  }
+})
 
 ipcMain.handle('audio:iniciar', apenasDoApp((evento, { pid, modo }) => {
   pararCaptura()

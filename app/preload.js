@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('ponte', {
   audioDisponivel: () => ipcRenderer.invoke('audio:disponivel'),
   audioSessoes: () => ipcRenderer.invoke('audio:sessoes'),
   audioPidDaFonte: (idDaFonte) => ipcRenderer.invoke('audio:pidDaFonte', idDaFonte),
+  // Onde a janela esta e qual tela a contem: reserva da captura de janela.
+  recorteDaJanela: (idDaFonte) => ipcRenderer.invoke('janela:recorte', idDaFonte),
   audioIniciar: (pid, modo) => ipcRenderer.invoke('audio:iniciar', { pid, modo }),
   audioParar: () => ipcRenderer.invoke('audio:parar'),
 

@@ -21,6 +21,7 @@
 #include <functiondiscoverykeys_devpkey.h>
 #include <avrt.h>
 #include <tlhelp32.h>
+#include <dwmapi.h>
 #include <wrl/implements.h>
 
 #include <atomic>
@@ -620,6 +621,55 @@ Napi::Value PidDaJanela(const Napi::CallbackInfo& info) {
   return Napi::Number::New(env, pid);
 }
 
+// Onde a janela está na tela, em pixels reais, e o monitor em que ela está.
+// É a reserva da captura de janela: no Windows 10 de um amigo o Chromium
+// recusava toda janela ("Could not start video source", 20/11/2026) e
+// capturava tela normalmente, então o app captura o monitor e recorta este
+// retângulo. Devolve null se a janela não existe mais.
+//
+// A borda vem do DWM (sem a sombra invisível que o GetWindowRect inclui no
+// Windows 10 e 11). A thread fica "per monitor v2" só durante a chamada, para
+// o retângulo do monitor também sair em pixels reais.
+Napi::Value JanelaNaTela(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "esperava o HWND como numero").ThrowAsJavaScriptException();
+    return env.Null();
+  }
+  HWND janela = reinterpret_cast<HWND>(static_cast<intptr_t>(info[0].As<Napi::Number>().Int64Value()));
+  if (!IsWindow(janela)) return env.Null();
+
+  DPI_AWARENESS_CONTEXT antes = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
+  RECT r = {};
+  if (FAILED(DwmGetWindowAttribute(janela, DWMWA_EXTENDED_FRAME_BOUNDS, &r, sizeof(r)))) {
+    GetWindowRect(janela, &r);
+  }
+  MONITORINFO mi = {};
+  mi.cbSize = sizeof(mi);
+  HMONITOR monitor = MonitorFromWindow(janela, MONITOR_DEFAULTTONEAREST);
+  const bool achouMonitor = monitor && GetMonitorInfoW(monitor, &mi);
+
+  if (antes) SetThreadDpiAwarenessContext(antes);
+
+  Napi::Object saida = Napi::Object::New(env);
+  saida.Set("x", r.left);
+  saida.Set("y", r.top);
+  saida.Set("largura", r.right - r.left);
+  saida.Set("altura", r.bottom - r.top);
+  saida.Set("minimizada", IsIconic(janela) != 0);
+  saida.Set("visivel", IsWindowVisible(janela) != 0);
+  if (achouMonitor) {
+    Napi::Object m = Napi::Object::New(env);
+    m.Set("x", mi.rcMonitor.left);
+    m.Set("y", mi.rcMonitor.top);
+    m.Set("largura", mi.rcMonitor.right - mi.rcMonitor.left);
+    m.Set("altura", mi.rcMonitor.bottom - mi.rcMonitor.top);
+    saida.Set("monitor", m);
+  }
+  return saida;
+}
+
 Napi::Value RaizDoAplicativoJs(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   if (info.Length() < 1 || !info[0].IsNumber()) {
@@ -645,6 +695,7 @@ Napi::Object Inicializar(Napi::Env env, Napi::Object exports) {
   Captura::Iniciar(env, exports);
   exports.Set("listarSessoes", Napi::Function::New(env, ListarSessoes));
   exports.Set("pidDaJanela", Napi::Function::New(env, PidDaJanela));
+  exports.Set("janelaNaTela", Napi::Function::New(env, JanelaNaTela));
   exports.Set("raizDoAplicativo", Napi::Function::New(env, RaizDoAplicativoJs));
   exports.Set("suportado", Napi::Function::New(env, Suportado));
   return exports;

@@ -20,7 +20,9 @@
             "libraries": [
               "ole32.lib",
               "mmdevapi.lib",
-              "avrt.lib"
+              "avrt.lib",
+              "dwmapi.lib",
+              "user32.lib"
             ],
             "msvs_settings": {
               "VCCLCompilerTool": {

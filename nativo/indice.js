@@ -126,6 +126,23 @@ function pidDaFonte (idDaFonte) {
   }
 }
 
+// Retângulo da janela e do monitor dela, em pixels reais (ver JanelaNaTela no
+// .cc). null se não deu: addon ausente, id que não é de janela, janela fechada.
+function janelaNaTela (idDaFonte) {
+  carregar()
+  if (!modulo || !modulo.janelaNaTela) return null
+
+  const partes = String(idDaFonte || '').split(':')
+  const hwnd = Number(partes[1])
+  if (partes[0] !== 'window' || !Number.isFinite(hwnd) || hwnd <= 0) return null
+
+  try {
+    return modulo.janelaNaTela(hwnd)
+  } catch {
+    return null
+  }
+}
+
 /**
  * Abre a captura.
  *
@@ -161,4 +178,4 @@ function capturar ({ pid, modo = 'excluir', aoReceber }) {
   }
 }
 
-module.exports = { disponivel, listarSessoes, pidDaFonte, capturar }
+module.exports = { disponivel, listarSessoes, pidDaFonte, janelaNaTela, capturar }
