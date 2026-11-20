@@ -1083,6 +1083,19 @@ option:disabled { color: var(--fraco); }
 .aviso-audio.alerta { color: #ffcf8b; }
 .aviso-qualidade:empty { display: none; }
 
+/* "Forçar SDR". Alinha pela base com os selects ao lado, que têm 36px. */
+.marcar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  font-size: 13px;
+  color: var(--texto);
+  cursor: pointer;
+  user-select: none;
+}
+.marcar input { width: 15px; height: 15px; margin: 0; accent-color: var(--realce); cursor: pointer; }
+
 /* Os dois botões andam juntos. Soltos no rodapé que quebra linha, o
    "Transmitir" descia sozinho para a linha de baixo, longe do "Cancelar". */
 .acoes-seletor { display: flex; gap: 8px; margin-left: auto; }

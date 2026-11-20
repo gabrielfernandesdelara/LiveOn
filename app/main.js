@@ -1,7 +1,7 @@
 // Processo principal: janela, seletor de fontes por IPC e o handler de
 // getDisplayMedia, que é onde o áudio do sistema entra (audio: 'loopback').
 
-const { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, powerMonitor, screen, session, shell } = require('electron')
+const { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, powerMonitor, screen, session, sharedTexture, shell } = require('electron')
 const path = require('node:path')
 const os = require('node:os')
 const fs = require('node:fs')
@@ -223,6 +223,8 @@ function vigiarJanela (alvo) {
 
   conteudo.on('render-process-gone', (_evento, detalhes) => {
     registrar('CRASH', `renderer morreu: ${detalhes.reason} (código ${detalhes.exitCode})`)
+    // Sem a página não há quem receba os quadros da captura HDR.
+    pararSdr('renderer morreu')
   })
   conteudo.on('unresponsive', () => registrar('CRASH', 'janela parou de responder'))
   conteudo.on('responsive', () => registrar('CRASH', 'janela voltou a responder'))
@@ -574,10 +576,23 @@ function configurarCaptura () {
   sessao.setDisplayMediaRequestHandler(async (request, callback) => {
     // Sem bilhete, o pedido não veio da nossa UI. Nega. E de outra página
     // também, mesmo com bilhete.
-    if (!pedidoPendente || !ehDoApp(request.frame && request.frame.url)) return callback({})
+    if (!pedidoPendente || !ehDoApp(request.frame && request.frame.url)) {
+      try { callback({}) } catch { /* negado */ }
+      return
+    }
 
     const { id, comAudio } = pedidoPendente
     pedidoPendente = null
+
+    // Responde uma vez só. No Electron 43 negar com callback({}) estoura
+    // quando o pedido era de vídeo, e o catch de baixo respondia de novo: era
+    // o "One-time callback was called more than once" no console.
+    let respondeu = false
+    const responder = (resposta) => {
+      if (respondeu) return
+      respondeu = true
+      try { callback(resposta) } catch (erro) { registrar('captura', `pedido negado: ${erro.message}`) }
+    }
 
     try {
       // Sem miniatura: aqui so interessa achar a fonte pelo id. O padrao do
@@ -590,15 +605,13 @@ function configurarCaptura () {
       })
       const fonte = fontes.find((f) => f.id === id)
       if (!fonte) {
+        // A janela sumiu da lista entre o seletor e o clique (fechou, ou o
+        // Windows deixou de oferecê-la). Sem isto o registro não dizia nada.
         registrar('captura', `fonte ${id} nao esta mais na lista do Windows (${fontes.length} fontes)`)
-        // Negar com {} estoura no Electron 43 quando o pedido era de video; o
-        // getDisplayMedia rejeita do mesmo jeito. Sem o try, o catch de baixo
-        // responderia de novo ("callback called more than once").
-        try { callback({}) } catch { /* negado */ }
-        return
+        return responder({})
       }
 
-      callback({
+      responder({
         video: fonte,
         // 'loopback' = áudio que o sistema está tocando. Só é entregue se o
         // renderer também tiver pedido audio no getDisplayMedia.
@@ -614,7 +627,7 @@ function configurarCaptura () {
       setTimeout(() => priorizar('captura em andamento'), 3000)
     } catch (erro) {
       registrar('captura', `falha ao listar fontes: ${erro.message}`)
-      try { callback({}) } catch { /* ja respondido */ }
+      responder({})
     }
   }, { useSystemPicker: false })
 
@@ -627,6 +640,12 @@ function configurarCaptura () {
 
 // --- IPC do seletor de fontes -------------------------------------------------
 
+// A última miniatura de cada tela. Enquanto o "Forçar SDR" captura um monitor,
+// o Windows o tira da lista do Chromium (medido: só um capturador por monitor
+// no mesmo processo), e o seletor, aberto para AJUSTAR, ficaria sem a tela que
+// está no ar. Ela volta com a última miniatura guardada.
+const telasVistas = new Map()
+
 ipcMain.handle('fontes:listar', apenasDoApp(async () => {
   const fontes = await desktopCapturer.getSources({
     types: ['screen', 'window'],
@@ -634,7 +653,7 @@ ipcMain.handle('fontes:listar', apenasDoApp(async () => {
     fetchWindowIcons: true
   })
 
-  return fontes
+  const lista = fontes
     .filter((f) => !f.thumbnail.isEmpty() || f.id.startsWith('screen:'))
     .map((f) => ({
       id: f.id,
@@ -643,6 +662,12 @@ ipcMain.handle('fontes:listar', apenasDoApp(async () => {
       miniatura: f.thumbnail.toDataURL(),
       icone: f.appIcon && !f.appIcon.isEmpty() ? f.appIcon.toDataURL() : null
     }))
+
+  for (const fonte of lista) if (fonte.tela) telasVistas.set(fonte.id, fonte)
+  if (sdr && !lista.some((f) => f.id === sdr.fonteId) && telasVistas.has(sdr.fonteId)) {
+    lista.unshift(telasVistas.get(sdr.fonteId))
+  }
+  return lista
 }))
 
 ipcMain.handle('fontes:escolher', apenasDoApp((_evento, { id, comAudio }) => {
@@ -726,6 +751,10 @@ ipcMain.handle('atualizar:instalar', apenasDoApp(() => {
 // app segue com o loopback normal, nada disso pode quebrar o resto.
 const capturaProcesso = require('../nativo/indice.js')
 
+// Só leitura: o HDR de cada monitor vai para o topo do registro (ver
+// nativo/src/cor_tela.cc para o porquê).
+const hdr = require('../nativo/hdr.js')
+
 let capturaAtiva = null
 
 function pararCaptura () {
@@ -741,45 +770,6 @@ ipcMain.handle('audio:sessoes', apenasDoApp(() => capturaProcesso.listarSessoes(
 // Descobre o processo dono da janela escolhida, para capturar só o áudio dela.
 ipcMain.handle('audio:pidDaFonte', apenasDoApp((_evento, idDaFonte) =>
   capturaProcesso.pidDaFonte(idDaFonte)))
-
-// --- janela pelo recorte da tela ----------------------------------------------
-//
-// Reserva da captura de janela. No Windows 10 de um amigo o Chromium recusava
-// TODA janela em 8 ms ("Could not start video source", 20/11/2026) e capturava
-// tela normalmente. Aqui sai onde a janela está e qual fonte de TELA do
-// Chromium é o monitor dela; a página captura essa tela e recorta.
-//
-// O monitor do Windows e o display do Electron são casados pelo canto, em
-// pixels reais: o addon devolve o monitor em pixels reais, e o
-// dipToScreenRect leva o display do Electron para a mesma régua.
-let telaDoMonitor = new Map()   // "x,y" do monitor -> id da fonte de tela
-
-ipcMain.handle('janela:recorte', apenasDoApp(async (_evento, idDaFonte) => {
-  const j = capturaProcesso.janelaNaTela(idDaFonte)
-  if (!j) return null
-  if (!j.monitor) return { ...j, telaId: null }
-
-  const chave = `${j.monitor.x},${j.monitor.y}`
-  if (!telaDoMonitor.has(chave)) {
-    const display = screen.getAllDisplays().find((d) => {
-      const real = screen.dipToScreenRect(null, d.bounds)
-      return real.x === j.monitor.x && real.y === j.monitor.y
-    })
-    if (!display) return { ...j, telaId: null }
-    const telas = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } })
-    const tela = telas.find((t) => String(t.display_id) === String(display.id))
-    if (!tela) return { ...j, telaId: null }
-    telaDoMonitor.set(chave, tela.id)
-  }
-  return { ...j, telaId: telaDoMonitor.get(chave) }
-}))
-
-// Monitor ligado, desligado ou trocado de lugar: o casamento é refeito.
-app.whenReady().then(() => {
-  for (const evento of ['display-added', 'display-removed', 'display-metrics-changed']) {
-    screen.on(evento, () => { telaDoMonitor = new Map() })
-  }
-})
 
 ipcMain.handle('audio:iniciar', apenasDoApp((evento, { pid, modo }) => {
   pararCaptura()
@@ -813,6 +803,140 @@ ipcMain.handle('audio:parar', apenasDoApp(() => {
   return true
 }))
 
+// --- forçar SDR ---------------------------------------------------------------
+//
+// Jogo em HDR chega estourado aos amigos: o Chromium pede a tela em 8 bits e
+// o Windows corta todo brilho acima de um certo ponto (medido em 19/11/2026:
+// tudo acima de ~66 nits virava branco). Com "Forçar SDR" marcado, a tela não
+// passa pelo Chromium: o addon captura o monitor em 16 bits, converte para SDR
+// na placa de vídeo, e cada quadro chega à página por `sharedTexture`, sem
+// passar pixel pela CPU. O monitor continua em HDR; quem muda é só a imagem
+// que vai para os amigos, como no Parsec.
+//
+// Monitor (duplicação de tela) ou janela (Windows Graphics Capture), e só com
+// aceleração por placa de vídeo: no modo "Processador" não há textura de GPU
+// para receber.
+
+let sdr = null   // { quadro (WebFrameMain), largura, altura, entregues, falhas }
+
+function pararSdr (motivo) {
+  if (!sdr) return
+  const contagem = hdr.pararCaptura()
+  registrar('sdr', `captura HDR parada (${motivo}): ${sdr.entregues} quadros entregues, ` +
+    `${contagem.pulados || 0} pulados, ${contagem.recuperacoes || 0} recuperacoes, ${sdr.falhas} falhas de entrega`)
+  sdr = null
+}
+
+// O retângulo do monitor em pixels físicos, que é como a duplicação do
+// Windows o chama. A fonte escolhida diz o monitor pelo display_id.
+async function retanguloDaFonte (fonteId) {
+  const fontes = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } })
+  const fonte = fontes.find((f) => f.id === fonteId)
+  if (!fonte) return null
+  const tela = screen.getAllDisplays().find((d) => String(d.id) === String(fonte.display_id))
+  if (!tela) return null
+  const r = screen.dipToScreenRect(null, tela.bounds)
+  return { x: r.x, y: r.y, largura: r.width, altura: r.height, nome: tela.label || fonte.name }
+}
+
+ipcMain.handle('sdr:disponivel', apenasDoApp(() =>
+  videoAtivo === 'gpu' && hdr.capturaDisponivel() && hdr.listar().some((m) => m.ligado)))
+
+ipcMain.handle('sdr:iniciar', apenasDoApp(async (evento, { fonteId, largura, altura, fps } = {}) => {
+  pararSdr('nova captura')
+  if (videoAtivo !== 'gpu') return { ok: false, motivo: 'o Forçar SDR precisa da placa de vídeo nas configurações' }
+
+  // O id da fonte diz o que é: "screen:<n>:<n>" ou "window:<hwnd>:<n>".
+  const [tipo, numero] = String(fonteId || '').split(':')
+  let alvo
+  let ret = null
+  if (tipo === 'screen') {
+    ret = await retanguloDaFonte(fonteId)
+    if (!ret) return { ok: false, motivo: 'não achei esse monitor' }
+    alvo = { x: ret.x, y: ret.y, largura: ret.largura, altura: ret.altura }
+  } else if (tipo === 'window' && Number(numero) > 0) {
+    alvo = { hwnd: Number(numero) }
+  } else {
+    return { ok: false, motivo: 'fonte desconhecida' }
+  }
+  const nome = ret ? ret.nome : 'janela'
+
+  const quadro = evento.senderFrame
+  let info
+  try {
+    info = hdr.iniciarCaptura({
+      ...alvo,
+      saidaLargura: Number(largura) || 1920,
+      saidaAltura: Number(altura) || 1080,
+      fps: Number(fps) || 60
+    }, (k, motivo) => {
+      if (!sdr) return
+      if (k < 0) {
+        const fim = motivo || 'a captura HDR parou'
+        pararSdr(fim)
+        if (!evento.sender.isDestroyed()) evento.sender.send('sdr:fim', fim)
+        return
+      }
+      entregarQuadroSdr(k)
+    })
+  } catch (erro) {
+    registrar('sdr', `nao consegui iniciar a captura HDR (${nome}): ${erro.message}`)
+    return { ok: false, motivo: erro.message }
+  }
+
+  // Monitor sem HDR: não há o que converter, a captura de sempre já sai certa.
+  if (!info.hdr) return { ok: false, semHdr: true }
+
+  sdr = { quadro, info, fonteId, entregues: 0, falhas: 0 }
+  // De uma janela, o nome do monitor é o do Windows (DISPLAY1): o título
+  // dela não vai para o log, pode ter coisa que ninguém quis mostrar.
+  const onde = info.modo === 'janela' ? `janela no ${info.monitor}` : nome
+  registrar('sdr', `captura HDR em ${onde}: ${info.entradaLargura}x${info.entradaAltura} -> ` +
+    `${info.largura}x${info.altura} @ ${Number(fps) || 60}fps, branco do SDR ${Math.round(info.branco)} nits, ` +
+    `pico ${Math.round(info.pico)} nits`)
+  return { ok: true, largura: info.largura, altura: info.altura, monitor: onde }
+}))
+
+function entregarQuadroSdr (k) {
+  const atual = sdr
+  let importado = null
+  try {
+    importado = sharedTexture.importSharedTexture({
+      textureInfo: {
+        pixelFormat: 'rgba',
+        codedSize: { width: atual.info.largura, height: atual.info.altura },
+        handle: { ntHandle: atual.info.alcas[k] },
+        // A hora do quadro, em microssegundos. Sem ela todo quadro saía com
+        // carimbo 0, e quem recebe não sabe espaçá-los: acumula e se reajusta
+        // de tempos em tempos. Eram as travadas leves a cada poucos segundos
+        // do Forçar SDR (medido em 19/11/2026).
+        timestamp: Math.round(performance.now() * 1000)
+      },
+      // A textura volta para o anel do addon só quando ninguém mais a usa,
+      // inclusive o codificador do outro processo.
+      allReferencesReleased: () => hdr.liberarQuadro(k)
+    })
+  } catch (erro) {
+    atual.falhas++
+    hdr.liberarQuadro(k)
+    if (atual.falhas === 1) registrar('sdr', `nao consegui importar o quadro: ${erro.message}`)
+    return
+  }
+
+  sharedTexture.sendSharedTexture({ frame: atual.quadro, importedSharedTexture: importado })
+    .then(() => { atual.entregues++ })
+    .catch((erro) => {
+      atual.falhas++
+      if (atual.falhas === 1) registrar('sdr', `nao consegui entregar o quadro: ${erro.message}`)
+    })
+    .finally(() => importado.release())
+}
+
+ipcMain.handle('sdr:parar', apenasDoApp(() => {
+  pararSdr('fim da transmissao')
+  return true
+}))
+
 // --- ciclo de vida ------------------------------------------------------------
 
 app.on('child-process-gone', (_evento, detalhes) => {
@@ -841,6 +965,15 @@ async function descreverMaquina () {
   registrarCabecalho('maquina', prioridadeEscolhida() === 'alta'
     ? 'prioridade: ALTA (escolhida nas configuracoes)'
     : 'prioridade: normal')
+
+  // HDR ligado com Windows anterior ao 24H2 e o que deixa a tela estourada
+  // para quem assiste. Com o [inicio], que traz a versao do Windows, o log
+  // de um amigo ja diz se foi isso.
+  const monitores = hdr.listar()
+  if (monitores.length) {
+    registrarCabecalho('maquina', 'monitores: ' + monitores.map((m) =>
+      `${m.nome} (${m.ligado ? 'HDR ligado' : m.suportado ? 'HDR desligado' : 'sem HDR'})`).join(', '))
+  }
 
   // Diz de cara se a captura por processo esta disponivel, e a primeira coisa
   // que se quer saber quando o audio sai errado.
@@ -883,4 +1016,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   pararCaptura()
+  pararSdr('app fechando')
 })

@@ -76,6 +76,7 @@ mídia.
 - **Ajustar a transmissão no ar**: trocar de tela, resolução ou fps sem parar de transmitir.
 - **Grade calculada**: as telas se redimensionam para caber, sempre em 16:9, com duplo clique para destacar, modo expandido e tela cheia.
 - **Webcam**, opcional e sem som: cada um liga a sua, com prévia antes de ir ao ar. Ela aparece por cima da tela de quem transmite, num canto ou redonda junto do nome (um clique troca), e quem liga só a webcam ganha um card inteiro. Com uma tela em destaque, as webcams dos outros ficam numa faixa de bolhas sobre ela, que dá para esconder. Vai em **360p**, para não pesar no upload.
+- **Forçar SDR**: com HDR ligado no Windows, jogo em HDR chega estourado para quem assiste. Marcando a opção, a tela ou a janela é capturada em 16 bits e convertida para SDR na placa de vídeo antes de ir para os amigos, como no Parsec. Seu monitor continua em HDR.
 - **Volume por pessoa** e escolha da **saída de áudio** (fone, caixa ou outro aparelho).
 - **Reconexão automática**: se a conexão com o servidor cai, o app tenta voltar por **105 segundos** e quem volta continua sendo a mesma pessoa, sem derrubar o vídeo. A sala vazia fica de pé por **2 minutos** esperando.
 - **Atualização automática**: o app baixa a versão nova em segundo plano e instala ao reiniciar, sem assistente.
@@ -225,8 +226,9 @@ LiveOn/
 │   ├── src/worker.js      # Sinalização: Worker + Durable Object, uma sala por código
 │   └── wrangler.toml      # Configuração do Worker e do limite de tentativas
 ├── nativo/
-│   ├── src/               # Addon C++ de captura de áudio por processo
-│   └── indice.js          # Carrega o addon; se não estiver compilado, o app segue sem
+│   ├── src/               # Addons C++: áudio por processo e captura HDR convertida
+│   ├── indice.js          # Carrega o addon de áudio; sem ele, o app segue sem
+│   └── hdr.js             # Carrega os de HDR; sem eles, só some o "Forçar SDR"
 ├── scripts/
 │   └── limpar-dist.js     # Apaga de dist/ os instaladores de versões antigas
 ├── build/

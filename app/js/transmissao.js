@@ -26,8 +26,129 @@ async function ajustarDimensoes (video) {
   }
 }
 
+// --- forçar SDR ---------------------------------------------------------------
+//
+// Com a opção marcada, a imagem da tela não vem do getDisplayMedia: vem do
+// addon, que captura o monitor em HDR e converte para SDR na placa de vídeo
+// (ver o "forçar SDR" do main.js). Cada quadro chega pela ponte como
+// VideoFrame e é escrito num MediaStreamTrackGenerator, que para o resto do
+// app é uma trilha de vídeo como qualquer outra.
+
+// Se a imagem no ar agora é a convertida.
+let sdrAtual = false
+
+// Sem nenhum quadro nesse tempo, a conversão não está funcionando nesta
+// máquina (por exemplo, o monitor ligado numa placa e o Chromium em outra).
+const ESPERA_PRIMEIRO_QUADRO_SDR = 3000
+
+async function capturarSdr (fonteId, qualidade) {
+  const gerador = new MediaStreamTrackGenerator({ kind: 'video' })
+  const escritor = gerador.writable.getWriter()
+  let escrevendo = false
+  let avisarPrimeiro = null
+  const primeiro = new Promise((resolver) => { avisarPrimeiro = resolver })
+
+  // O quadro chega EMPRESTADO: ele aponta para uma textura do addon, que a
+  // ponte libera assim que esta funcao volta. Por isso ele e copiado na hora
+  // para um canvas nosso (copia de placa de video, barata), e e a copia que
+  // segue para a previa e para os amigos. Sem a copia, o <video> da previa
+  // segurava o quadro alem da vida da textura: medido em 19/11/2026, a pagina
+  // caia ou a placa de video travava ao parar.
+  let tela = null
+  let desenho = null
+  let carimbo = 0
+  window.ponte.aoQuadroSdr((quadro) => {
+    // Codificador atrasado: descarta em vez de acumular atraso.
+    if (escrevendo || gerador.readyState === 'ended') return
+    const largura = quadro.displayWidth
+    const altura = quadro.displayHeight
+    if (!tela || tela.width !== largura || tela.height !== altura) {
+      tela = new OffscreenCanvas(largura, altura)
+      desenho = tela.getContext('2d', { alpha: false })
+    }
+    desenho.drawImage(quadro, 0, 0)
+    // O carimbo tem que sempre avançar: e por ele que quem recebe espaça os
+    // quadros. Carimbo repetido (eram todos 0) fazia a imagem travar de
+    // tempos em tempos do outro lado.
+    carimbo = Math.max(quadro.timestamp || 0, carimbo + 1)
+    const copia = new VideoFrame(tela, { timestamp: carimbo })
+    escrevendo = true
+    avisarPrimeiro(true)
+    escritor.write(copia)
+      .catch(() => copia.close())
+      .finally(() => { escrevendo = false })
+  })
+
+  const desistir = (motivo) => {
+    window.ponte.aoQuadroSdr(null)
+    gerador.stop()
+    if (motivo) {
+      anotar(`Forcar SDR nao funcionou: ${motivo}`)
+      avisar(`Forçar SDR não funcionou (${motivo}). Transmitindo do jeito normal.`)
+    }
+    return null
+  }
+
+  let resposta
+  try {
+    resposta = await window.ponte.sdrIniciar({
+      fonteId,
+      largura: qualidade.largura,
+      altura: qualidade.altura,
+      fps: qualidade.fps
+    })
+  } catch (erro) {
+    resposta = { ok: false, motivo: erro.message }
+  }
+
+  if (!resposta || !resposta.ok) {
+    // Monitor sem HDR: a captura de sempre já sai certa, nada a avisar.
+    if (resposta && resposta.semHdr) {
+      anotar('Forcar SDR: esse monitor nao esta em HDR, captura normal')
+      return desistir()
+    }
+    return desistir((resposta && resposta.motivo) || 'erro desconhecido')
+  }
+
+  const veio = await Promise.race([
+    primeiro,
+    new Promise((resolver) => setTimeout(() => resolver(false), ESPERA_PRIMEIRO_QUADRO_SDR))
+  ])
+  if (!veio) {
+    window.ponte.sdrParar()
+    return desistir('a imagem convertida não chegou')
+  }
+
+  gerador.contentHint = 'motion'
+  anotar(`Forcar SDR: ${resposta.monitor} em HDR, convertendo para ${resposta.largura}x${resposta.altura}`)
+  return gerador
+}
+
+function pararSdr () {
+  if (!sdrAtual) return
+  sdrAtual = false
+  try {
+    window.ponte.sdrParar()
+    window.ponte.aoQuadroSdr(null)
+  } catch { /* sem ponte */ }
+}
+
+// A captura convertida parou sozinha (o Windows interrompeu, a resolução do
+// monitor mudou): a transmissão segue, pela captura de sempre.
+try {
+  window.ponte.aoFimSdr((motivo) => {
+    if (!sdrAtual || !streamLocal) return
+    anotar(`Forcar SDR parou: ${motivo}`)
+    // Janela fechada: é o mesmo que o 'ended' da captura de sempre, a
+    // transmissão acaba. Não há para onde voltar.
+    if (/janela foi fechada/.test(motivo)) return pararTransmissao()
+    avisar('A conversão do HDR parou. Voltando para a captura normal.')
+    ajustarTransmissao(fonteAtual, audioAtual, { semSdr: true })
+  })
+} catch { /* sem ponte */ }
+
 // Captura video e audio conforme o que o seletor escolheu, e devolve o stream
-// pronto para entrar na malha.
+// pronto para entrar na malha, e se a imagem e a convertida (sdr).
 //
 // Esta parte e comum a COMECAR e a AJUSTAR uma transmissao. Estava dentro do
 // iniciarTransmissao; saiu para ca porque duplicar o preparo seria garantia de
@@ -35,83 +156,99 @@ async function ajustarDimensoes (video) {
 // o contentHint, o 'ended' da barra do sistema).
 //
 // Estoura em vez de avisar: quem chamou decide o que dizer ao usuario.
-async function capturarFonte (fonteId, configAudio, qualidade) {
+async function capturarFonte (fonteId, configAudio, qualidade, sdr) {
   // So o modo "tudo" usa o loopback do Chromium. Os outros pegam o audio pelo
   // addon nativo, ou nao pegam audio nenhum.
   const usaLoopback = configAudio.modo === 'tudo'
 
-  // Ordem importa: o processo principal precisa saber qual fonte foi escolhida
-  // ANTES do getDisplayMedia, porque e o handler de la que responde ao pedido.
-  const pedir = async (comLimites) => {
-    await window.ponte.escolherFonte(fonteId, usaLoopback)
-    return navigator.mediaDevices.getDisplayMedia({
-      video: comLimites
-        ? {
-            width: { ideal: qualidade.largura },
-            height: { ideal: qualidade.altura },
-            frameRate: { ideal: qualidade.fps, max: qualidade.fps }
-          }
-        : true,
-      // Precisa pedir audio aqui, senao o 'loopback' do main.js nao e entregue.
-      audio: usaLoopback
-    })
+  // Enquanto a captura convertida roda, o Windows tira aquele monitor da lista
+  // do Chromium (medido em 19/11/2026), e qualquer getDisplayMedia nele falha.
+  // Ela para ANTES de qualquer captura nova: custa um instante de imagem
+  // parada para quem assiste, so no ajuste.
+  if (sdrAtual) {
+    try { await window.ponte.sdrParar() } catch { /* sem ponte */ }
   }
 
-  // Janela no Windows 10 de um amigo falhava toda vez com "Could not start
-  // video source" (20/11/2026), em 8 ms, e tela funcionava. Ordem: o pedido
-  // de sempre; uma segunda tentativa sem limite de tamanho e fps; e por fim a
-  // janela recortada da captura do monitor dela, que nao passa pelo
-  // capturador de janela do Chromium. Janela que ja precisou do recorte vai
-  // direto para ele nas proximas vezes.
-  const ehJanela = String(fonteId).startsWith('window:')
   let video = null
   let audioDoLoopback = []
+  const querConvertida = sdr && /^(screen|window):/.test(String(fonteId))
 
-  if (ehJanela && janelasPorRecorte.has(fonteId)) {
-    ({ video, audio: audioDoLoopback } = await capturarJanelaRecortando(fonteId, qualidade, usaLoopback))
-  } else {
-    let stream = null
+  // O som do sistema so vem pelo getDisplayMedia, e por isso ANTES da captura
+  // convertida comecar. A imagem que vem junto e descartada.
+  if (querConvertida && usaLoopback) {
+    await window.ponte.escolherFonte(fonteId, true)
+    const soSom = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+    for (const trilha of soSom.getVideoTracks()) trilha.stop()
+    audioDoLoopback = soSom.getAudioTracks()
+  }
+
+  if (querConvertida) video = await capturarSdr(fonteId, qualidade)
+  const convertida = Boolean(video)
+
+  // Nao deu (monitor sem HDR, ou falhou) e o som ja veio: a captura de sempre
+  // pede o som de novo, entao o primeiro sai.
+  if (!convertida && audioDoLoopback.length) {
+    for (const trilha of audioDoLoopback) trilha.stop()
+    audioDoLoopback = []
+  }
+
+  if (!convertida) {
+    // Ordem importa: o processo principal precisa saber qual fonte foi
+    // escolhida ANTES do getDisplayMedia, porque e o handler de la que
+    // responde ao pedido.
+    const pedir = async (comLimites) => {
+      await window.ponte.escolherFonte(fonteId, usaLoopback)
+      return navigator.mediaDevices.getDisplayMedia({
+        video: comLimites
+          ? {
+              width: { ideal: qualidade.largura },
+              height: { ideal: qualidade.altura },
+              frameRate: { ideal: qualidade.fps, max: qualidade.fps }
+            }
+          : true,
+        // Precisa pedir audio aqui, senao o 'loopback' do main.js nao e entregue.
+        audio: usaLoopback
+      })
+    }
+
+    // Janela no Windows 10 de um amigo falhava toda vez com "Could not start
+    // video source" (20/11/2026), e tela funcionava. Uma segunda tentativa, um
+    // instante depois e sem limite de tamanho e fps (que viram limite no
+    // capturador do Windows), antes de desistir. O tamanho e o fps sao
+    // aplicados depois na trilha, se ela aceitar.
+    let stream
     let semLimites = false
     try {
       stream = await pedir(true)
     } catch (erro) {
       anotarFalhaDeCaptura('primeira tentativa', fonteId, configAudio, erro)
-      if (!ehJanela) throw erro
+      if (!String(fonteId).startsWith('window:')) throw erro
       await new Promise((resolver) => setTimeout(resolver, 500))
+      stream = await pedir(false)
+      semLimites = true
+      anotar('captura de janela: a segunda tentativa, sem limites, funcionou')
+    }
+
+    if (semLimites) {
       try {
-        stream = await pedir(false)
-        semLimites = true
-        anotar('captura de janela: a segunda tentativa, sem limites, funcionou')
-      } catch (erro2) {
-        anotarFalhaDeCaptura('segunda tentativa', fonteId, configAudio, erro2)
+        await stream.getVideoTracks()[0].applyConstraints({
+          width: { ideal: qualidade.largura },
+          height: { ideal: qualidade.altura },
+          frameRate: { ideal: qualidade.fps, max: qualidade.fps }
+        })
+      } catch (erro) {
+        anotar(`a janela nao aceitou o tamanho e o fps: ${erro.message}`)
       }
     }
 
-    if (stream) {
-      if (semLimites) {
-        try {
-          await stream.getVideoTracks()[0].applyConstraints({
-            width: { ideal: qualidade.largura },
-            height: { ideal: qualidade.altura },
-            frameRate: { ideal: qualidade.fps, max: qualidade.fps }
-          })
-        } catch (erro) {
-          anotar(`a janela nao aceitou o tamanho e o fps: ${erro.message}`)
-        }
-      }
-      video = stream.getVideoTracks()[0]
-      // Parar pela barra nativa do sistema, ou fechar a janela capturada.
-      video.addEventListener('ended', pararTransmissao)
-      await ajustarDimensoes(video)
-      audioDoLoopback = stream.getAudioTracks()
-    } else {
-      ({ video, audio: audioDoLoopback } = await capturarJanelaRecortando(fonteId, qualidade, usaLoopback))
-      janelasPorRecorte.add(fonteId)
-      avisar('Essa janela vai pelo recorte da tela: o que ficar na frente dela também aparece.')
-    }
+    video = stream.getVideoTracks()[0]
+    video.contentHint = 'motion'
+    // Parar pela barra nativa do sistema, ou fechar a janela capturada.
+    video.addEventListener('ended', pararTransmissao)
+
+    await ajustarDimensoes(video)
+    audioDoLoopback = stream.getAudioTracks()
   }
-
-  video.contentHint = 'motion'
 
   // Fecha a captura nativa anterior ANTES de abrir outra. No comeco isto e
   // inofensivo, nao ha nada aberto; no ajuste e obrigatorio, senao a escuta
@@ -135,125 +272,7 @@ async function capturarFonte (fonteId, configAudio, qualidade) {
     }
   }
 
-  return new MediaStream(trilhas)
-}
-
-// --- janela pelo recorte da tela ----------------------------------------------
-//
-// Reserva para quando o Chromium recusa a janela. Captura o MONITOR onde ela
-// esta (a tela funcionava no PC do amigo) e recorta o retangulo dela a cada
-// quadro, num canvas do tamanho de quando comecou, sem aumentar alem da
-// qualidade escolhida. O retangulo vem do addon, conferido a cada 250 ms: a
-// janela pode andar, mudar de tamanho (a imagem e encaixada, sem esticar),
-// minimizar (fica o ultimo quadro) ou fechar (a transmissao acaba, como na
-// captura de sempre). O preco e o de qualquer recorte de tela: o que estiver
-// NA FRENTE da janela aparece junto, e por isso o aviso na tela.
-
-const janelasPorRecorte = new Set()
-const VIGIA_RECORTE = 250
-
-async function capturarJanelaRecortando (fonteId, qualidade, comAudio) {
-  let onde = await window.ponte.recorteDaJanela(fonteId)
-  if (!onde) throw new Error('a janela não existe mais')
-  if (!onde.telaId || !onde.monitor) throw new Error('não achei o monitor dessa janela')
-
-  await window.ponte.escolherFonte(onde.telaId, comAudio)
-  const tela = await navigator.mediaDevices.getDisplayMedia({
-    video: { frameRate: { ideal: qualidade.fps, max: qualidade.fps } },
-    audio: comAudio
-  })
-  const trilhaTela = tela.getVideoTracks()[0]
-
-  // Tamanho par: o codificador quer largura e altura pares.
-  const caber = Math.min(1, qualidade.largura / onde.largura, qualidade.altura / onde.altura)
-  const largura = Math.max(2, Math.floor(onde.largura * caber / 2) * 2)
-  const altura = Math.max(2, Math.floor(onde.altura * caber / 2) * 2)
-  const quadro = new OffscreenCanvas(largura, altura)
-  const desenho = quadro.getContext('2d', { alpha: false })
-  desenho.fillStyle = '#000'
-  desenho.fillRect(0, 0, largura, altura)
-
-  const gerador = new MediaStreamTrackGenerator({ kind: 'video' })
-  const escritor = gerador.writable.getWriter()
-  const leitor = new MediaStreamTrackProcessor({ track: trilhaTela }).readable.getReader()
-
-  let vivo = true
-  let vigia = null
-  const encerrar = () => {
-    if (!vivo) return
-    vivo = false
-    clearInterval(vigia)
-    trilhaTela.stop()
-    leitor.cancel().catch(() => {})
-  }
-  // Acabou sem ninguem mandar parar (janela fechada, tela perdida): a
-  // transmissao acaba junto, como o 'ended' da captura de sempre.
-  const acabouSozinho = (motivo) => {
-    anotar(`janela pelo recorte parou: ${motivo}`)
-    encerrar()
-    const noAr = streamLocal && streamLocal.getVideoTracks()[0] === gerador
-    gerador.stop()
-    if (noAr) pararTransmissao()
-  }
-
-  vigia = setInterval(async () => {
-    if (gerador.readyState === 'ended') return encerrar()
-    let novo = null
-    try { novo = await window.ponte.recorteDaJanela(fonteId) } catch { /* tenta de novo */ return }
-    if (!vivo) return
-    if (!novo) return acabouSozinho('a janela foi fechada')
-    onde = novo
-  }, VIGIA_RECORTE)
-
-  ;(async () => {
-    let escrevendo = false
-    while (vivo) {
-      let lido
-      try { lido = await leitor.read() } catch { break }
-      if (lido.done) break
-      const q = lido.value
-      if (gerador.readyState === 'ended') { q.close(); break }
-      // Codificador atrasado: descarta em vez de acumular atraso.
-      if (escrevendo) { q.close(); continue }
-
-      const m = onde.monitor
-      if (!onde.minimizada && m && m.largura > 0 && m.altura > 0) {
-        const ex = q.displayWidth / m.largura
-        const ey = q.displayHeight / m.altura
-        const sx = (onde.x - m.x) * ex
-        const sy = (onde.y - m.y) * ey
-        const sw = onde.largura * ex
-        const sh = onde.altura * ey
-        // So a parte da janela que esta dentro do monitor; o resto fica preto.
-        const x0 = Math.max(0, sx)
-        const y0 = Math.max(0, sy)
-        const x1 = Math.min(q.displayWidth, sx + sw)
-        const y1 = Math.min(q.displayHeight, sy + sh)
-        if (x1 - x0 >= 2 && y1 - y0 >= 2) {
-          const k = Math.min(largura / sw, altura / sh)
-          const ox = (largura - sw * k) / 2
-          const oy = (altura - sh * k) / 2
-          desenho.fillRect(0, 0, largura, altura)
-          desenho.drawImage(q, x0, y0, x1 - x0, y1 - y0,
-            ox + (x0 - sx) * k, oy + (y0 - sy) * k, (x1 - x0) * k, (y1 - y0) * k)
-        }
-      }
-      // O carimbo da captura da tela, que ja avanca: quem recebe espaca os
-      // quadros por ele (carimbo parado faz a imagem travar do outro lado).
-      const carimbo = q.timestamp
-      q.close()
-      const saida = new VideoFrame(quadro, { timestamp: carimbo })
-      escrevendo = true
-      escritor.write(saida)
-        .catch(() => saida.close())
-        .finally(() => { escrevendo = false })
-    }
-    if (vivo && gerador.readyState !== 'ended') acabouSozinho('a captura da tela acabou')
-    encerrar()
-  })()
-
-  anotar(`janela pelo recorte da tela: ${onde.largura}x${onde.altura} -> ${largura}x${altura} @ ${qualidade.fps}fps`)
-  return { video: gerador, audio: tela.getAudioTracks() }
+  return { stream: new MediaStream(trilhas), sdr: convertida }
 }
 
 // O aviso some da tela em 6 s, e sem isto o registro so mostrava "captura
@@ -262,21 +281,36 @@ async function capturarJanelaRecortando (fonteId, qualidade, comAudio) {
 function anotarFalhaDeCaptura (quando, fonteId, configAudio, erro) {
   const tipo = String(fonteId).split(':')[0]
   const detalhe = erro && erro.constraint ? ` (limite: ${erro.constraint})` : ''
-  anotar(`captura FALHOU na ${quando} (${tipo} ${fonteId}, audio ${configAudio && configAudio.modo}): ` +
-    `${erro && erro.name}: ${erro && erro.message}${detalhe}`)
+  anotar(`captura FALHOU na ${quando} (${tipo} ${fonteId}, audio ${configAudio && configAudio.modo}, ` +
+    `forcar SDR ${querSdr() ? 'marcado' : 'desmarcado'}): ${erro && erro.name}: ${erro && erro.message}${detalhe}`)
+}
+
+// Janela que o Windows recusa (NotReadableError, "Could not start video
+// source") nao tem o que a pessoa fazer no LiveOn: a mensagem crua do
+// Chromium nao dizia isso. Ja houve reserva pelo recorte da tela (1.5.7) e o
+// dono pediu para tirar: transmitir janela e SO a janela, nada do que esta
+// na frente dela pode vazar.
+function avisarFalhaDeCaptura (fonteId, erro) {
+  if (String(fonteId).startsWith('window:') && erro && erro.name === 'NotReadableError') {
+    return avisar('O Windows não deixou capturar essa janela. Tente a tela inteira.')
+  }
+  return avisar('Não consegui capturar essa fonte: ' + (erro && erro.message))
 }
 
 async function iniciarTransmissao (fonteId, configAudio) {
   const qualidade = configuracaoDeVideo()
   qualidadeLocal = { altura: qualidade.altura, fps: qualidade.fps }
 
+  let captura
   try {
-    streamLocal = await capturarFonte(fonteId, configAudio, qualidade)
+    captura = await capturarFonte(fonteId, configAudio, qualidade, querSdr())
   } catch (erro) {
     anotarFalhaDeCaptura('transmissao', fonteId, configAudio, erro)
-    return avisar('Não consegui capturar essa fonte: ' + erro.message)
+    return avisarFalhaDeCaptura(fonteId, erro)
   }
 
+  streamLocal = captura.stream
+  sdrAtual = captura.sdr
   fonteAtual = fonteId
   audioAtual = configAudio
 
@@ -302,20 +336,21 @@ async function iniciarTransmissao (fonteId, configAudio) {
 //   replaceTrack troca a trilha POR DENTRO do remetente que ja existe, entao
 //   tambem nao renegocia. addTrack, que e o que o comeco usa, criaria um
 //   remetente novo e obrigaria uma rodada de SDP.
-async function ajustarTransmissao (fonteId, configAudio) {
+//
+// Com o "Forçar SDR" no ar, ou ligando/desligando ele, e sempre captura nova:
+// a imagem convertida sai do addon ja no tamanho e no fps pedidos, e mudar
+// isso e recomecar a captura de la.
+async function ajustarTransmissao (fonteId, configAudio, opcoes = {}) {
   if (!streamLocal) return
 
   const qualidade = configuracaoDeVideo()
   const mesmaFonte = fonteId === fonteAtual
   const mesmoAudio = JSON.stringify(configAudio) === JSON.stringify(audioAtual)
+  const sdr = opcoes.semSdr ? false : querSdr()
 
   qualidadeLocal = { altura: qualidade.altura, fps: qualidade.fps }
 
-  // A janela pelo recorte nao tem como mudar de tamanho na trilha: o tamanho
-  // e o do canvas dela. Mudar a qualidade e recortar de novo.
-  const atual = streamLocal.getVideoTracks()[0]
-  const recortada = typeof MediaStreamTrackGenerator !== 'undefined' && atual instanceof MediaStreamTrackGenerator
-  const video = mesmaFonte && mesmoAudio && !recortada ? atual : null
+  const video = mesmaFonte && mesmoAudio && !sdr && !sdrAtual ? streamLocal.getVideoTracks()[0] : null
 
   if (video) {
     try {
@@ -338,15 +373,17 @@ async function ajustarTransmissao (fonteId, configAudio) {
   }
 
   const antigo = streamLocal
-  let novo
+  const eraSdr = sdrAtual
+  let captura
   try {
-    novo = await capturarFonte(fonteId, configAudio, qualidade)
+    captura = await capturarFonte(fonteId, configAudio, qualidade, sdr)
   } catch (erro) {
     anotarFalhaDeCaptura('troca de fonte', fonteId, configAudio, erro)
-    return avisar('Não consegui capturar essa fonte: ' + erro.message)
+    return avisarFalhaDeCaptura(fonteId, erro)
   }
 
-  streamLocal = novo
+  streamLocal = captura.stream
+  sdrAtual = captura.sdr
   fonteAtual = fonteId
   audioAtual = configAudio
 
@@ -355,6 +392,14 @@ async function ajustarTransmissao (fonteId, configAudio) {
   // Para as trilhas velhas SO depois da troca: parar antes deixaria um vao sem
   // imagem no meio do caminho.
   for (const trilha of antigo.getTracks()) trilha.stop()
+
+  // Saiu da imagem convertida: a captura do addon para junto.
+  if (eraSdr && !sdrAtual) {
+    try {
+      window.ponte.sdrParar()
+      window.ponte.aoQuadroSdr(null)
+    } catch { /* sem ponte */ }
+  }
 
   reaplicarQualidade()
   anotar(`fonte trocada no ar: ${qualidade.altura}p @ ${qualidade.fps}fps`)
@@ -416,6 +461,9 @@ function pararTransmissao () {
 
   for (const trilha of streamLocal.getTracks()) trilha.stop()
   streamLocal = null
+
+  // A captura convertida do addon, se era ela.
+  pararSdr()
 
   // Fecha a captura nativa, se estava em uso.
   pararTrilhaDeProcesso()

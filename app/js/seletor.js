@@ -52,6 +52,7 @@ async function abrirSeletor (modo = 'iniciar') {
   $('#seletor').classList.remove('oculto')
 
   atualizarAvisoDeQualidade()
+  await atualizarOpcaoSdr(ajustando)
   addonAudio = await window.ponte.audioDisponivel()
   sessoesDeAudio = addonAudio.ok ? await window.ponte.audioSessoes() : []
   desenharAplicativosDeAudio()
@@ -77,6 +78,31 @@ async function abrirSeletor (modo = 'iniciar') {
   }
 
   await carregarFontes()
+}
+
+// "Forçar SDR" só aparece quando faz diferença e quando dá: algum monitor com
+// HDR ligado, addon compilado e aceleração por placa de vídeo. Vale para as
+// duas abas: monitor pela duplicação de tela, janela pelo Windows Graphics
+// Capture. Quem decide o que é possível é o processo principal.
+let sdrPossivel = false
+
+async function atualizarOpcaoSdr (ajustando) {
+  try {
+    sdrPossivel = Boolean(await window.ponte.sdrDisponivel())
+  } catch {
+    sdrPossivel = false
+  }
+  $('#campo-sdr').checked = ajustando ? sdrAtual : lembrar('liveon:forcar-sdr') === '1'
+  mostrarOpcaoSdr()
+}
+
+function mostrarOpcaoSdr () {
+  $('#caixa-sdr').classList.toggle('oculto', !sdrPossivel)
+}
+
+// O que a pessoa pediu agora. Escondida, a opção vale "não".
+function querSdr () {
+  return !$('#caixa-sdr').classList.contains('oculto') && $('#campo-sdr').checked
 }
 
 function desenharAplicativosDeAudio () {
