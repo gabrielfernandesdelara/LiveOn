@@ -40,6 +40,25 @@ const INTERVALO_VIGIA = 20000   // de quanto em quanto o alarme confere
 // código preso.
 const CARENCIA_VAZIA = 120000
 
+// Carência de quem CAI. A conexão com a Cloudflare cai sozinha de tempos em
+// tempos (1006), e o webSocketClose chegava aqui na hora: a sala inteira
+// recebia 'saiu', derrubava a conexão de vídeo com a pessoa, e quando ela
+// voltava 1,4 s depois (registro de 20/11/2026) tudo era remontado do zero,
+// com o card sumindo e voltando. A mídia é P2P e não tinha caído.
+//
+// Agora a queda fica calada por este tempo: a pessoa vira AUSENTE, e se voltar
+// com a credencial é uma retomada, ninguém vê nada. Só depois disso a saída é
+// anunciada. Quem sai de propósito manda 'sair' antes de fechar e sai na hora.
+// 20 s cobrem as quatro primeiras tentativas do app (1, 2, 4 e 8 s de espera).
+const CARENCIA_QUEDA = 20000
+
+// O que chega para quem esta ausente (SDP, ICE, pedido de qualidade, aviso de
+// estado) fica guardado e e entregue na volta. Sem isso, alguem que comecasse
+// a transmitir naquele segundo mandaria a oferta para o vazio, e a conexao
+// dos dois ficaria travada esperando uma resposta que nunca vem. O teto e
+// folgado: o comeco de uma transmissao sao algumas dezenas de mensagens.
+const FILA_MAXIMA = 300
+
 // Quantas credenciais a sala lembra. Havia uma por pessoa que entrou, para
 // sempre, tudo dentro de um valor só do armazenamento, que tem limite de
 // tamanho. Estourar o limite faria o `put` falhar no meio do `entrar`, e a
@@ -222,13 +241,16 @@ export class Sala {
         return this.enviar(ws, { tipo: 'pong' })
       }
       case 'pong': return
+      // Saída de propósito: anuncia na hora, sem a carência de quem cai.
+      case 'sair': return this.sair(ws)
       default:
         return this.enviar(ws, { tipo: 'erro', motivo: `tipo desconhecido: ${msg.tipo}` })
     }
   }
 
-  async webSocketClose (ws) { await this.sair(ws) }
-  async webSocketError (ws) { await this.sair(ws) }
+  // Fechou sem 'sair' antes: e queda, nao despedida.
+  async webSocketClose (ws) { await this.ausentar(ws) }
+  async webSocketError (ws) { await this.ausentar(ws) }
 
   // Abre a sala neste código. Falha se já existir, senão alguém poderia
   // "recriar" a sala de outra pessoa e trocar o nome dela.
@@ -308,6 +330,11 @@ export class Sala {
       let transmitindo = false
       let camera = ''
 
+      // Ou ele caiu ha pouco e ainda esta na carencia: tambem ninguem viu.
+      const ausentes = await this.ausentes()
+      const ausente = ausentes[conhecido.id]
+      let novatos = []
+
       if (velho) {
         const antigos = this.dados(velho)
         retomada = true
@@ -315,16 +342,32 @@ export class Sala {
         camera = (antigos && antigos.camera) || ''
         velho.serializeAttachment(null)
         try { velho.close(4001, 'substituído pela reconexão') } catch { /* já morreu */ }
+      } else if (ausente) {
+        retomada = true
+        transmitindo = Boolean(ausente.transmitindo)
+        camera = ausente.camera || ''
+        // Quem entrou enquanto ele estava fora nunca o viu: para esses, ele
+        // e uma entrada normal.
+        novatos = this.outros(ws).filter((outro) => {
+          const d = this.dados(outro)
+          return d && (d.entrouEm || 0) > ausente.desde
+        })
+      }
+      if (ausente) {
+        delete ausentes[conhecido.id]
+        await this.estado.storage.put('ausentes', ausentes)
       }
 
-      return this.acomodar(ws, conhecido.nome, rotulo, {
-        id: conhecido.id, credencial, retomada, transmitindo, camera
+      await this.acomodar(ws, conhecido.nome, rotulo, {
+        id: conhecido.id, credencial, retomada, transmitindo, camera, novatos
       })
+      if (ausente) await this.entregarFila(ws, conhecido.id)
+      return
     }
 
     // Dois "Gabriel" na mesma sala viram confusão: os cards ficam iguais e
     // ninguém sabe quem está transmitindo.
-    if (this.nomeOcupado(ws, nome)) {
+    if (this.nomeOcupado(ws, nome) || await this.nomeDeAusente(nome)) {
       return this.enviar(ws, { tipo: 'erro', motivo: `já tem alguém chamado "${nome}" nessa sala` })
     }
 
@@ -337,6 +380,13 @@ export class Sala {
       const d = this.dados(outro)
       return d && (d.nome || '').toLowerCase() === alvo
     })
+  }
+
+  // Quem caiu e ainda esta na carencia guarda o nome: senao outro pegaria o
+  // nome dele e, na volta, a sala teria dois iguais.
+  async nomeDeAusente (nome) {
+    const alvo = nome.toLowerCase()
+    return Object.values(await this.ausentes()).some((a) => (a.nome || '').toLowerCase() === alvo)
   }
 
   // Parte comum de criar e entrar: registra o participante e avisa os outros.
@@ -377,10 +427,10 @@ export class Sala {
 
     // Numa retomada ninguém viu essa pessoa sair, anunciar entrada criaria
     // uma cópia dela na lista dos outros.
-    if (!retomada) {
-      for (const outro of this.outros(ws)) {
-        this.enviar(outro, { tipo: 'entrou', id, nome })
-      }
+    // Para quem chegou durante a ausencia dele, porem, e entrada de verdade.
+    const avisar = retomada ? ((retorno && retorno.novatos) || []) : this.outros(ws)
+    for (const outro of avisar) {
+      this.enviar(outro, { tipo: 'entrou', id, nome })
     }
 
     await this.agendarVigia()  }
@@ -409,6 +459,33 @@ export class Sala {
     if ((await this.estado.storage.getAlarm()) === null) {
       await this.estado.storage.setAlarm(Date.now() + INTERVALO_VIGIA)
     }
+  }
+
+  // Quem caiu sem se despedir. Sai da lista de sockets (o socket morreu), mas
+  // a saida so e anunciada pelo alarme, depois de CARENCIA_QUEDA.
+  async ausentes () {
+    return (await this.estado.storage.get('ausentes')) || {}
+  }
+
+  async ausentar (ws) {
+    const meu = this.dados(ws)
+    if (!meu) return
+    ws.serializeAttachment(null)
+
+    const ausentes = await this.ausentes()
+    ausentes[meu.id] = {
+      nome: meu.nome, transmitindo: meu.transmitindo, camera: meu.camera || '', desde: Date.now()
+    }
+    await this.estado.storage.put('ausentes', ausentes)
+
+    if (this.quantos() === 0) await this.estado.storage.put('vaziaDesde', Date.now())
+    await this.agendarAte(Date.now() + CARENCIA_QUEDA)
+  }
+
+  // Adianta o alarme se ele estiver marcado para depois de `quando`.
+  async agendarAte (quando) {
+    const marcado = await this.estado.storage.getAlarm()
+    if (marcado === null || marcado > quando) await this.estado.storage.setAlarm(quando)
   }
 
   async alarm () {
@@ -441,8 +518,26 @@ export class Sala {
       }
     }
 
-    if (this.quantos() > 0) {
-      return this.estado.storage.setAlarm(Date.now() + INTERVALO_VIGIA)
+    // A carencia de quem caiu venceu: agora sim, a sala fica sabendo.
+    const ausentes = await this.ausentes()
+    let proximo = Infinity
+    let mudou = false
+    for (const [id, a] of Object.entries(ausentes)) {
+      if (agora - a.desde >= CARENCIA_QUEDA) {
+        delete ausentes[id]
+        await this.estado.storage.delete(`fila:${id}`)
+        mudou = true
+        for (const outro of this.todos()) {
+          if (this.dados(outro)) this.enviar(outro, { tipo: 'saiu', id })
+        }
+      } else {
+        proximo = Math.min(proximo, a.desde + CARENCIA_QUEDA)
+      }
+    }
+    if (mudou) await this.estado.storage.put('ausentes', ausentes)
+
+    if (this.quantos() > 0 || proximo !== Infinity) {
+      return this.estado.storage.setAlarm(Math.min(Date.now() + INTERVALO_VIGIA, proximo))
     }
 
     // Sala vazia: o vigia continua só enquanto durar a carência, e a última
@@ -455,7 +550,7 @@ export class Sala {
     await this.estado.storage.deleteAll()
   }
 
-  repassar (ws, msg) {
+  async repassar (ws, msg) {
     const meu = this.dados(ws)
     if (!meu) return
 
@@ -465,9 +560,14 @@ export class Sala {
         return this.enviar(outro, { ...msg, de: meu.id })
       }
     }
+
+    // Nao esta conectado agora: se caiu ha pouco, guarda para a volta.
+    if (typeof msg.para === 'string' && (await this.ausentes())[msg.para]) {
+      await this.guardarPara(msg.para, { ...msg, de: meu.id })
+    }
   }
 
-  anunciarEstado (ws, msg) {
+  async anunciarEstado (ws, msg) {
     const meu = this.dados(ws)
     if (!meu) return
 
@@ -475,8 +575,30 @@ export class Sala {
     meu.camera = cameraValida(msg.camera)
     ws.serializeAttachment(meu)
 
-    for (const outro of this.outros(ws)) {
-      this.enviar(outro, { tipo: 'estado', de: meu.id, transmitindo: meu.transmitindo, camera: meu.camera })
+    const aviso = { tipo: 'estado', de: meu.id, transmitindo: meu.transmitindo, camera: meu.camera }
+    for (const outro of this.outros(ws)) this.enviar(outro, aviso)
+    for (const id of Object.keys(await this.ausentes())) await this.guardarPara(id, aviso)
+  }
+
+  async guardarPara (id, msg) {
+    const chave = `fila:${id}`
+    const fila = (await this.estado.storage.get(chave)) || []
+    if (fila.length >= FILA_MAXIMA) return
+    fila.push(msg)
+    await this.estado.storage.put(chave, fila)
+  }
+
+  // Entrega, na ordem, o que chegou durante a ausencia. Vai DEPOIS do
+  // 'bemvindo': o cliente precisa saber que voltou antes de negociar.
+  async entregarFila (ws, id) {
+    const chave = `fila:${id}`
+    const fila = (await this.estado.storage.get(chave)) || []
+    await this.estado.storage.delete(chave)
+    // So o que veio de quem continua na sala: SDP de quem ja saiu criaria, do
+    // outro lado, uma conexao com ninguem.
+    const presentes = new Set(this.outros(ws).map((outro) => this.dados(outro).id))
+    for (const msg of fila) {
+      if (presentes.has(msg.de)) this.enviar(ws, msg)
     }
   }
 

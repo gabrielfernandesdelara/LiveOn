@@ -182,6 +182,7 @@ $('#config').onclick = (evento) => {
 $('#btn-sair').onclick = () => {
   // Marca antes de fechar, senao o onclose acha que caiu e tenta reconectar.
   saindoDeProposito = true
+  avisarSaida()
 
   if (ws) {
     try { ws.close() } catch { /* ja estava fechando */ }

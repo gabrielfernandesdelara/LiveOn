@@ -3,6 +3,21 @@
 
 'use strict'
 
+// Se a queda desta vez ja apareceu na tela. A primeira tentativa de voltar
+// sai em 1 s e quase sempre resolve (a conexao com a Cloudflare cai sozinha
+// de tempos em tempos): nesse caso nada aparece, nem o "reconectando" nem o
+// "Reconectado". So da segunda tentativa em diante a pessoa e avisada.
+let quedaNaTela = false
+
+// Saida de proposito, ao contrario da queda, e anunciada na hora: o servidor
+// segura quem cai por uns segundos, esperando a volta (CARENCIA_QUEDA no
+// worker). Sem este aviso, fechar o app deixaria a pessoa pendurada na sala
+// dos outros ate a carencia vencer.
+function avisarSaida () {
+  if (meuId) enviar({ tipo: 'sair' })
+}
+window.addEventListener('pagehide', avisarSaida)
+
 function conectar ({ nome, codigo, rotulo, criando }) {
   sessao = { nome, codigo, rotulo, criando }
   saindoDeProposito = false
@@ -110,7 +125,10 @@ function tentarReconectar () {
 
   // Espera crescente: 1s, 2s, 4s... ate 10s.
   const espera = Math.min(1000 * 2 ** (tentativasDeReconexao - 1), 10000)
-  marcarConexao('ruim', `reconectando (${tentativasDeReconexao}/${MAX_TENTATIVAS})...`)
+  if (tentativasDeReconexao > 1) {
+    quedaNaTela = true
+    marcarConexao('ruim', `reconectando (${tentativasDeReconexao}/${MAX_TENTATIVAS})...`)
+  }
 
   clearTimeout(temporizadorReconexao)
   temporizadorReconexao = setTimeout(abrirSocket, espera)
@@ -240,7 +258,8 @@ function tratar (msg) {
           ? ': ' + msg.participantes.map((p) => `${p.nome}/${p.id.slice(0, 8)}${p.transmitindo ? ' (no ar)' : ''}${p.camera ? ' (camera)' : ''}`).join(', ')
           : ''))
       marcarConexao('ok', '')
-      if (reconectou) avisar('Reconectado.')
+      if (reconectou && quedaNaTela) avisar('Reconectado.')
+      quedaNaTela = false
       mostrarSala(rotuloDaSala)
       break
     }
