@@ -40,7 +40,11 @@ function diferenca (par, chave, valor) {
   if (!par.ultimaMedicao) par.ultimaMedicao = {}
   const antes = par.ultimaMedicao[chave]
   par.ultimaMedicao[chave] = valor
-  return antes === undefined || valor === undefined ? null : valor - antes
+  if (antes === undefined || valor === undefined) return null
+  // O contador recomeça quando a transmissão para e volta (remetente novo), e
+  // a conta dava taxa negativa no registro (-1296kbps em 19/11/2026). Contador
+  // que andou para trás é um contador novo: sem com o que comparar ainda.
+  return valor < antes ? null : valor - antes
 }
 
 // Na primeira medição ainda não há com o que comparar, e a taxa fica de fora.

@@ -42,17 +42,50 @@ async function capturarFonte (fonteId, configAudio, qualidade) {
 
   // Ordem importa: o processo principal precisa saber qual fonte foi escolhida
   // ANTES do getDisplayMedia, porque e o handler de la que responde ao pedido.
-  await window.ponte.escolherFonte(fonteId, usaLoopback)
+  const pedir = async (comLimites) => {
+    await window.ponte.escolherFonte(fonteId, usaLoopback)
+    return navigator.mediaDevices.getDisplayMedia({
+      video: comLimites
+        ? {
+            width: { ideal: qualidade.largura },
+            height: { ideal: qualidade.altura },
+            frameRate: { ideal: qualidade.fps, max: qualidade.fps }
+          }
+        : true,
+      // Precisa pedir audio aqui, senao o 'loopback' do main.js nao e entregue.
+      audio: usaLoopback
+    })
+  }
 
-  const stream = await navigator.mediaDevices.getDisplayMedia({
-    video: {
-      width: { ideal: qualidade.largura },
-      height: { ideal: qualidade.altura },
-      frameRate: { ideal: qualidade.fps, max: qualidade.fps }
-    },
-    // Precisa pedir audio aqui, senao o 'loopback' do main.js nao e entregue.
-    audio: usaLoopback
-  })
+  // Janela no Windows 10 de um amigo falhava toda vez com "Could not start
+  // video source" (20/11/2026), e tela funcionava. Uma segunda tentativa, um
+  // instante depois e sem limite de tamanho e fps (que viram limite no
+  // capturador do Windows), antes de desistir. O tamanho e o fps sao
+  // aplicados depois na trilha, se ela aceitar.
+  let stream
+  let semLimites = false
+  try {
+    stream = await pedir(true)
+  } catch (erro) {
+    anotarFalhaDeCaptura('primeira tentativa', fonteId, configAudio, erro)
+    if (!String(fonteId).startsWith('window:')) throw erro
+    await new Promise((resolver) => setTimeout(resolver, 500))
+    stream = await pedir(false)
+    semLimites = true
+    anotar('captura de janela: a segunda tentativa, sem limites, funcionou')
+  }
+
+  if (semLimites) {
+    try {
+      await stream.getVideoTracks()[0].applyConstraints({
+        width: { ideal: qualidade.largura },
+        height: { ideal: qualidade.altura },
+        frameRate: { ideal: qualidade.fps, max: qualidade.fps }
+      })
+    } catch (erro) {
+      anotar(`a janela nao aceitou o tamanho e o fps: ${erro.message}`)
+    }
+  }
 
   const video = stream.getVideoTracks()[0]
   video.contentHint = 'motion'
@@ -87,6 +120,16 @@ async function capturarFonte (fonteId, configAudio, qualidade) {
   return new MediaStream(trilhas)
 }
 
+// O aviso some da tela em 6 s, e sem isto o registro so mostrava "captura
+// concedida" sem nada depois. Vai o tipo da fonte e o erro inteiro, nunca o
+// titulo da janela (o id e so o numero dela).
+function anotarFalhaDeCaptura (quando, fonteId, configAudio, erro) {
+  const tipo = String(fonteId).split(':')[0]
+  const detalhe = erro && erro.constraint ? ` (limite: ${erro.constraint})` : ''
+  anotar(`captura FALHOU na ${quando} (${tipo} ${fonteId}, audio ${configAudio && configAudio.modo}): ` +
+    `${erro && erro.name}: ${erro && erro.message}${detalhe}`)
+}
+
 async function iniciarTransmissao (fonteId, configAudio) {
   const qualidade = configuracaoDeVideo()
   qualidadeLocal = { altura: qualidade.altura, fps: qualidade.fps }
@@ -94,6 +137,7 @@ async function iniciarTransmissao (fonteId, configAudio) {
   try {
     streamLocal = await capturarFonte(fonteId, configAudio, qualidade)
   } catch (erro) {
+    anotarFalhaDeCaptura('transmissao', fonteId, configAudio, erro)
     return avisar('Não consegui capturar essa fonte: ' + erro.message)
   }
 
@@ -158,6 +202,7 @@ async function ajustarTransmissao (fonteId, configAudio) {
   try {
     novo = await capturarFonte(fonteId, configAudio, qualidade)
   } catch (erro) {
+    anotarFalhaDeCaptura('troca de fonte', fonteId, configAudio, erro)
     return avisar('Não consegui capturar essa fonte: ' + erro.message)
   }
 

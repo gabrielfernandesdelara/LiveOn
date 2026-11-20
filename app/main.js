@@ -580,9 +580,23 @@ function configurarCaptura () {
     pedidoPendente = null
 
     try {
-      const fontes = await desktopCapturer.getSources({ types: ['screen', 'window'] })
+      // Sem miniatura: aqui so interessa achar a fonte pelo id. O padrao do
+      // Electron fotografava TODAS as janelas do PC a cada transmissao, logo
+      // antes de o Chromium abrir a captura de uma delas (a doc do Electron
+      // manda passar 0 quando a miniatura nao serve para nada).
+      const fontes = await desktopCapturer.getSources({
+        types: [id.startsWith('screen:') ? 'screen' : 'window'],
+        thumbnailSize: { width: 0, height: 0 }
+      })
       const fonte = fontes.find((f) => f.id === id)
-      if (!fonte) return callback({})
+      if (!fonte) {
+        registrar('captura', `fonte ${id} nao esta mais na lista do Windows (${fontes.length} fontes)`)
+        // Negar com {} estoura no Electron 43 quando o pedido era de video; o
+        // getDisplayMedia rejeita do mesmo jeito. Sem o try, o catch de baixo
+        // responderia de novo ("callback called more than once").
+        try { callback({}) } catch { /* negado */ }
+        return
+      }
 
       callback({
         video: fonte,
@@ -599,8 +613,8 @@ function configurarCaptura () {
       priorizar('captura concedida')
       setTimeout(() => priorizar('captura em andamento'), 3000)
     } catch (erro) {
-      console.error('[captura] falha ao listar fontes:', erro)
-      callback({})
+      registrar('captura', `falha ao listar fontes: ${erro.message}`)
+      try { callback({}) } catch { /* ja respondido */ }
     }
   }, { useSystemPicker: false })
 
