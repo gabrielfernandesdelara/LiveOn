@@ -12,10 +12,25 @@ function inicialDe (nome) {
 
 // Quadradinho com a inicial e, para quem está no ar, o ponto vermelho. O
 // tamanho e as cores vêm do CSS de cada lugar: .selo, .pilha, .pessoa.
-function criarAvatar (nome, noAr = true) {
+//
+// Com o id, mostra a foto de perfil por cima da inicial, se a pessoa tiver
+// (perfil.js). A inicial fica embaixo: se a imagem falhar, ela aparece. O
+// ponto vem depois da foto, para ficar por cima dela.
+function criarAvatar (nome, noAr = true, id = null) {
   const avatar = document.createElement('span')
   avatar.className = 'avatar'
   avatar.textContent = inicialDe(nome)
+
+  const foto = id ? fotoDe(id) : ''
+  if (foto) {
+    const imagem = document.createElement('img')
+    imagem.className = 'foto'
+    imagem.alt = ''
+    imagem.draggable = false
+    imagem.src = foto
+    avatar.appendChild(imagem)
+    avatar.classList.add('com-foto')
+  }
 
   if (noAr) {
     const ponto = document.createElement('span')
@@ -85,7 +100,7 @@ function desenharPessoas () {
   // O botão: até três avatares empilhados, e o total.
   const pilha = $('#pilha-pessoas')
   pilha.textContent = ''
-  for (const pessoa of todos.slice(0, 3)) pilha.appendChild(criarAvatar(pessoa.nome, pessoa.noAr))
+  for (const pessoa of todos.slice(0, 3)) pilha.appendChild(criarAvatar(pessoa.nome, pessoa.noAr, pessoa.id))
   $('#total-pessoas').textContent = String(todos.length)
 
   // O cabeçalho do pop-over.
@@ -113,7 +128,7 @@ function desenharPessoas () {
     sub.textContent = legendaDe(pessoa)
 
     textos.append(nome, sub)
-    linha.append(criarAvatar(pessoa.nome, pessoa.noAr), textos)
+    linha.append(criarAvatar(pessoa.nome, pessoa.noAr, pessoa.id), textos)
 
     // No modo expandido as miniaturas somem, então a lista vira o único jeito
     // de trocar de transmissão sem sair do destaque. O pop-over fica aberto

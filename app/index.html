@@ -245,7 +245,8 @@
   <div class="painel-config" role="dialog" aria-labelledby="titulo-config">
     <nav class="lateral-config">
       <h2 id="titulo-config">Configurações</h2>
-      <button class="aba-config ativa" data-aba="aparencia"><span data-icone="pincel"></span>Aparência</button>
+      <button class="aba-config ativa" data-aba="perfil"><span data-icone="usuario"></span>Perfil</button>
+      <button class="aba-config" data-aba="aparencia"><span data-icone="pincel"></span>Aparência</button>
       <button class="aba-config" data-aba="desempenho"><span data-icone="desempenho"></span>Desempenho</button>
       <span class="cresce"></span>
       <span id="config-versao" class="versao-config"></span>
@@ -254,7 +255,51 @@
     <div class="conteudo-config">
       <button id="btn-fechar-config" class="botao-icone fechar-config" title="Fechar (Esc)"><span data-icone="fechar" data-tamanho="16"></span></button>
 
-      <section class="secao-config" data-secao="aparencia">
+      <!-- Foto de perfil (perfil.js): vai para quem estiver na sala, nunca
+           para um servidor. O enquadramento e um quadrado: arrastar move,
+           a roda do mouse e a barra dao zoom. -->
+      <section class="secao-config" data-secao="perfil">
+        <h3>Perfil</h3>
+        <p class="descricao-config">Sua foto aparece para quem estiver na sala com você.</p>
+
+        <div class="grupo-config perfil-topo">
+          <div id="foto-atual" class="foto-atual"></div>
+          <div>
+            <div class="titulo-grupo">Foto</div>
+            <p class="descricao-opcao">Fica no seu computador. Qualquer imagem serve: ela é diminuída sozinha.</p>
+            <div class="botoes-foto">
+              <button id="btn-escolher-foto" class="principal">Escolher imagem</button>
+              <button id="btn-ajustar-foto" class="oculto">Ajustar posição</button>
+              <button id="btn-remover-foto" class="oculto">Remover</button>
+              <input id="arquivo-foto" type="file" accept="image/*" class="oculto">
+            </div>
+            <p id="aviso-foto" class="nota-dialogo alerta"></p>
+          </div>
+        </div>
+
+        <div id="recorte-foto" class="grupo-config oculto">
+          <div class="titulo-grupo">Posição</div>
+          <p class="descricao-opcao">Arraste a imagem e use o zoom para enquadrar.</p>
+          <div class="recorte">
+            <canvas id="canvas-recorte" width="560" height="560"></canvas>
+            <div class="lado-recorte">
+              <div class="previa-foto">
+                <canvas width="96" height="96" class="previa-g"></canvas>
+                <canvas width="64" height="64" class="previa-m"></canvas>
+                <canvas width="44" height="44" class="previa-p"></canvas>
+              </div>
+              <label for="zoom-foto">Zoom</label>
+              <input id="zoom-foto" type="range" min="1" max="4" step="0.01" value="1">
+            </div>
+          </div>
+          <div class="acoes-editor">
+            <button id="btn-cancelar-foto">Cancelar</button>
+            <button id="btn-salvar-foto" class="principal">Usar esta foto</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="secao-config oculto" data-secao="aparencia">
         <h3>Aparência</h3>
         <p class="descricao-config">Muda só o que você vê. Cada amigo escolhe o dele.</p>
 
@@ -284,8 +329,8 @@
             <p class="descricao-opcao">Por cima da tela de quem também transmite.</p>
           </div>
           <div id="opcao-camera" class="segmentos segmentos-abas">
-            <button data-valor="canto">No canto</button>
-            <button data-valor="selo">Redonda</button>
+            <button data-valor="canto" data-exemplo="camera-canto">No canto</button>
+            <button data-valor="selo" data-exemplo="camera-selo">Redonda</button>
           </div>
         </div>
 
@@ -295,8 +340,8 @@
             <p class="descricao-opcao">Com o mouse, ela some quando ele para.</p>
           </div>
           <div id="opcao-selo" class="segmentos segmentos-abas">
-            <button data-valor="mouse">Com o mouse</button>
-            <button data-valor="sempre">Sempre</button>
+            <button data-valor="mouse" data-exemplo="selo-mouse">Com o mouse</button>
+            <button data-valor="sempre" data-exemplo="selo-sempre">Sempre</button>
           </div>
         </div>
       </section>
@@ -321,13 +366,43 @@
 
         <div class="grupo-config">
           <div class="cores-tema">
-            <label class="cor"><input type="color" data-cor="fundo"><span class="nome-cor">Fundo</span><span class="hex-cor"></span></label>
-            <label class="cor"><input type="color" data-cor="painel"><span class="nome-cor">Painéis</span><span class="hex-cor"></span></label>
-            <label class="cor"><input type="color" data-cor="borda"><span class="nome-cor">Bordas</span><span class="hex-cor"></span></label>
-            <label class="cor"><input type="color" data-cor="texto"><span class="nome-cor">Texto</span><span class="hex-cor"></span></label>
-            <label class="cor"><input type="color" data-cor="destaque"><span class="nome-cor">Destaque</span><span class="hex-cor"></span></label>
+            <label class="cor"><input type="color" class="editor-tema-cor" data-cor="fundo"><span class="nome-cor">Fundo</span><span class="hex-cor"></span></label>
+            <label class="cor"><input type="color" class="editor-tema-cor" data-cor="painel"><span class="nome-cor">Painéis</span><span class="hex-cor"></span></label>
+            <label class="cor"><input type="color" class="editor-tema-cor" data-cor="borda"><span class="nome-cor">Bordas</span><span class="hex-cor"></span></label>
+            <label class="cor"><input type="color" class="editor-tema-cor" data-cor="texto"><span class="nome-cor">Texto</span><span class="hex-cor"></span></label>
+            <label class="cor"><input type="color" class="editor-tema-cor" data-cor="destaque"><span class="nome-cor">Destaque</span><span class="hex-cor"></span></label>
           </div>
           <p id="aviso-contraste" class="nota-dialogo alerta"></p>
+        </div>
+
+        <div class="grupo-config">
+          <div class="titulo-grupo">Papel de parede</div>
+          <p class="descricao-opcao">Aparece no fundo, atrás das telas e na entrada.</p>
+          <div class="linha-papel">
+            <div id="previa-papel" class="previa-papel vazio"></div>
+            <div class="controles-papel">
+              <div class="botoes-foto">
+                <button id="btn-escolher-papel">Escolher imagem</button>
+                <button id="btn-remover-papel" class="oculto">Remover</button>
+                <input id="arquivo-papel" type="file" accept="image/*" class="oculto">
+              </div>
+              <label for="escurecer-papel">Escurecer</label>
+              <input id="escurecer-papel" type="range" min="0" max="0.85" step="0.01" value="0.35">
+            </div>
+          </div>
+          <p id="aviso-papel" class="nota-dialogo alerta"></p>
+        </div>
+
+        <div class="grupo-config">
+          <div class="titulo-grupo">Ícone do LiveOn</div>
+          <p class="descricao-opcao">Segue o destaque até você escolher outra cor.</p>
+          <div class="linha-icone">
+            <span class="marca previa-marca"><span class="marca-icone"><span data-icone="marca" data-tamanho="30"></span></span></span>
+            <div class="cores-icone">
+              <label class="cor"><input type="color" class="editor-tema-cor" data-cor="marca"><span class="nome-cor">Ícone</span><span class="hex-cor"></span></label>
+              <label class="cor"><input type="color" class="editor-tema-cor" data-cor="marcaPonto"><span class="nome-cor">Ponto</span><span class="hex-cor"></span></label>
+            </div>
+          </div>
         </div>
 
         <div class="acoes-editor">
@@ -414,6 +489,9 @@
      e o que executa no carregamento so enxerga o que ja carregou antes. As
      funcoes podem se chamar em qualquer direcao, porque so rodam depois que
      tudo carregou. Arquivo novo entra antes de ligacoes.js e partida.js. -->
+<!-- O exemplo que aparece passando o mouse numa opcao (exemplos.js). -->
+<div id="exemplo" class="exemplo oculto" aria-hidden="true"></div>
+
 <script src="js/configuracao.js"></script>
 <script src="js/estado.js"></script>
 <script src="js/icones.js"></script>
@@ -432,6 +510,8 @@
 <script src="js/navegacao.js"></script>
 <script src="js/diagnostico.js"></script>
 <script src="js/sinal.js"></script>
+<script src="js/perfil.js"></script>
+<script src="js/exemplos.js"></script>
 <script src="js/preferencias.js"></script>
 <script src="js/ligacoes.js"></script>
 <script src="js/partida.js"></script>

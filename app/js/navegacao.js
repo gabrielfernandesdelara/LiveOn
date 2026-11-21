@@ -61,6 +61,7 @@ function voltarParaEntrada () {
   camerasRecebidas.clear()
   qualidadePorId.clear()
   volumePorId.clear()
+  fotosPorId.clear()
   aguardandoEntrada = false
   if (sessao) sessao.credencial = null
   volumeAntesDeMudo.clear()

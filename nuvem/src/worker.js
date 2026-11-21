@@ -227,7 +227,11 @@ export class Sala {
       case 'ice':
       // Pedido de quem assiste para quem transmite: "me manda menor".
       // Direcionado como SDP/ICE, e por isso usa o mesmo repasse.
-      case 'qualidade': return this.repassar(ws, msg)
+      case 'qualidade':
+      // A foto de perfil de quem manda, para uma pessoa (o app comprime para
+      // ~16 KB). So repassa: nao fica guardada em lugar nenhum, a nao ser na
+      // fila de quem caiu, que some na volta ou na saida.
+      case 'foto': return this.repassar(ws, msg)
       case 'estado': return this.anunciarEstado(ws, msg)
       case 'ping': {
         // So chega aqui se o auto-response NAO pegou a mensagem. Nesse caso o

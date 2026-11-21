@@ -176,10 +176,31 @@ for (const aba of document.querySelectorAll('.aba-config')) aba.onclick = () => 
 for (const tema of document.querySelectorAll('.tema')) tema.onclick = () => escolherTema(tema.dataset.tema)
 for (const botao of document.querySelectorAll('#opcao-camera button')) botao.onclick = () => escolherFormatoDaCamera(botao.dataset.valor)
 for (const botao of document.querySelectorAll('#opcao-selo button')) botao.onclick = () => definirNomeNoCard(botao.dataset.valor)
-for (const campo of document.querySelectorAll('.cores-tema input')) campo.oninput = () => mudarCorDoEditor(campo)
+for (const campo of document.querySelectorAll('.editor-tema-cor')) campo.oninput = () => mudarCorDoEditor(campo)
+$('#btn-escolher-papel').onclick = () => $('#arquivo-papel').click()
+$('#arquivo-papel').onchange = () => {
+  const arquivo = $('#arquivo-papel').files[0]
+  $('#arquivo-papel').value = ''
+  escolherPapel(arquivo)
+}
+$('#btn-remover-papel').onclick = removerPapel
+$('#escurecer-papel').oninput = mudarEscurecer
 $('#campo-base-tema').onchange = mudarBaseDoTema
 $('#btn-salvar-tema').onclick = salvarTema
 $('#btn-cancelar-tema').onclick = () => mostrarAbaConfig('aparencia')
+$('#btn-escolher-foto').onclick = () => $('#arquivo-foto').click()
+$('#arquivo-foto').onchange = () => {
+  const arquivo = $('#arquivo-foto').files[0]
+  // Limpa, senao escolher o MESMO arquivo de novo nao dispara o change.
+  $('#arquivo-foto').value = ''
+  escolherFoto(arquivo)
+}
+$('#btn-ajustar-foto').onclick = ajustarFotoAtual
+$('#btn-remover-foto').onclick = removerFoto
+$('#btn-salvar-foto').onclick = salvarFoto
+$('#btn-cancelar-foto').onclick = fecharRecorte
+$('#zoom-foto').oninput = () => zoomRecorte(Number($('#zoom-foto').value))
+ligarRecorte()
 $('#campo-nome-tema').onkeydown = (evento) => { if (evento.key === 'Enter') salvarTema() }
 $('#btn-fechar-config').onclick = fecharConfig
 $('#campo-video').onchange = trocarVideo

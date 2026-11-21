@@ -224,7 +224,21 @@ option:disabled { color: var(--fraco); }
 /* ---------- marca ---------- */
 
 .marca { display: flex; align-items: center; flex: 0 0 auto; }
-.marca-icone { display: grid; place-items: center; flex: 0 0 auto; background: #4f8cff; }
+.marca-icone { display: grid; place-items: center; flex: 0 0 auto; background: var(--marca, #4f8cff); }
+/* O recorte tem a cor do quadrado, e o ponto e o vermelho da marca. Os dois
+   seguem o tema da pessoa, quando ele escolhe (tema.js). */
+.marca-recorte { fill: var(--marca, #4f8cff); }
+.marca-ponto { fill: var(--marca-ponto, #ff4d4f); }
+
+/* Papel de parede do tema da pessoa: no fundo do app inteiro, com um veu da
+   cor do fundo por cima para dar para ler. A barra, os paineis e os cards
+   continuam solidos. */
+html.com-papel body {
+  background-image: linear-gradient(var(--veu-papel), var(--veu-papel)), var(--papel);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
 .marca-nome {
   font-family: "Sora", "Segoe UI", sans-serif;
   font-weight: 600;
@@ -364,6 +378,19 @@ option:disabled { color: var(--fraco); }
    decorativa. O anel em volta tem a cor do que está atrás, para "recortar"
    o avatar; por isso cada lugar define a própria cor de anel. */
 .ponto { position: absolute; border-radius: 50%; background: var(--no-ar); }
+
+/* Foto de perfil (perfil.js): cobre a inicial, que continua embaixo para o
+   caso de a imagem falhar. O ponto de "no ar" vem depois no HTML e fica por
+   cima dela. */
+.avatar .foto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  pointer-events: none;
+}
 
 /* ---------- botão de pessoas e pop-over ---------- */
 
@@ -1219,7 +1246,139 @@ option:disabled { color: var(--fraco); }
 .hex-cor { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--apagado); }
 .acoes-editor { display: flex; justify-content: flex-end; gap: 8px; padding-top: 20px; border-top: 1px solid var(--borda); }
 .acoes-editor button { padding: 0 16px; }
-#aviso-contraste:empty { display: none; }
+#aviso-contraste:empty,
+#aviso-papel:empty { display: none; }
+
+.linha-papel { display: flex; align-items: center; gap: 18px; margin-top: 12px; }
+.previa-papel {
+  flex: 0 0 auto;
+  width: 192px;
+  height: 108px;
+  border: 1px solid var(--borda);
+  border-radius: 7px;
+  background-color: var(--fundo);
+  background-size: cover;
+  background-position: center;
+}
+.previa-papel.vazio { border-style: dashed; }
+.controles-papel { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; max-width: 300px; }
+.controles-papel .botoes-foto { margin-top: 0; }
+.controles-papel label { margin: 4px 0 0; }
+#escurecer-papel { width: 100%; margin: 0; accent-color: var(--realce); cursor: pointer; }
+#escurecer-papel:disabled { opacity: .4; cursor: default; }
+.previa-tema.com-papel { background-size: cover; background-position: center; }
+
+.linha-icone { display: flex; align-items: center; gap: 18px; margin-top: 12px; }
+.previa-marca .marca-icone { width: 56px; height: 56px; border-radius: 14px; }
+.cores-icone { display: grid; grid-template-columns: repeat(2, 120px); gap: 12px; }
+
+/* Perfil: a foto atual e, escolhendo uma imagem, o enquadramento. A moldura
+   tem o mesmo arredondamento do avatar (6px em 22px, uns 27%), para a pessoa
+   ver o corte de verdade. */
+.perfil-topo { display: flex; align-items: flex-start; gap: 22px; }
+.foto-atual .avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 24px;
+  background: var(--avatar);
+  font-size: 34px;
+}
+.botoes-foto { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+#aviso-foto:empty { display: none; }
+.recorte { display: flex; align-items: flex-start; gap: 24px; margin: 14px 0 20px; }
+#canvas-recorte {
+  flex: 0 0 auto;
+  width: 280px;
+  height: 280px;
+  border: 1px solid var(--borda);
+  border-radius: 76px;
+  background: var(--campo);
+  cursor: grab;
+  touch-action: none;
+}
+#canvas-recorte:active { cursor: grabbing; }
+.lado-recorte { display: flex; flex-direction: column; gap: 10px; min-width: 170px; }
+.lado-recorte label { margin: 8px 0 0; }
+.previa-foto { display: flex; align-items: flex-end; gap: 12px; }
+.previa-foto canvas { border-radius: 27%; background: var(--avatar); }
+.previa-foto .previa-g { width: 48px; height: 48px; }
+.previa-foto .previa-m { width: 32px; height: 32px; }
+.previa-foto .previa-p { width: 22px; height: 22px; }
+#zoom-foto { width: 100%; margin: 0; accent-color: var(--realce); cursor: pointer; }
+
+/* Exemplo ao passar o mouse numa opção (exemplos.js): um card de mentira com
+   as cores do tema em uso. Acima de tudo, inclusive das configurações, e sem
+   pegar o mouse, senão ele mesmo tiraria o mouse da opção. */
+.exemplo {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+  padding: 10px;
+  border: 1px solid var(--borda-hover);
+  border-radius: 10px;
+  background: var(--painel-alto);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .5);
+  pointer-events: none;
+}
+.ex-legenda { font-size: 12px; line-height: 1.4; color: var(--apagado); }
+.ex-par { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ex-card {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--borda);
+  border-radius: 7px;
+  background: #000;
+  overflow: hidden;
+}
+.ex-tela { position: absolute; inset: 0; background: linear-gradient(135deg, #1f3550, #2b1f45); }
+.ex-bloco { position: absolute; border-radius: 3px; background: rgba(255, 255, 255, .16); }
+.ex-bloco-1 { left: 10%; top: 14%; width: 46%; height: 12%; }
+.ex-bloco-2 { left: 10%; top: 34%; width: 30%; height: 30%; }
+.ex-bloco-3 { left: 46%; top: 34%; width: 40%; height: 46%; }
+.ex-selo {
+  position: absolute;
+  left: 6%;
+  bottom: 8%;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--vidro);
+}
+.ex-inicial {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--avatar);
+  color: var(--texto-avatar);
+  font-size: 9px;
+  font-weight: 700;
+}
+.ex-par .ex-inicial { width: 12px; height: 12px; border-radius: 4px; font-size: 7px; }
+.ex-ponto {
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--no-ar);
+}
+.ex-cam {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  background: #3a4252;
+  color: rgba(255, 255, 255, .75);
+  box-shadow: 0 0 0 1px var(--anel-escuro);
+}
+.ex-cam-canto { right: 5%; top: 7%; width: 28%; aspect-ratio: 16 / 9; border-radius: 4px; }
+.ex-cam-selo { left: 5%; bottom: 7%; width: 22px; height: 22px; border-radius: 50%; }
+.ex-cursor { position: absolute; left: 44%; top: 46%; color: #fff; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8)); }
 
 /* Janela estreita: as abas sobem para uma faixa em cima. */
 @media (max-width: 720px) {
@@ -1238,6 +1397,7 @@ option:disabled { color: var(--fraco); }
   .conteudo-config { position: static; padding: 20px; }
   .linha-opcao { flex-direction: column; align-items: flex-start; gap: 10px; }
   .editor-topo { grid-template-columns: minmax(0, 1fr); }
+  .perfil-topo, .recorte { flex-direction: column; }
   .cores-tema { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 

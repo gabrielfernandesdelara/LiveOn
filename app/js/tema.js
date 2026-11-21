@@ -13,9 +13,20 @@
 // apagado. Funciona igual em tema claro, porque "perto do texto" é a direção
 // do contraste, seja ela qual for.
 //
-// Ficam FORA do tema, de propósito: o vermelho de "no ar" (é o sinal de quem
-// está transmitindo, tema nenhum pode esconder), o âmbar dos alertas e o azul
-// do ícone do LiveOn (é a marca).
+// Fica FORA do tema, de propósito: o vermelho de "no ar" nas pessoas e nos
+// cards (é o sinal de quem está transmitindo, tema nenhum pode esconder) e o
+// âmbar dos alertas.
+//
+// Desde a 1.5.9 o tema da pessoa também pode ter:
+// - as cores do ÍCONE do LiveOn (o quadrado e o ponto), a pedido do dono,
+//   para combinar com o resto. Sem escolha, o quadrado segue o destaque e o
+//   ponto fica vermelho. Só dentro do app: o ícone da barra de tarefas é o
+//   do instalador;
+// - um PAPEL DE PAREDE, que aparece no fundo (atrás das telas e na entrada),
+//   com um véu da cor do fundo por cima para escurecer. A imagem é reduzida e
+//   comprimida na hora (até PAPEL_MAXIMO) e fica numa chave própria,
+//   'liveon:papel-<lugar>', para o JSON dos temas não carregar 400 KB a cada
+//   leitura.
 
 'use strict'
 
@@ -34,6 +45,15 @@ const NOMES_PRONTOS = { grafite: 'Grafite', marinho: 'Marinho', carvao: 'Carvão
 
 const LUGARES_PESSOAIS = 4
 const CHAVES_DE_COR = ['fundo', 'painel', 'borda', 'texto', 'destaque']
+// Opcionais: sem elas, o ícone segue o destaque e o ponto fica vermelho.
+const CHAVES_DO_ICONE = ['marca', 'marcaPonto']
+const MARCA_PADRAO = '#4f8cff'
+const PONTO_PADRAO = '#ff4d4f'
+
+const PAPEL_MAXIMO = 450 * 1024
+const PAPEL_LADO = 1920
+const ESCURECER_PADRAO = 0.35
+const FORMATO_DE_PAPEL = /^data:image\/webp;base64,[A-Za-z0-9+/]+=*$/
 
 // O que está em uso: um dos prontos ou 'pessoal-0' a 'pessoal-3'.
 let temaAtual = 'grafite'
@@ -95,7 +115,9 @@ function derivarPaleta (c) {
     '--listra-2': misturar(c.fundo, c.painel, 0.3),
     '--anel-escuro': misturar(c.fundo, '#000000', 0.25),
     '--realce': c.destaque,
-    '--realce-hover': misturar(c.destaque, '#000000', 0.1)
+    '--realce-hover': misturar(c.destaque, '#000000', 0.1),
+    '--marca': c.marca || c.destaque,
+    '--marca-ponto': c.marcaPonto || PONTO_PADRAO
   }
 }
 
@@ -109,12 +131,30 @@ function pintar (elemento, cores) {
   }
 }
 
+// O papel de parede no fundo do app, com o véu da cor do fundo por cima.
+// Sem papel, tira.
+function pintarPapel (papel, escurecer, fundo) {
+  const raiz = document.documentElement
+  if (!papel) {
+    raiz.classList.remove('com-papel')
+    raiz.style.removeProperty('--papel')
+    raiz.style.removeProperty('--veu-papel')
+    return
+  }
+  const [r, g, b] = paraRgb(fundo)
+  raiz.style.setProperty('--papel', `url("${papel}")`)
+  raiz.style.setProperty('--veu-papel', `rgba(${r}, ${g}, ${b}, ${Math.min(0.9, Math.max(0, escurecer))})`)
+  raiz.classList.add('com-papel')
+}
+
 // O que mostrar embaixo das cores no editor. Não impede salvar.
 function avisoDeContraste (cores) {
   if (contraste(cores.texto, cores.fundo) < 4.5 || contraste(cores.texto, cores.painel) < 4.5) {
     return 'O texto pode ficar difícil de ler.'
   }
   if (contraste('#ffffff', cores.destaque) < 3) return 'O texto dos botões pode ficar difícil de ler.'
+  // O desenho do ícone é branco: num quadrado claro ele some.
+  if (contraste('#ffffff', cores.marca || cores.destaque) < 2) return 'O desenho do ícone pode sumir nessa cor.'
   return ''
 }
 
@@ -132,29 +172,49 @@ function temasPessoais () {
     if (!CHAVES_DE_COR.every((k) => corValida(t.cores[k]))) return null
     const cores = {}
     for (const k of CHAVES_DE_COR) cores[k] = t.cores[k].toLowerCase()
-    return { nome: String(t.nome || '').trim().slice(0, 24) || 'Meu tema ' + (i + 1), cores }
+    for (const k of CHAVES_DO_ICONE) if (corValida(t.cores[k])) cores[k] = t.cores[k].toLowerCase()
+    const escurecer = Number(t.escurecer)
+    return {
+      nome: String(t.nome || '').trim().slice(0, 24) || 'Meu tema ' + (i + 1),
+      cores,
+      papel: t.papel === true,
+      escurecer: Number.isFinite(escurecer) ? Math.min(0.9, Math.max(0, escurecer)) : ESCURECER_PADRAO
+    }
   })
+}
+
+// O papel de parede de um lugar, ou '' se nao tiver (ou se vier quebrado).
+function papelDoLugar (lugar) {
+  const papel = lembrar('liveon:papel-' + lugar)
+  return FORMATO_DE_PAPEL.test(papel) ? papel : ''
 }
 
 function guardarTemasPessoais (lista) {
   guardar('liveon:temas-pessoais', JSON.stringify(lista))
 }
 
-// As cinco cores de qualquer tema, pronto ou da pessoa.
-function coresDoTema (nome) {
-  if (CORES_PRONTAS[nome]) return { ...CORES_PRONTAS[nome] }
+// Tudo de um tema, pronto ou da pessoa: as cores, o papel e o quanto ele
+// escurece. É o ponto de partida do editor.
+function temaCompleto (nome) {
+  if (CORES_PRONTAS[nome]) return { cores: { ...CORES_PRONTAS[nome] }, papel: '', escurecer: ESCURECER_PADRAO }
   const m = /^pessoal-(\d)$/.exec(nome || '')
   const pessoal = m && temasPessoais()[Number(m[1])]
-  return pessoal ? { ...pessoal.cores } : { ...CORES_PRONTAS.grafite }
+  if (!pessoal) return temaCompleto('grafite')
+  return {
+    cores: { ...pessoal.cores },
+    papel: pessoal.papel ? papelDoLugar(Number(m[1])) : '',
+    escurecer: pessoal.escurecer
+  }
 }
 
 // --- aplicar -----------------------------------------------------------------
 
-// Mostra cores sem guardar nada: é o que o editor usa enquanto a pessoa
+// Mostra um tema sem guardar nada: é o que o editor usa enquanto a pessoa
 // escolhe. aplicarTema() desfaz.
-function previaDeCores (cores) {
+function previaDeTema ({ cores, papel, escurecer }) {
   document.documentElement.dataset.tema = 'pessoal'
   pintar(document.documentElement, cores)
+  pintarPapel(papel, escurecer, cores.fundo)
 }
 
 function aplicarTema (nome) {
@@ -163,10 +223,11 @@ function aplicarTema (nome) {
 
   if (pessoal) {
     temaAtual = nome
-    previaDeCores(pessoal.cores)
+    previaDeTema(temaCompleto(nome))
   } else {
     temaAtual = TEMAS.includes(nome) ? nome : 'grafite'
     pintar(document.documentElement, null)
+    pintarPapel('')
     document.documentElement.dataset.tema = temaAtual
   }
 

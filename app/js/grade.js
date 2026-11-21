@@ -316,7 +316,7 @@ function criarCard (id, nome, souEu) {
   estado.className = 'estado'
 
   nomeDoSelo.append(quem, estado)
-  selo.append(criarAvatar(nome), nomeDoSelo)
+  selo.append(criarAvatar(nome, true, id), nomeDoSelo)
 
   const flutuantes = document.createElement('div')
   flutuantes.className = 'controles-flutuantes'

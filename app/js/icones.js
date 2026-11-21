@@ -65,6 +65,11 @@ const DESENHOS = {
     ['path', { d: 'M3.34 19a10 10 0 1 1 17.32 0' }]
   ],
   mais: [['path', { d: 'M12 5v14M5 12h14' }]],
+  cursor: [['path', { d: 'M5 3l14 7-6 2-2 6z' }]],
+  usuario: [
+    ['circle', { cx: 12, cy: 8, r: 4 }],
+    ['path', { d: 'M4 21a8 8 0 0 1 16 0' }]
+  ],
   lapis: [
     ['path', { d: 'M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z' }],
     ['path', { d: 'm15 5 4 4' }]
@@ -122,8 +127,10 @@ function marca (tamanho) {
   svg.append(
     elementoSvg('rect', { x: 5, y: 9, width: 34, height: 26, rx: 6, fill: 'none', stroke: '#ffffff', 'stroke-width': 4 }),
     elementoSvg('path', { d: 'M15 41h14', fill: 'none', stroke: '#ffffff', 'stroke-width': 4, 'stroke-linecap': 'round' }),
-    elementoSvg('circle', { cx: 39, cy: 11, r: 7.5, fill: '#4f8cff' }),
-    elementoSvg('circle', { cx: 39, cy: 11, r: 4.5, fill: '#ff4d4f' })
+    // As cores ficam tambem como classe: o tema da pessoa troca as duas pelo
+    // CSS (--marca, --marca-ponto). O atributo e o padrao, se nao houver.
+    elementoSvg('circle', { cx: 39, cy: 11, r: 7.5, fill: '#4f8cff', class: 'marca-recorte' }),
+    elementoSvg('circle', { cx: 39, cy: 11, r: 4.5, fill: '#ff4d4f', class: 'marca-ponto' })
   )
   return svg
 }

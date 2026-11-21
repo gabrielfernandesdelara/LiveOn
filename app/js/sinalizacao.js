@@ -245,6 +245,10 @@ function tratar (msg) {
         }
       }
 
+      // Minha foto para quem esta la. Numa retomada eles ja tem, mas mandar
+      // de novo custa ~16 KB e cobre quem entrou enquanto eu estava fora.
+      for (const id of participantes.keys()) enviarFotoPara(id)
+
       rotuloDaSala = msg.rotulo || 'sala'
       // Só na entrada de verdade: cada reconexão também recebe 'bemvindo', e
       // não pode abrir arquivo novo nem reiniciar as medições.
@@ -271,9 +275,12 @@ function tratar (msg) {
       // Se eu ja estou no ar, o recem-chegado precisa receber minhas trilhas.
       // Ele ja sabe da minha webcam: veio na lista do 'bemvindo' dele.
       if (streamLocal || streamCamera) adicionarMidia(garantirPar(msg.id))
+      enviarFotoPara(msg.id)
       sincronizarGrade()
       break
     }
+
+    case 'foto': receberFoto(msg); break
 
     case 'saiu': {
       const quem = participantes.get(msg.id)
