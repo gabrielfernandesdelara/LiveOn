@@ -92,6 +92,7 @@ function marcarAparencia () {
   marcar(document.querySelectorAll('#opcao-assistir button'), modoAssistir)
   marcar(document.querySelectorAll('#opcao-tamanho-cam button'), tamanhoDaCamera)
   marcar(document.querySelectorAll('#opcao-minha-tela button'), minhaTela)
+  marcar(document.querySelectorAll('#opcao-pausa button'), modoPausa)
   marcar(document.querySelectorAll('#opcao-som-novo button'), somDasNovas)
 }
 
@@ -111,6 +112,8 @@ function mostrarAbaConfig (aba) {
   if (aba === 'perfil') desenharPerfil()
   if (aba === 'audio') preencherSaidas()
   if (aba === 'mini') mostrarAtalhoDaMini()
+  if (aba === 'debug') mostrarMonitoria()
+  if (aba === 'desempenho') lerInfoDaPlaca().then(mostrarCodificador)
   mostrarSecaoConfig(aba, aba)
 }
 

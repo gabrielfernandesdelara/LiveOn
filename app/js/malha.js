@@ -81,7 +81,7 @@ function garantirPar (id) {
     // Transmissao nova, remetentes novos do outro lado: o teto que eu pedi
     // precisa ser dito outra vez, senao volta calado para a qualidade cheia.
     // So para a tela: a webcam tem teto fixo, de quem manda.
-    if (!daCamera && (qualidadePorId.has(id) || !estouAssistindo(id))) pedirQualidade(id)
+    if (!daCamera && (qualidadePorId.has(id) || !estouAssistindo(id) || imagemPausadaDe(id))) pedirQualidade(id)
 
     // Rede de seguranca para o quadro congelado: se o aviso de "parei" nao
     // chegar, os proprios eventos da trilha limpam a tela.
@@ -107,7 +107,7 @@ function garantirPar (id) {
         // Sem imagem porque EU pedi para nao receber (ainda nao cliquei para
         // assistir): nao e o fim da transmissao. Limpar aqui descartaria o
         // stream, e o clique em "Assistir" nao traria a imagem de volta.
-        if (!daCamera && !estouAssistindo(id)) return
+        if (!daCamera && (!estouAssistindo(id) || imagemPausadaDe(id))) return
         sumindo = setTimeout(limpar, ESPERA_ANTES_DE_LIMPAR)
       })
       track.addEventListener('unmute', () => clearTimeout(sumindo))
@@ -211,6 +211,9 @@ function adicionarTrilhas (par) {
     const remetente = par.pc.addTrack(trilha, streamLocal)
     par.remetentes.push(remetente)
     par.remetentePorTipo.set(trilha.kind, remetente)
+    // H.264 na placa ou VP8 (codificador.js). Antes da negociacao, que o
+    // addTrack so dispara depois.
+    preferirCodec(par, remetente)
     // Aplicar aqui tambem, e nao so no 'connected': quando a transmissao
     // comeca com o par JA conectado, aquele evento nao dispara de novo, e o
     // teto ficava sem ser aplicado, calado.
@@ -275,7 +278,9 @@ async function aplicarQualidadeAgora (par, remetente) {
     params.encodings[0].scaleResolutionDownBy = Math.max(1, alturaFonte / altura)
     params.encodings[0].maxFramerate = fps
     params.encodings[0].maxBitrate = bitrateDe(altura, fps)
-    params.encodings[0].active = ativo
+    // Pausado (o LiveOn do amigo nao esta a vista): so a imagem para, o
+    // audio, no ramo de cima, continua.
+    params.encodings[0].active = ativo && !par.semImagem
     params.degradationPreference = 'maintain-framerate'
   })
 }

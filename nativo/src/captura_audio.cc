@@ -620,6 +620,48 @@ Napi::Value PidDaJanela(const Napi::CallbackInfo& info) {
   return Napi::Number::New(env, pid);
 }
 
+// Quanto da area da janela esta coberto por OUTRAS janelas (0 a 1). Usado
+// pela pausa "quando nao esta a vista" (1.6.4): uma grade de pontos dentro da
+// area da janela, e para cada um o Windows diz qual janela esta por cima
+// (WindowFromPoint, que ja ignora janela invisivel e as sobreposicoes que
+// deixam o mouse passar, como a do Discord e a da NVIDIA). Ponto fora de
+// qualquer monitor nao conta. Minimizada devolve 1.
+Napi::Value FracaoCoberta(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "esperava o HWND como numero").ThrowAsJavaScriptException();
+    return Napi::Number::New(env, 0);
+  }
+  HWND janela = reinterpret_cast<HWND>(static_cast<intptr_t>(info[0].As<Napi::Number>().Int64Value()));
+  if (!IsWindow(janela)) return Napi::Number::New(env, 0);
+  if (IsIconic(janela)) return Napi::Number::New(env, 1);
+
+  RECT area;
+  if (!GetClientRect(janela, &area)) return Napi::Number::New(env, 0);
+  POINT canto = { 0, 0 };
+  ClientToScreen(janela, &canto);
+  const int largura = area.right - area.left;
+  const int altura = area.bottom - area.top;
+  if (largura <= 0 || altura <= 0) return Napi::Number::New(env, 1);
+
+  const int colunas = 8;
+  const int linhas = 6;
+  int contados = 0;
+  int cobertos = 0;
+  for (int i = 0; i < colunas; i++) {
+    for (int j = 0; j < linhas; j++) {
+      POINT p = { canto.x + (largura * (2 * i + 1)) / (2 * colunas), canto.y + (altura * (2 * j + 1)) / (2 * linhas) };
+      if (!MonitorFromPoint(p, MONITOR_DEFAULTTONULL)) continue;
+      contados++;
+      HWND topo = WindowFromPoint(p);
+      HWND raiz = topo ? GetAncestor(topo, GA_ROOT) : nullptr;
+      if (raiz != janela) cobertos++;
+    }
+  }
+  if (contados == 0) return Napi::Number::New(env, 1);
+  return Napi::Number::New(env, static_cast<double>(cobertos) / contados);
+}
+
 Napi::Value RaizDoAplicativoJs(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   if (info.Length() < 1 || !info[0].IsNumber()) {
@@ -645,6 +687,7 @@ Napi::Object Inicializar(Napi::Env env, Napi::Object exports) {
   Captura::Iniciar(env, exports);
   exports.Set("listarSessoes", Napi::Function::New(env, ListarSessoes));
   exports.Set("pidDaJanela", Napi::Function::New(env, PidDaJanela));
+  exports.Set("fracaoCoberta", Napi::Function::New(env, FracaoCoberta));
   exports.Set("raizDoAplicativo", Napi::Function::New(env, RaizDoAplicativoJs));
   exports.Set("suportado", Napi::Function::New(env, Suportado));
   return exports;

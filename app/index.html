@@ -233,6 +233,7 @@
       <button class="aba-config" data-aba="audio"><span data-icone="som"></span>Áudio</button>
       <button class="aba-config" data-aba="mini"><span data-icone="pip"></span>Mini tela</button>
       <button class="aba-config" data-aba="desempenho"><span data-icone="desempenho"></span>Desempenho</button>
+      <button class="aba-config" data-aba="debug"><span data-icone="lupa"></span>Debug</button>
       <span class="cresce"></span>
       <span id="config-versao" class="versao-config"></span>
     </nav>
@@ -492,6 +493,55 @@
         <p class="nota-dialogo">Enquanto a mini tela estiver travada, essa tecla fica reservada para destravar: em outros programas ela não funciona até você destravar.</p>
       </section>
 
+      <!-- Debug (1.6.4): o registro, que sempre existiu e nao tinha botao, e a
+           monitoria, a medicao detalhada que so liga quando a pessoa quer. -->
+      <section class="secao-config oculto" data-secao="debug">
+        <h3>Debug</h3>
+        <p class="descricao-config">Para quando algo dá errado e alguém precisa entender o que aconteceu.</p>
+
+        <h4 class="bloco-config">Registro</h4>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">O que é</div>
+            <p class="descricao-opcao">Um arquivo de texto por sala, gravado sempre, em Documentos\LiveOn\Logs. Cada arquivo some sozinho duas semanas depois da última escrita. É ele que você manda quando alguma coisa dá errado.</p>
+          </div>
+          <button id="btn-abrir-log">Abrir a pasta</button>
+        </div>
+        <div class="grupo-config">
+          <div class="titulo-grupo">O que ele guarda</div>
+          <ul class="lista-debug">
+            <li>A máquina: processador, memória, cada placa de vídeo (fabricante, driver e qual está ativa), placa ou processador, e a prioridade.</li>
+            <li>A sala: quando você entra e sai, quem já estava, quem chega e sai, e quem entra e sai do ar. O código da sala aparece cortado, só os 4 primeiros caracteres.</li>
+            <li>As conexões com cada amigo: o estado (conectando, conectada, instável, falhou), por onde a imagem passa (direto ou por um servidor) e quantos caminhos foram tentados.</li>
+            <li>A cada 30 segundos, o vídeo de cada amigo: codec, resolução, fps, taxa, quem codifica e decodifica, quadros perdidos, congelamentos, o que está limitando a qualidade, e a sua internet (ida e volta e upload estimado).</li>
+            <li>A cada 30 segundos, o uso de processador e de memória do LiveOn.</li>
+            <li>Travamentos: se o app ficou parado mais de 2 segundos, e se o PC dormiu.</li>
+            <li>Falhas: captura de tela que não abriu, erro da página, quedas da conexão com a sala e reconexões.</li>
+            <li>O que você escolhe: tela ou janela, qualidade, modo de áudio, volume, sinal fraco, mini tela, foto e tema.</li>
+          </ul>
+          <p class="nota-dialogo">Nunca vai para o registro: o código inteiro da sala, o título das janelas que você transmite, nem a imagem ou o som.</p>
+        </div>
+
+        <h4 class="bloco-config">Monitoria</h4>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Medição detalhada</div>
+            <p class="descricao-opcao">Ligada, o LiveOn mede tudo a cada 5 segundos e grava numa planilha em Documentos\LiveOn\Monitorias, uma por vez que o app abre. Abre no Excel.</p>
+          </div>
+          <div id="opcao-monitoria" class="segmentos segmentos-abas">
+            <button data-valor="desligada">Desligada</button>
+            <button data-valor="ligada">Ligada</button>
+          </div>
+        </div>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">O que ela mede</div>
+            <p class="descricao-opcao">Processador e memória de cada parte do LiveOn e a memória livre do PC; e, para cada amigo, o vídeo que você recebe e o que você manda (resolução, fps, taxa, codec, quem codifica, perdas, atraso irregular, congelamentos) e a conexão. Ela pesa pouco, mas só deixe ligada quando estiver procurando um problema.</p>
+          </div>
+          <button id="btn-abrir-monitoria">Abrir a pasta</button>
+        </div>
+      </section>
+
       <section class="secao-config oculto" data-secao="desempenho">
         <h3>Desempenho</h3>
         <p id="config-placa" class="quem-dialogo"></p>
@@ -510,6 +560,22 @@
           <button id="btn-reiniciar" class="principal oculto">Reiniciar agora</button>
         </div>
 
+        <!-- Codificador (codificador.js): VP8 no processador ou H.264 na placa.
+             O automatico decide por um teste de verdade nesta placa. -->
+        <div class="grupo-config">
+          <div class="campo">
+            <label for="campo-codificador">Codificar o vídeo que você transmite com</label>
+            <span class="caixa-select">
+              <select id="campo-codificador">
+                <option value="auto">Automático (recomendado)</option>
+                <option value="h264">H.264 na placa de vídeo</option>
+                <option value="vp8">VP8 no processador</option>
+              </select>
+            </span>
+          </div>
+          <p id="nota-codificador" class="nota-dialogo"></p>
+        </div>
+
         <div class="grupo-config">
           <div class="campo">
             <label for="campo-prioridade">Prioridade do LiveOn</label>
@@ -521,6 +587,20 @@
             </span>
           </div>
           <p id="config-nota-prioridade" class="nota-dialogo"></p>
+        </div>
+
+        <!-- Pausa (pausa.js): so a imagem para, o som continua; a mini tela
+             nunca pausa. -->
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Pausar as telas fora de vista</div>
+            <p class="descricao-opcao">Para de receber a imagem quando você não está vendo. O som continua, e a mini tela não pausa. Um programa só em parte por cima, ou o LiveOn em outro monitor, não pausa.</p>
+          </div>
+          <div id="opcao-pausa" class="segmentos segmentos-abas">
+            <button data-valor="nunca" data-exemplo="pausa-nunca">Nunca</button>
+            <button data-valor="minimizado" data-exemplo="pausa-minimizado">Minimizado</button>
+            <button data-valor="coberto" data-exemplo="pausa-coberto">Minimizado ou coberto</button>
+          </div>
         </div>
       </section>
     </div>
@@ -595,6 +675,9 @@
 <script src="js/exemplos.js"></script>
 <script src="js/assistir.js"></script>
 <script src="js/mini.js"></script>
+<script src="js/monitoria.js"></script>
+<script src="js/pausa.js"></script>
+<script src="js/codificador.js"></script>
 <script src="js/preferencias.js"></script>
 <script src="js/ligacoes.js"></script>
 <script src="js/partida.js"></script>

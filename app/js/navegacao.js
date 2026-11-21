@@ -79,6 +79,7 @@ function voltarParaEntrada () {
 
   pararDiagnostico()
   pararSinal()
+  pararPausa()
   if (meuId) {
     anotar('sai da sala')
     try { window.ponte.logSaiu() } catch { /* sem ponte */ }

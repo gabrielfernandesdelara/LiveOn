@@ -65,6 +65,11 @@ const DESENHOS = {
     ['path', { d: 'M3.34 19a10 10 0 1 1 17.32 0' }]
   ],
   mais: [['path', { d: 'M12 5v14M5 12h14' }]],
+  pausa: [['path', { d: 'M9 5v14M15 5v14' }]],
+  lupa: [
+    ['circle', { cx: 11, cy: 11, r: 7 }],
+    ['path', { d: 'm20 20-4-4' }]
+  ],
   cadeado: [
     ['rect', { x: 4, y: 11, width: 16, height: 10, rx: 2 }],
     ['path', { d: 'M8 11V7a4 4 0 0 1 8 0v4' }]

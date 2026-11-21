@@ -161,4 +161,16 @@ function capturar ({ pid, modo = 'excluir', aoReceber }) {
   }
 }
 
-module.exports = { disponivel, listarSessoes, pidDaFonte, capturar }
+// Quanto da janela (pelo HWND) esta coberto por outras, de 0 a 1. Sem o
+// addon, null: quem chama trata como "nao sei" e nao pausa por cobertura.
+function fracaoCoberta (hwnd) {
+  carregar()
+  if (!modulo || typeof modulo.fracaoCoberta !== 'function') return null
+  try {
+    return modulo.fracaoCoberta(hwnd)
+  } catch {
+    return null
+  }
+}
+
+module.exports = { disponivel, listarSessoes, pidDaFonte, capturar, fracaoCoberta }

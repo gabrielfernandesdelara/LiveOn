@@ -76,6 +76,9 @@ contextBridge.exposeInMainWorld('ponte', {
     }
   },
 
+  // Se a janela esta minimizada e quanto dela esta coberto (pausa.js).
+  visibilidade: () => ipcRenderer.invoke('janela:visibilidade'),
+
   // Tela cheia da janela do app.
   telaCheia: (ligar) => ipcRenderer.invoke('janela:telaCheia', ligar),
   aoMudarTelaCheia: (aoMudar) => {
@@ -96,6 +99,10 @@ contextBridge.exposeInMainWorld('ponte', {
   },
 
   registrarLog: (texto) => ipcRenderer.send('log:registrar', texto),
+  // Aba Debug: abrir a pasta do registro ou da monitoria, e a monitoria.
+  abrirPastaDoLog: (qual) => ipcRenderer.invoke('log:abrirPasta', qual),
+  ligarMonitoria: (ligar) => ipcRenderer.invoke('monitoria:ligar', ligar),
+  enviarMonitoria: (linhas) => ipcRenderer.send('monitoria:linhas', linhas),
   caminhoDoLog: () => ipcRenderer.invoke('log:caminho'),
   // Entrar numa sala dá a ela o próprio arquivo de registro; sair encerra as
   // medições.

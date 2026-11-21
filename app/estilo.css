@@ -1139,6 +1139,10 @@ html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-ev
 }
 .bloco-config + .grupo-config { border-top: 0; padding-top: 10px; }
 .campo-saida { max-width: 380px; margin-top: 12px; }
+#opcao-pausa button { padding: 0 12px; }
+.lista-debug { margin: 10px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.6; color: var(--apagado); }
+.lista-debug li + li { margin-top: 4px; }
+.user-select-texto, .lista-debug, .descricao-opcao { user-select: text; }
 .titulo-grupo { font-size: 13px; font-weight: 600; }
 .descricao-opcao { margin: 2px 0 0; font-size: 12px; color: var(--apagado); }
 .linha-opcao { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
@@ -1432,6 +1436,64 @@ html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-ev
   color: #fff;
 }
 .ex-alto-falante.mudo { color: var(--mudo); }
+
+/* Exemplos da pausa: a area de trabalho (com o LiveOn minimizado ou coberto
+   por um jogo) e o card do amigo pausado. */
+.ex-desktop {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--borda);
+  border-radius: 7px;
+  background: linear-gradient(135deg, #24324a, #3a2a45);
+  overflow: hidden;
+}
+.ex-janela {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #fff;
+}
+.ex-janela-liveon {
+  left: 6%;
+  top: 6%;
+  width: 62%;
+  height: 58%;
+  place-items: start;
+  padding: 2px 4px;
+  background: var(--painel);
+  border: 1px solid var(--borda-hover);
+}
+/* Cobre quase todo o LiveOn: so a faixa de cima, com o nome, fica de fora. */
+.ex-janela-jogo { left: 10%; top: 24%; width: 84%; height: 56%; background: #1f6b4a; border: 1px solid rgba(255, 255, 255, .25); }
+.ex-barra-tarefas {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  padding: 2px 0;
+  background: rgba(0, 0, 0, .55);
+}
+.ex-icone-tarefa { width: 10px; height: 10px; border-radius: 3px; background: var(--marca, #4f8cff); }
+.ex-icone-tarefa.minimizado { box-shadow: 0 2px 0 -1px #fff; }
+.ex-pausado .ex-tela { filter: grayscale(.6) brightness(.6); }
+.ex-simbolo-pausa {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--vidro);
+  color: #fff;
+  transform: translate(-50%, -50%);
+}
 
 .ex-cam-pequena { width: 18%; }
 .ex-cam-grande { width: 36%; }

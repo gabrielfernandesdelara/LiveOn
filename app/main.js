@@ -175,20 +175,122 @@ function caminhoLivre (base) {
 }
 
 // Pela data da última escrita, e não da criação: um log de sala que ficou
-// aberta dias conta a partir do fim dela.
+// aberta dias conta a partir do fim dela. Vale também para a Monitoria.
 function limparLogsAntigos () {
   const limite = Date.now() - VALIDADE_DOS_LOGS
-  try {
-    const pasta = pastaDosLogs()
-    for (const nome of fs.readdirSync(pasta)) {
-      if (!nome.endsWith('.log')) continue
-      const caminho = path.join(pasta, nome)
-      try {
-        if (caminho !== arquivoLog && fs.statSync(caminho).mtimeMs < limite) fs.rmSync(caminho, { force: true })
-      } catch { /* um arquivo preso não impede os outros */ }
-    }
-  } catch { /* limpar é bônus */ }
+  const limparPasta = (pasta, extensao, emUso) => {
+    try {
+      for (const nome of fs.readdirSync(pasta)) {
+        if (!nome.endsWith(extensao)) continue
+        const caminho = path.join(pasta, nome)
+        try {
+          if (caminho !== emUso && fs.statSync(caminho).mtimeMs < limite) fs.rmSync(caminho, { force: true })
+        } catch { /* um arquivo preso não impede os outros */ }
+      }
+    } catch { /* limpar é bônus */ }
+  }
+  limparPasta(pastaDosLogs(), '.log', arquivoLog)
+  limparPasta(pastaDaMonitoria(), '.csv', monitoria.arquivo)
 }
+
+// --- monitoria ----------------------------------------------------------------
+//
+// Medição detalhada, ligada na aba Debug (1.6.4, a pedido do dono). É o
+// registro de [medicao] e de "video" em dose maior: a cada 5 s, numa
+// planilha CSV própria em LiveOn\Monitorias, um arquivo por abertura do app.
+// Formato "longo" (hora; quem; medida; valor), que aceita qualquer medida nova
+// sem mudar o cabeçalho e abre no Excel; separado por ";" porque o Excel em
+// português usa a vírgula como decimal. O processo principal mede os
+// processos do app; a página mede os vídeos e manda as linhas por IPC.
+const INTERVALO_MONITORIA = 5000
+const monitoria = { arquivo: null, relogio: null }
+
+// Documentos\LiveOn\Monitorias, ao lado da Logs e nao dentro dela (pedido do
+// dono). Nos testes, dentro da pasta temporaria deles, para nao sujar nada.
+function pastaDaMonitoria () {
+  if (process.env.LIVEON_PASTA_LOGS) return path.join(process.env.LIVEON_PASTA_LOGS, 'Monitorias')
+  return path.join(app.getPath('home'), 'Documents', 'LiveOn', 'Monitorias')
+}
+
+function linhaDaMonitoria (hora, quem, medida, valor) {
+  // Sem ";" nem quebra de linha dentro de um campo: o nome de quem vem de
+  // outra pessoa.
+  const limpo = (v) => String(v === undefined || v === null ? '' : v).replace(/[;\r\n]/g, ' ').slice(0, 120)
+  return `${limpo(hora)};${limpo(quem)};${limpo(medida)};${limpo(valor)}\n`
+}
+
+function escreverNaMonitoria (texto) {
+  if (!monitoria.arquivo) return
+  try { fs.appendFileSync(monitoria.arquivo, texto) } catch { /* disco cheio: medir é bônus */ }
+}
+
+function medirProcessos () {
+  const hora = new Date().toLocaleTimeString('pt-BR')
+  let texto = ''
+  let memoria = 0
+  const porTipo = new Map()
+  for (const p of app.getAppMetrics()) {
+    const atual = porTipo.get(p.type) || { cpu: 0, memoria: 0 }
+    atual.cpu += p.cpu ? p.cpu.percentCPUUsage : 0
+    atual.memoria += p.memory ? p.memory.workingSetSize : 0
+    porTipo.set(p.type, atual)
+    memoria += p.memory ? p.memory.workingSetSize : 0
+  }
+  for (const [tipo, uso] of porTipo) {
+    texto += linhaDaMonitoria(hora, 'app', `cpu ${tipo} (%)`, uso.cpu.toFixed(1).replace('.', ','))
+    texto += linhaDaMonitoria(hora, 'app', `memoria ${tipo} (MB)`, Math.round(uso.memoria / 1024))
+  }
+  texto += linhaDaMonitoria(hora, 'app', 'memoria total (MB)', Math.round(memoria / 1024))
+  texto += linhaDaMonitoria(hora, 'pc', 'memoria livre (MB)', Math.round(os.freemem() / 1048576))
+  escreverNaMonitoria(texto)
+}
+
+function ligarMonitoria (ligar) {
+  if (!ligar) {
+    clearInterval(monitoria.relogio)
+    if (monitoria.arquivo) registrar('monitoria', 'desligada')
+    monitoria.relogio = null
+    monitoria.arquivo = null
+    return null
+  }
+  if (monitoria.arquivo) return monitoria.arquivo
+  try {
+    fs.mkdirSync(pastaDaMonitoria(), { recursive: true })
+    let caminho = path.join(pastaDaMonitoria(), `Monitoria ${carimbo()}.csv`)
+    for (let n = 2; fs.existsSync(caminho); n++) caminho = path.join(pastaDaMonitoria(), `Monitoria ${carimbo()} (${n}).csv`)
+    // A marca do UTF-8 no começo faz o Excel abrir os acentos certos.
+    fs.writeFileSync(caminho, String.fromCharCode(0xFEFF) + 'hora;quem;medida;valor\n')
+    monitoria.arquivo = caminho
+  } catch (erro) {
+    registrar('monitoria', `nao consegui criar o arquivo: ${erro.message}`)
+    return null
+  }
+  registrar('monitoria', `ligada: ${path.basename(monitoria.arquivo)}`)
+  medirProcessos()
+  monitoria.relogio = setInterval(medirProcessos, INTERVALO_MONITORIA)
+  return monitoria.arquivo
+}
+
+ipcMain.handle('monitoria:ligar', apenasDoApp((_evento, ligar) => ligarMonitoria(Boolean(ligar))))
+
+// As linhas da página: os vídeos de cada amigo. Chegam prontas, mas passam
+// pelo mesmo limpador: é texto que veio de outro processo.
+ipcMain.on('monitoria:linhas', apenasDoApp((_evento, linhas) => {
+  if (!monitoria.arquivo || !Array.isArray(linhas)) return
+  const hora = new Date().toLocaleTimeString('pt-BR')
+  escreverNaMonitoria(linhas.slice(0, 400).map((l) => linhaDaMonitoria(hora, l && l.quem, l && l.medida, l && l.valor)).join(''))
+}))
+
+// Abre o Explorador na pasta, com o arquivo atual selecionado quando houver.
+ipcMain.handle('log:abrirPasta', apenasDoApp((_evento, qual) => {
+  const monitorar = qual === 'monitoria'
+  const arquivo = monitorar ? monitoria.arquivo : arquivoLog
+  const pasta = monitorar ? pastaDaMonitoria() : pastaDosLogs()
+  try { fs.mkdirSync(pasta, { recursive: true }) } catch { /* abre o que der */ }
+  if (arquivo && fs.existsSync(arquivo)) shell.showItemInFolder(arquivo)
+  else shell.openPath(pasta)
+  return true
+}))
 
 function iniciarLog () {
   try {
@@ -433,6 +535,23 @@ ipcMain.handle('mini:destravar', apenasDoApp(() => {
 }))
 
 app.on('will-quit', () => globalShortcut.unregisterAll())
+
+// Se a janela de quem pergunta esta a vista (pausa "quando nao esta a
+// vista", 1.6.4): minimizada, e quanto dela outras janelas cobrem (addon;
+// null se ele faltar). A janela e a de quem perguntou, e nao a principal fixa,
+// para valer tambem nos testes.
+ipcMain.handle('janela:visibilidade', apenasDoApp((evento) => {
+  const alvo = BrowserWindow.fromWebContents(evento.sender)
+  if (!alvo || alvo.isDestroyed()) return null
+  const minimizada = alvo.isMinimized() || !alvo.isVisible()
+  let coberta = null
+  try {
+    const alca = alvo.getNativeWindowHandle()
+    const hwnd = alca.length >= 8 ? Number(alca.readBigUInt64LE(0)) : alca.readUInt32LE(0)
+    coberta = capturaProcesso.fracaoCoberta(hwnd)
+  } catch { coberta = null }
+  return { minimizada, coberta }
+}))
 
 ipcMain.handle('janela:telaCheia', apenasDoApp((_evento, ligar) => {
   if (!janela) return false

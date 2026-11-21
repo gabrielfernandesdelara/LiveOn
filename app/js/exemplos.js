@@ -57,6 +57,51 @@ function camDeTamanho (tamanho, legenda) {
   return [card, legenda]
 }
 
+// Um pedaco da area de trabalho, para os exemplos da pausa: a janela do
+// LiveOn, e por cima dela, se houver, a de um jogo.
+function desktopDeExemplo ({ minimizado, coberto }) {
+  const area = document.createElement('div')
+  area.className = 'ex-desktop'
+  if (!minimizado) {
+    const liveon = document.createElement('span')
+    liveon.className = 'ex-janela ex-janela-liveon'
+    liveon.textContent = 'LiveOn'
+    area.appendChild(liveon)
+  }
+  if (coberto) {
+    const jogo = document.createElement('span')
+    jogo.className = 'ex-janela ex-janela-jogo'
+    jogo.textContent = 'Jogo'
+    area.appendChild(jogo)
+  }
+  const barra = document.createElement('span')
+  barra.className = 'ex-barra-tarefas'
+  const icone = document.createElement('span')
+  icone.className = 'ex-icone-tarefa' + (minimizado ? ' minimizado' : '')
+  barra.appendChild(icone)
+  area.appendChild(barra)
+  return area
+}
+
+// O card do amigo como fica pausado: a imagem parada, o simbolo de pausa e o
+// alto-falante, porque o som continua.
+function cardPausadoDeExemplo () {
+  const card = cardDeExemplo()
+  card.classList.add('ex-pausado')
+  const pausa = document.createElement('span')
+  pausa.className = 'ex-simbolo-pausa'
+  pausa.appendChild(icone('pausa', 16, 2.4))
+  card.append(pausa, altoFalanteDeExemplo('som'))
+  return card
+}
+
+function pausaDeExemplo (estado, legenda) {
+  const par = document.createElement('div')
+  par.className = 'ex-par'
+  par.append(desktopDeExemplo(estado), cardPausadoDeExemplo())
+  return [par, legenda]
+}
+
 function altoFalanteDeExemplo (qual) {
   const botao = document.createElement('span')
   botao.className = 'ex-alto-falante' + (qual === 'mudo' ? ' mudo' : '')
@@ -110,6 +155,15 @@ const EXEMPLOS = {
     card.appendChild(seloDeExemplo())
     return [card, 'Só a tela dos amigos ocupa a grade. A sua continua indo para eles.']
   },
+  'pausa-nunca': () => {
+    const card = cardDeExemplo()
+    card.append(seloDeExemplo(), altoFalanteDeExemplo('som'))
+    return [card, 'As telas continuam chegando mesmo com o LiveOn minimizado ou atrás de outro programa.']
+  },
+  'pausa-minimizado': () => pausaDeExemplo({ minimizado: true },
+    'Minimizado, a imagem das telas pausa e o som continua. Abriu o LiveOn de novo, ela volta na hora.'),
+  'pausa-coberto': () => pausaDeExemplo({ coberto: true },
+    'Também pausa quando outro programa cobre quase todo o LiveOn. Só em parte por cima, ou em outro monitor, não pausa.'),
   'assistir-auto': () => {
     const card = cardDeExemplo()
     card.appendChild(seloDeExemplo())

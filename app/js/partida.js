@@ -19,6 +19,11 @@
 
   if (!window.ponte) return anotar('sem ponte: rodando fora do Electron')
 
+  // Monitoria ligada de antes: volta a medir desde a abertura.
+  try { await retomarMonitoria() } catch { /* medir e bonus */ }
+  // O teste do codificador desta placa, se ainda nao foi feito.
+  prepararCodificador().catch(() => {})
+
   // Estado atual da atualizacao (pode ja ter sido baixada antes da tela abrir).
   mostrarAtualizacao(await window.ponte.estadoAtualizacao())
 

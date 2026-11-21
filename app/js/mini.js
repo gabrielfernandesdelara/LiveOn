@@ -143,6 +143,14 @@ function abrirMiniTela (id) {
   }
   mostrarNaMini()
   anotar(`mini tela: ${id.slice(0, 8)}`)
+  avisarPausaDaMini()
+}
+
+// A tela da mini nunca pausa: abrir, trocar ou fechar a mini muda quem pode
+// estar pausado, e quem transmite precisa saber.
+function avisarPausaDaMini () {
+  if (!pausaAtiva()) return
+  for (const [id, p] of participantes) if (p.transmitindo) pedirQualidade(id)
 }
 
 function montarMiniTela () {
@@ -240,10 +248,12 @@ function avisoNaMini (texto) {
 }
 
 function fecharMiniTela () {
+  const tinha = miniId
   if (miniAberta()) miniJanela.close()
   miniJanela = null
   miniId = null
   miniTravada = false
+  if (tinha) avisarPausaDaMini()
 }
 
 // A pessoa da mini parou de mandar a tela (ou saiu): reavalia o que mostrar.

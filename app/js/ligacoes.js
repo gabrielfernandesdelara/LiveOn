@@ -176,6 +176,11 @@ for (const botao of document.querySelectorAll('#opcao-assistir button')) botao.o
 for (const botao of document.querySelectorAll('#opcao-tamanho-cam button')) botao.onclick = () => definirTamanhoDaCamera(botao.dataset.valor)
 for (const botao of document.querySelectorAll('#opcao-minha-tela button')) botao.onclick = () => definirMinhaTela(botao.dataset.valor)
 $('#btn-atalho-mini').onclick = capturarAtalhoDaMini
+$('#campo-codificador').onchange = () => definirCodificador($('#campo-codificador').value)
+for (const botao of document.querySelectorAll('#opcao-pausa button')) botao.onclick = () => definirModoPausa(botao.dataset.valor)
+$('#btn-abrir-log').onclick = () => window.ponte.abrirPastaDoLog('registro')
+$('#btn-abrir-monitoria').onclick = () => window.ponte.abrirPastaDoLog('monitoria')
+for (const botao of document.querySelectorAll('#opcao-monitoria button')) botao.onclick = () => definirMonitoria(botao.dataset.valor === 'ligada')
 $('#btn-atalho-padrao').onclick = voltarAtalhoPadrao
 for (const botao of document.querySelectorAll('#opcao-som-novo button')) botao.onclick = () => definirSomDasNovas(botao.dataset.valor)
 for (const campo of document.querySelectorAll('.editor-tema-cor')) campo.oninput = () => mudarCorDoEditor(campo)

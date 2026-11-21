@@ -50,6 +50,9 @@ function pedirQualidade (id) {
     fps: escolha ? escolha.fps : 0,
     // false = "ainda nao cliquei para assistir": quem transmite desliga o
     // envio para mim (assistir.js).
-    assistindo: estouAssistindo(id)
+    assistindo: estouAssistindo(id),
+    // true = o LiveOn nao esta a vista: so a imagem para, o som continua
+    // (pausa.js).
+    pausado: imagemPausadaDe(id)
   })
 }

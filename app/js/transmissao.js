@@ -315,6 +315,8 @@ async function iniciarTransmissao (fonteId, configAudio) {
   audioAtual = configAudio
 
   for (const id of participantes.keys()) adicionarTrilhas(garantirPar(id))
+  // H.264: confere, com a captura rodando, se ele saiu mesmo pela placa.
+  conferirCodificadorNoAr()
 
   anunciarEstado()
 

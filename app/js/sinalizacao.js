@@ -260,6 +260,7 @@ function tratar (msg) {
         try { window.ponte.logSala(rotuloDaSala) } catch { /* sem ponte */ }
         iniciarDiagnostico()
         iniciarSinal()
+        iniciarPausa()
       }
       anotar(`sala "${rotuloDaSala}" codigo=${mascararCodigo(sessao.codigo)}: entrei como ${meuId.slice(0, 8)}` +
         `${msg.retomada ? ' (retomada)' : ''}, ${msg.participantes.length} ja estavam la` +
@@ -322,6 +323,7 @@ function tratar (msg) {
       const fps = Math.max(0, Number(msg.fps) || 0)
       par.qualidadePedida = (altura || fps) ? { altura, fps } : null
       par.assistindo = msg.assistindo !== false
+      par.semImagem = msg.pausado === true
       for (const remetente of par.remetentes) aplicarQualidade(par, remetente)
       anotar(`${msg.de.slice(0, 8)} pediu ${altura ? altura + 'p' : 'automatica'}${fps ? ' a ' + fps + ' fps' : ''}`)
       break

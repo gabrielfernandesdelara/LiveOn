@@ -192,6 +192,7 @@ function adicionarCamera (par) {
   if (!trilha) return
 
   par.remetenteCamera = par.pc.addTrack(trilha, streamCamera)
+  preferirCodec(par, par.remetenteCamera)
   limitarCamera(par)
 }
 
