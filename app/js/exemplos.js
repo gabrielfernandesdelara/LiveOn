@@ -49,6 +49,13 @@ function webcamDeExemplo (formato) {
   return cam
 }
 
+function altoFalanteDeExemplo (qual) {
+  const botao = document.createElement('span')
+  botao.className = 'ex-alto-falante' + (qual === 'mudo' ? ' mudo' : '')
+  botao.appendChild(icone(qual, 14, 2))
+  return botao
+}
+
 const EXEMPLOS = {
   'camera-canto': () => {
     const card = cardDeExemplo()
@@ -72,6 +79,34 @@ const EXEMPLOS = {
     mexendo.append(seloDeExemplo(), cursor)
     par.append(parado, mexendo)
     return [par, 'Parado, o card fica limpo. Com o mouse mexendo em cima, a inicial aparece.']
+  },
+  'assistir-auto': () => {
+    const card = cardDeExemplo()
+    card.appendChild(seloDeExemplo())
+    return [card, 'A tela de quem entra no ar aparece na hora.']
+  },
+  'assistir-clique': () => {
+    const card = cardDeExemplo()
+    const convite = document.createElement('span')
+    convite.className = 'ex-convite'
+    const texto = document.createElement('span')
+    texto.textContent = 'Ana está transmitindo'
+    const botao = document.createElement('span')
+    botao.className = 'ex-botao'
+    botao.textContent = 'Assistir'
+    convite.append(texto, botao)
+    card.appendChild(convite)
+    return [card, 'Aparece um convite, e a tela só abre quando você clica em Assistir.']
+  },
+  'som-ligado': () => {
+    const card = cardDeExemplo()
+    card.appendChild(altoFalanteDeExemplo('som'))
+    return [card, 'Cada tela nova já começa com som.']
+  },
+  'som-mudo': () => {
+    const card = cardDeExemplo()
+    card.appendChild(altoFalanteDeExemplo('mudo'))
+    return [card, 'Cada tela nova começa muda. Clique no alto-falante do card para ouvir.']
   },
   'selo-sempre': () => {
     const card = cardDeExemplo()

@@ -245,6 +245,10 @@ function tratar (msg) {
         }
       }
 
+      // Quem ja estava com a tela no ar quando eu cheguei: tela nova para mim.
+      // Na reconexao, aoAbrirTela so reafirma o que ja estava decidido.
+      for (const p of msg.participantes) if (p.transmitindo) aoAbrirTela(p.id)
+
       // Minha foto para quem esta la. Numa retomada eles ja tem, mas mandar
       // de novo custa ~16 KB e cobre quem entrou enquanto eu estava fora.
       for (const id of participantes.keys()) enviarFotoPara(id)
@@ -307,6 +311,7 @@ function tratar (msg) {
       const altura = Math.max(0, Number(msg.altura) || 0)
       const fps = Math.max(0, Number(msg.fps) || 0)
       par.qualidadePedida = (altura || fps) ? { altura, fps } : null
+      par.assistindo = msg.assistindo !== false
       for (const remetente of par.remetentes) aplicarQualidade(par, remetente)
       anotar(`${msg.de.slice(0, 8)} pediu ${altura ? altura + 'p' : 'automatica'}${fps ? ' a ' + fps + ' fps' : ''}`)
       break
@@ -337,6 +342,10 @@ function tratar (msg) {
       // Aviso sonoro so na virada: quem ja estava no ar quando entrei nao
       // dispara nada, senao seria uma saraivada ao abrir a sala.
       if (comecouAgora) tocarAviso()
+
+      // Tela nova: assistir na hora ou esperar o clique, e com que som.
+      if (transmitindo) aoAbrirTela(msg.de)
+      else aoFecharTela(msg.de)
 
       if (camera) {
         // O video chegou antes do aviso e foi guardado como tela: e a webcam.

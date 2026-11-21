@@ -403,6 +403,27 @@ function criarCard (id, nome, souEu) {
   // dois cliques de trocar o formato.
   cam.addEventListener('dblclick', (evento) => evento.stopPropagation())
 
+  // "Com um clique" (assistir.js): o convite cobre o card ate a pessoa
+  // clicar. So nos cards dos outros.
+  if (!souEu) {
+    const convite = document.createElement('div')
+    convite.className = 'convite'
+    const texto = document.createElement('span')
+    texto.className = 'convite-texto'
+    texto.textContent = nome + ' está transmitindo'
+    const botao = document.createElement('button')
+    botao.className = 'principal'
+    botao.appendChild(icone('transmitir', 15, 2))
+    botao.append('Assistir')
+    botao.onclick = (evento) => {
+      evento.stopPropagation()
+      assistir(id)
+    }
+    convite.addEventListener('dblclick', (evento) => evento.stopPropagation())
+    convite.append(texto, botao)
+    palco.append(convite)
+  }
+
   palco.append(selo, cam, flutuantes)
 
   // Focar e so por duplo clique: o botao proprio saiu, era mais um item
@@ -454,6 +475,7 @@ function sincronizarGrade () {
       }
     }
     card.classList.toggle('no-ar', pessoa.noAr)
+    if (!pessoa.souEu) atualizarConvite(pessoa.id)
 
     // O meu card mostra a previa do que estou mandando.
     if (pessoa.souEu) mostrarNoCard(card, streamLocal, streamCamera)

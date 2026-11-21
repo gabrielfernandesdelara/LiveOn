@@ -81,7 +81,7 @@ function garantirPar (id) {
     // Transmissao nova, remetentes novos do outro lado: o teto que eu pedi
     // precisa ser dito outra vez, senao volta calado para a qualidade cheia.
     // So para a tela: a webcam tem teto fixo, de quem manda.
-    if (!daCamera && qualidadePorId.has(id)) pedirQualidade(id)
+    if (!daCamera && (qualidadePorId.has(id) || !estouAssistindo(id))) pedirQualidade(id)
 
     // Rede de seguranca para o quadro congelado: se o aviso de "parei" nao
     // chegar, os proprios eventos da trilha limpam a tela.
@@ -104,6 +104,10 @@ function garantirPar (id) {
       let sumindo = null
       track.addEventListener('mute', () => {
         clearTimeout(sumindo)
+        // Sem imagem porque EU pedi para nao receber (ainda nao cliquei para
+        // assistir): nao e o fim da transmissao. Limpar aqui descartaria o
+        // stream, e o clique em "Assistir" nao traria a imagem de volta.
+        if (!daCamera && !estouAssistindo(id)) return
         sumindo = setTimeout(limpar, ESPERA_ANTES_DE_LIMPAR)
       })
       track.addEventListener('unmute', () => clearTimeout(sumindo))
@@ -228,8 +232,33 @@ function adicionarMidia (par) {
 // muda nada para os outros: e outro codificador. Medido com duas conexoes
 // reais saindo de uma captura 1280x720: uma entregou 1280x720 e a outra
 // 640x360 ao mesmo tempo.
-async function aplicarQualidade (par, remetente) {
-  if (!remetente.track || remetente.track.kind !== 'video') return
+//
+// Em FILA, por remetente: duas chamadas quase juntas (o comeco da
+// transmissao e o pedido do amigo chegando logo depois) faziam o segundo
+// setParameters ser recusado enquanto o primeiro nao terminava, e o envio
+// ficava com o valor do primeiro. Medido no test/assistir.js: o amigo pedia
+// para assistir e o envio continuava desligado. Cada chamada le o estado do
+// par na HORA de aplicar, entao a ultima palavra e sempre a do pedido mais
+// recente.
+function aplicarQualidade (par, remetente) {
+  const anterior = filaDeParametros.get(remetente) || Promise.resolve()
+  const proxima = anterior.then(() => aplicarQualidadeAgora(par, remetente))
+  filaDeParametros.set(remetente, proxima)
+  return proxima
+}
+
+const filaDeParametros = new WeakMap()
+
+async function aplicarQualidadeAgora (par, remetente) {
+  if (!remetente.track) return
+
+  // Quem pediu para assistir so com um clique e ainda nao clicou nao recebe
+  // nada da minha tela, nem o som dela: e banda a menos no meu upload
+  // (assistir.js). Pedido sem o campo, de app antigo, vale como assistindo.
+  const ativo = par.assistindo !== false
+  if (remetente.track.kind !== 'video') {
+    return definirParametros(remetente, (params) => { params.encodings[0].active = ativo })
+  }
 
   const fonte = remetente.track.getSettings() || {}
   const alturaFonte = fonte.height || qualidadeLocal.altura
@@ -242,15 +271,35 @@ async function aplicarQualidade (par, remetente) {
   const altura = Math.min(pedido.altura || alturaFonte, alturaFonte)
   const fps = Math.min(pedido.fps || fpsFonte, fpsFonte)
 
-  try {
-    const params = remetente.getParameters()
-    if (!params.encodings || params.encodings.length === 0) params.encodings = [{}]
+  return definirParametros(remetente, (params) => {
     params.encodings[0].scaleResolutionDownBy = Math.max(1, alturaFonte / altura)
     params.encodings[0].maxFramerate = fps
     params.encodings[0].maxBitrate = bitrateDe(altura, fps)
+    params.encodings[0].active = ativo
     params.degradationPreference = 'maintain-framerate'
-    await remetente.setParameters(params)
-  } catch (erro) {
-    console.warn('[qualidade] nao consegui aplicar:', erro)
+  })
+}
+
+// getParameters, ajusta e setParameters, tentando de novo se a negociacao
+// mudou os parametros no meio. Acontece com remetente recem-criado: o pedido
+// do amigo chega enquanto a trilha ainda esta sendo negociada, e o
+// setParameters recusa com "modified RTCP parameters" (medido no
+// test/assistir.js). Relendo depois de um instante, passa.
+async function definirParametros (remetente, ajustar) {
+  for (let tentativa = 1; tentativa <= 5; tentativa++) {
+    try {
+      const params = remetente.getParameters()
+      if (!params.encodings || params.encodings.length === 0) params.encodings = [{}]
+      ajustar(params)
+      await remetente.setParameters(params)
+      return
+    } catch (erro) {
+      const passageiro = erro.name === 'InvalidModificationError' || erro.name === 'InvalidStateError'
+      if (!passageiro || tentativa === 5 || !remetente.track) {
+        console.warn(`[qualidade] nao consegui aplicar: ${erro.name}: ${erro.message}`)
+        return
+      }
+      await new Promise((resolver) => setTimeout(resolver, 200 * tentativa))
+    }
   }
 }

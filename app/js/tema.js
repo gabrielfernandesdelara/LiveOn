@@ -53,6 +53,10 @@ const PONTO_PADRAO = '#ff4d4f'
 const PAPEL_MAXIMO = 450 * 1024
 const PAPEL_LADO = 1920
 const ESCURECER_PADRAO = 0.35
+// Onde o papel fica: o ponto da imagem que a pessoa escolheu para o meio
+// (x e y de 0 a 100) e o zoom (1 = a imagem cobrindo a janela, ate 3).
+const POSICAO_PADRAO = { x: 50, y: 50, zoom: 1 }
+const ZOOM_PAPEL_MAXIMO = 3
 const FORMATO_DE_PAPEL = /^data:image\/webp;base64,[A-Za-z0-9+/]+=*$/
 
 // O que está em uso: um dos prontos ou 'pessoal-0' a 'pessoal-3'.
@@ -131,20 +135,38 @@ function pintar (elemento, cores) {
   }
 }
 
-// O papel de parede no fundo do app, com o véu da cor do fundo por cima.
-// Sem papel, tira.
-function pintarPapel (papel, escurecer, fundo) {
-  const raiz = document.documentElement
+// A posicao que vier do armazenamento, dentro dos limites.
+function posicaoValida (p) {
+  const numero = (v, padrao, min, max) => Number.isFinite(Number(v)) ? Math.min(max, Math.max(min, Number(v))) : padrao
+  return {
+    x: numero(p && p.x, 50, 0, 100),
+    y: numero(p && p.y, 50, 0, 100),
+    zoom: numero(p && p.zoom, 1, 1, ZOOM_PAPEL_MAXIMO)
+  }
+}
+
+// As variaveis do papel num elemento: o <html> para o app, ou a previa do
+// editor. O CSS faz o resto (html.com-papel body::before e .camada-papel).
+function variaveisDoPapel (elemento, papel, escurecer, fundo, posicao) {
   if (!papel) {
-    raiz.classList.remove('com-papel')
-    raiz.style.removeProperty('--papel')
-    raiz.style.removeProperty('--veu-papel')
+    for (const v of ['--papel', '--veu-papel', '--papel-x', '--papel-y', '--papel-zoom']) elemento.style.removeProperty(v)
     return
   }
   const [r, g, b] = paraRgb(fundo)
-  raiz.style.setProperty('--papel', `url("${papel}")`)
-  raiz.style.setProperty('--veu-papel', `rgba(${r}, ${g}, ${b}, ${Math.min(0.9, Math.max(0, escurecer))})`)
-  raiz.classList.add('com-papel')
+  const p = posicaoValida(posicao)
+  elemento.style.setProperty('--papel', `url("${papel}")`)
+  elemento.style.setProperty('--veu-papel', `rgba(${r}, ${g}, ${b}, ${Math.min(0.9, Math.max(0, escurecer))})`)
+  elemento.style.setProperty('--papel-x', p.x + '%')
+  elemento.style.setProperty('--papel-y', p.y + '%')
+  elemento.style.setProperty('--papel-zoom', String(p.zoom))
+}
+
+// O papel de parede no fundo do app, com o véu da cor do fundo por cima.
+// Sem papel, tira.
+function pintarPapel (papel, escurecer, fundo, posicao) {
+  const raiz = document.documentElement
+  variaveisDoPapel(raiz, papel, escurecer, fundo, posicao)
+  raiz.classList.toggle('com-papel', Boolean(papel))
 }
 
 // O que mostrar embaixo das cores no editor. Não impede salvar.
@@ -178,7 +200,8 @@ function temasPessoais () {
       nome: String(t.nome || '').trim().slice(0, 24) || 'Meu tema ' + (i + 1),
       cores,
       papel: t.papel === true,
-      escurecer: Number.isFinite(escurecer) ? Math.min(0.9, Math.max(0, escurecer)) : ESCURECER_PADRAO
+      escurecer: Number.isFinite(escurecer) ? Math.min(0.9, Math.max(0, escurecer)) : ESCURECER_PADRAO,
+      posicao: posicaoValida(t.posicao)
     }
   })
 }
@@ -196,14 +219,15 @@ function guardarTemasPessoais (lista) {
 // Tudo de um tema, pronto ou da pessoa: as cores, o papel e o quanto ele
 // escurece. É o ponto de partida do editor.
 function temaCompleto (nome) {
-  if (CORES_PRONTAS[nome]) return { cores: { ...CORES_PRONTAS[nome] }, papel: '', escurecer: ESCURECER_PADRAO }
+  if (CORES_PRONTAS[nome]) return { cores: { ...CORES_PRONTAS[nome] }, papel: '', escurecer: ESCURECER_PADRAO, posicao: { ...POSICAO_PADRAO } }
   const m = /^pessoal-(\d)$/.exec(nome || '')
   const pessoal = m && temasPessoais()[Number(m[1])]
   if (!pessoal) return temaCompleto('grafite')
   return {
     cores: { ...pessoal.cores },
     papel: pessoal.papel ? papelDoLugar(Number(m[1])) : '',
-    escurecer: pessoal.escurecer
+    escurecer: pessoal.escurecer,
+    posicao: { ...pessoal.posicao }
   }
 }
 
@@ -211,10 +235,10 @@ function temaCompleto (nome) {
 
 // Mostra um tema sem guardar nada: é o que o editor usa enquanto a pessoa
 // escolhe. aplicarTema() desfaz.
-function previaDeTema ({ cores, papel, escurecer }) {
+function previaDeTema ({ cores, papel, escurecer, posicao }) {
   document.documentElement.dataset.tema = 'pessoal'
   pintar(document.documentElement, cores)
-  pintarPapel(papel, escurecer, cores.fundo)
+  pintarPapel(papel, escurecer, cores.fundo, posicao)
 }
 
 function aplicarTema (nome) {

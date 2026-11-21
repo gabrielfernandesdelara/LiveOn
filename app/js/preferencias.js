@@ -57,6 +57,8 @@ function marcarAparencia () {
   marcar(document.querySelectorAll('.tema'), temaAtual)
   marcar(document.querySelectorAll('#opcao-camera button'), formatoDaCamera)
   marcar(document.querySelectorAll('#opcao-selo button'), nomeNoCard)
+  marcar(document.querySelectorAll('#opcao-assistir button'), modoAssistir)
+  marcar(document.querySelectorAll('#opcao-som-novo button'), somDasNovas)
 }
 
 // A aba acesa na lateral e a seção que aparece. O editor de tema e uma seção
@@ -73,6 +75,7 @@ function mostrarAbaConfig (aba) {
   fecharRecorte()
   if (aba === 'aparencia') desenharTemasPessoais()
   if (aba === 'perfil') desenharPerfil()
+  if (aba === 'audio') preencherSaidas()
   mostrarSecaoConfig(aba, aba)
 }
 
@@ -86,13 +89,14 @@ let temaEmEdicao = null
 // Um pedaco do app desenhado com as cores de quem estiver em volta: e a
 // classe amostra-* ou as variaveis postas por pintar() que decidem quais.
 // Com papel de parede, ele aparece no fundo da miniatura.
-function criarPreviaDeTema (papel, escurecer, fundo) {
+function criarPreviaDeTema (papel, escurecer, fundo, posicao) {
   const previa = document.createElement('span')
   previa.className = 'previa-tema'
   if (papel) {
     const [r, g, b] = paraRgb(fundo)
     const veu = `rgba(${r}, ${g}, ${b}, ${escurecer})`
     previa.style.backgroundImage = `linear-gradient(${veu}, ${veu}), url("${papel}")`
+    if (posicao) previa.style.backgroundPosition = `center, ${posicao.x}% ${posicao.y}%`
     previa.classList.add('com-papel')
   }
   const barra = document.createElement('span')
@@ -134,7 +138,7 @@ function desenharTemasPessoais () {
     pintar(botao, tema.cores)
     nome.textContent = tema.nome
     const papel = tema.papel ? papelDoLugar(i) : ''
-    botao.append(criarPreviaDeTema(papel, tema.escurecer, tema.cores.fundo), nome)
+    botao.append(criarPreviaDeTema(papel, tema.escurecer, tema.cores.fundo, tema.posicao), nome)
     botao.onclick = () => escolherTema('pessoal-' + i)
 
     const acoes = document.createElement('div')
@@ -223,12 +227,14 @@ function mostrarTemaNoEditor () {
     campo.parentNode.querySelector('.hex-cor').textContent = cor.toUpperCase()
   }
 
-  $('#previa-papel').style.backgroundImage = papel ? `url("${papel}")` : ''
+  variaveisDoPapel($('#previa-papel'), papel, escurecer, cores.fundo, temaEmEdicao.posicao)
   $('#previa-papel').classList.toggle('vazio', !papel)
   $('#btn-remover-papel').classList.toggle('oculto', !papel)
   $('#btn-escolher-papel').textContent = papel ? 'Trocar imagem' : 'Escolher imagem'
   $('#escurecer-papel').value = String(escurecer)
   $('#escurecer-papel').disabled = !papel
+  $('#zoom-papel').value = String(temaEmEdicao.posicao.zoom)
+  $('#zoom-papel').disabled = !papel
 
   previaDeTema(temaEmEdicao)
   $('#aviso-contraste').textContent = avisoDeContraste(cores)
@@ -243,6 +249,47 @@ function mudarCorDoEditor (campo) {
 function mudarBaseDoTema () {
   temaEmEdicao = temaCompleto($('#campo-base-tema').value)
   mostrarTemaNoEditor()
+}
+
+// Arrastar na previa move a imagem junto com o mouse: o ponto escolhido
+// anda no sentido contrario do arraste. Com zoom, o mesmo arraste anda menos
+// na imagem, por isso a divisao.
+function moverPapel (dx, dy) {
+  if (!temaEmEdicao || !temaEmEdicao.papel) return
+  const previa = $('#previa-papel')
+  const p = temaEmEdicao.posicao
+  p.x = Math.min(100, Math.max(0, p.x - (dx / previa.clientWidth) * 100 / p.zoom))
+  p.y = Math.min(100, Math.max(0, p.y - (dy / previa.clientHeight) * 100 / p.zoom))
+  mostrarTemaNoEditor()
+}
+
+function mudarZoomDoPapel (valor) {
+  if (!temaEmEdicao || !temaEmEdicao.papel) return
+  temaEmEdicao.posicao.zoom = Math.min(ZOOM_PAPEL_MAXIMO, Math.max(1, valor))
+  mostrarTemaNoEditor()
+}
+
+function ligarPreviaDoPapel () {
+  const previa = $('#previa-papel')
+  let ultimo = null
+  previa.addEventListener('pointerdown', (evento) => {
+    if (!temaEmEdicao || !temaEmEdicao.papel) return
+    previa.setPointerCapture(evento.pointerId)
+    ultimo = { x: evento.clientX, y: evento.clientY }
+  })
+  previa.addEventListener('pointermove', (evento) => {
+    if (!ultimo) return
+    moverPapel(evento.clientX - ultimo.x, evento.clientY - ultimo.y)
+    ultimo = { x: evento.clientX, y: evento.clientY }
+  })
+  const soltar = () => { ultimo = null }
+  previa.addEventListener('pointerup', soltar)
+  previa.addEventListener('pointercancel', soltar)
+  previa.addEventListener('wheel', (evento) => {
+    if (!temaEmEdicao || !temaEmEdicao.papel) return
+    evento.preventDefault()
+    mudarZoomDoPapel(temaEmEdicao.posicao.zoom * (evento.deltaY < 0 ? 1.06 : 1 / 1.06))
+  }, { passive: false })
 }
 
 function mudarEscurecer () {
@@ -286,6 +333,8 @@ async function escolherPapel (arquivo) {
 
   if (!temaEmEdicao) return
   temaEmEdicao.papel = await paraDataUrl(blob)
+  // Imagem nova comeca no meio, sem zoom.
+  temaEmEdicao.posicao = { ...POSICAO_PADRAO }
   anotar(`papel de parede escolhido: ${Math.round(blob.size / 1024)} KB`)
   mostrarTemaNoEditor()
 }
@@ -314,7 +363,8 @@ function salvarTema () {
     nome: $('#campo-nome-tema').value.trim().slice(0, 24) || 'Meu tema ' + (lugar + 1),
     cores: { ...cores },
     papel: Boolean(papel),
-    escurecer
+    escurecer,
+    posicao: { ...temaEmEdicao.posicao }
   }
   guardarTemasPessoais(lista)
   edicaoTema = null
@@ -330,9 +380,12 @@ function cancelarEdicaoDeTema () {
   temaEmEdicao = null
   aplicarTema(temaAtual)
 }
-async function abrirConfig () {
+// Abre no Perfil, ou na aba pedida (a engrenagem da minha linha na lista de
+// pessoas abre no Audio). O clique do botao chega aqui como evento, por
+// isso o teste do texto.
+async function abrirConfig (aba) {
   avisarFoto('')
-  mostrarAbaConfig('perfil')
+  mostrarAbaConfig(typeof aba === 'string' ? aba : 'perfil')
   marcarAparencia()
   $('#config').classList.remove('oculto')
   try {

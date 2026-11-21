@@ -47,6 +47,9 @@ function pedirQualidade (id) {
     tipo: 'qualidade',
     para: id,
     altura: escolha ? escolha.altura : 0,
-    fps: escolha ? escolha.fps : 0
+    fps: escolha ? escolha.fps : 0,
+    // false = "ainda nao cliquei para assistir": quem transmite desliga o
+    // envio para mim (assistir.js).
+    assistindo: estouAssistindo(id)
   })
 }

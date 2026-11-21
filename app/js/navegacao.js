@@ -31,7 +31,7 @@ function fecharDialogo () {
     fecharConfig()
     return true
   }
-  for (const id of ['#saida', '#seletor']) {
+  for (const id of ['#seletor']) {
     if (!$(id).classList.contains('oculto')) {
       $(id).classList.add('oculto')
       return true
@@ -62,6 +62,7 @@ function voltarParaEntrada () {
   qualidadePorId.clear()
   volumePorId.clear()
   fotosPorId.clear()
+  esquecerTelas()
   aguardandoEntrada = false
   if (sessao) sessao.credencial = null
   volumeAntesDeMudo.clear()

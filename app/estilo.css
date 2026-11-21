@@ -233,12 +233,21 @@ option:disabled { color: var(--fraco); }
 /* Papel de parede do tema da pessoa: no fundo do app inteiro, com um veu da
    cor do fundo por cima para dar para ler. A barra, os paineis e os cards
    continuam solidos. */
-html.com-papel body {
+/* A imagem fica numa camada propria, atras de tudo, para dar para mover e
+   aproximar: o ponto escolhido (--papel-x/y) e o centro do zoom. A mesma
+   regra pinta a previa do editor (.camada-papel), que recebe as variaveis
+   no proprio elemento. */
+html.com-papel body::before,
+.camada-papel {
+  content: "";
   background-image: linear-gradient(var(--veu-papel), var(--veu-papel)), var(--papel);
   background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+  background-position: center, var(--papel-x, 50%) var(--papel-y, 50%);
+  background-repeat: no-repeat;
+  transform: scale(var(--papel-zoom, 1));
+  transform-origin: var(--papel-x, 50%) var(--papel-y, 50%);
 }
+html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
 .marca-nome {
   font-family: "Sora", "Segoe UI", sans-serif;
   font-weight: 600;
@@ -1251,21 +1260,26 @@ html.com-papel body {
 
 .linha-papel { display: flex; align-items: center; gap: 18px; margin-top: 12px; }
 .previa-papel {
+  position: relative;
   flex: 0 0 auto;
-  width: 192px;
-  height: 108px;
+  width: 256px;
+  height: 144px;
   border: 1px solid var(--borda);
   border-radius: 7px;
   background-color: var(--fundo);
-  background-size: cover;
-  background-position: center;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
 }
-.previa-papel.vazio { border-style: dashed; }
+.previa-papel:active { cursor: grabbing; }
+.previa-papel .camada-papel { position: absolute; inset: 0; pointer-events: none; }
+.previa-papel.vazio { border-style: dashed; cursor: default; }
+.previa-papel.vazio .camada-papel { display: none; }
 .controles-papel { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; max-width: 300px; }
 .controles-papel .botoes-foto { margin-top: 0; }
 .controles-papel label { margin: 4px 0 0; }
-#escurecer-papel { width: 100%; margin: 0; accent-color: var(--realce); cursor: pointer; }
-#escurecer-papel:disabled { opacity: .4; cursor: default; }
+#escurecer-papel, #zoom-papel { width: 100%; margin: 0; accent-color: var(--realce); cursor: pointer; }
+#escurecer-papel:disabled, #zoom-papel:disabled { opacity: .4; cursor: default; }
 .previa-tema.com-papel { background-size: cover; background-position: center; }
 
 .linha-icone { display: flex; align-items: center; gap: 18px; margin-top: 12px; }
@@ -1379,6 +1393,55 @@ html.com-papel body {
 .ex-cam-canto { right: 5%; top: 7%; width: 28%; aspect-ratio: 16 / 9; border-radius: 4px; }
 .ex-cam-selo { left: 5%; bottom: 7%; width: 22px; height: 22px; border-radius: 50%; }
 .ex-cursor { position: absolute; left: 44%; top: 46%; color: #fff; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8)); }
+.ex-convite {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--painel);
+  font-size: 10px;
+  color: var(--apagado);
+}
+.ex-botao { padding: 3px 10px; border-radius: 5px; background: var(--realce); color: #fff; font-weight: 600; }
+.ex-alto-falante {
+  position: absolute;
+  right: 6%;
+  bottom: 8%;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--vidro);
+  color: #fff;
+}
+.ex-alto-falante.mudo { color: var(--mudo); }
+
+/* "Com um clique" (assistir.js): o convite cobre o card de quem abriu a tela
+   ate a pessoa clicar em Assistir. O video fica escondido e mudo. */
+.convite { display: none; }
+.card.aguardando .convite {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--painel);
+  text-align: center;
+}
+.convite-texto { font-size: 13px; color: var(--apagado); }
+.card.aguardando .palco > video,
+.card.aguardando .cam,
+.card.aguardando .vazio { visibility: hidden; }
+#miniaturas .card.aguardando .convite-texto,
+.card.minusculo.aguardando .convite-texto { display: none; }
 
 /* Janela estreita: as abas sobem para uma faixa em cima. */
 @media (max-width: 720px) {

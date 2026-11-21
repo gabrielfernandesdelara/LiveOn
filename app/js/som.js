@@ -51,7 +51,8 @@ function aplicarVolume (id, nivel) {
       // Se o autoplay tinha entrado mudo a forca, mexer no volume e gesto do
       // usuario, da para devolver o som.
       if (nivel > 0) delete video.dataset.mudoForcado
-      video.muted = nivel === 0
+      // Esperando o clique para assistir, fica mudo seja qual for o volume.
+      video.muted = nivel === 0 || card.classList.contains('aguardando')
     }
 
     const barra = card.querySelector('.volume')
@@ -156,7 +157,15 @@ async function listarSaidas () {
   }
 }
 
-async function abrirSaida () {
+// A engrenagem da minha linha na lista de pessoas: abre as configuracoes ja
+// na aba Audio, onde a escolha mora desde a 1.6.0.
+function abrirSaida () {
+  abrirConfig('audio')
+}
+
+// Monta a lista de aparelhos da aba Audio. Roda ao abrir a aba e quando um
+// aparelho entra ou sai (headset conectado no meio da sala).
+async function preencherSaidas () {
   const campo = $('#campo-saida')
   campo.textContent = ''
 
@@ -178,7 +187,4 @@ async function abrirSaida () {
 
   // A escolha guardada pode ter sumido junto com o aparelho.
   campo.value = [...campo.options].some((o) => o.value === saidaEscolhida) ? saidaEscolhida : ''
-
-  $('#saida-quem').textContent = meuNome
-  $('#saida').classList.remove('oculto')
 }

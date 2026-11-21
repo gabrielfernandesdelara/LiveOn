@@ -218,24 +218,6 @@
   </div>
 </div>
 
-<!-- ---------------- saida de audio ---------------- -->
-<div id="saida" class="dialogo oculto">
-  <div class="painel-dialogo">
-    <h2>Saída de áudio</h2>
-    <p id="saida-quem" class="quem-dialogo"></p>
-
-    <div class="campo">
-      <label for="campo-saida">Tocar o som em</label>
-      <span class="caixa-select"><select id="campo-saida"></select></span>
-    </div>
-
-    <p class="nota-dialogo">Vale só para o LiveOn. O resto do computador continua usando a saída do Windows.</p>
-
-    <div class="acoes-dialogo">
-      <button id="btn-fechar-saida">Fechar</button>
-    </div>
-  </div>
-</div>
 
 <!-- ---------------- configuracoes ----------------
      Abre pela engrenagem da tela de entrada e pela da barra da sala. Quase do
@@ -247,6 +229,7 @@
       <h2 id="titulo-config">Configurações</h2>
       <button class="aba-config ativa" data-aba="perfil"><span data-icone="usuario"></span>Perfil</button>
       <button class="aba-config" data-aba="aparencia"><span data-icone="pincel"></span>Aparência</button>
+      <button class="aba-config" data-aba="audio"><span data-icone="som"></span>Áudio</button>
       <button class="aba-config" data-aba="desempenho"><span data-icone="desempenho"></span>Desempenho</button>
       <span class="cresce"></span>
       <span id="config-versao" class="versao-config"></span>
@@ -344,6 +327,28 @@
             <button data-valor="sempre" data-exemplo="selo-sempre">Sempre</button>
           </div>
         </div>
+
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Quando alguém abre a tela</div>
+            <p class="descricao-opcao">Com um clique, quem transmite não manda nada até você clicar.</p>
+          </div>
+          <div id="opcao-assistir" class="segmentos segmentos-abas">
+            <button data-valor="auto" data-exemplo="assistir-auto">Assistir na hora</button>
+            <button data-valor="clique" data-exemplo="assistir-clique">Com um clique</button>
+          </div>
+        </div>
+
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Som das telas novas</div>
+            <p class="descricao-opcao">Como cada tela começa. O alto-falante do card troca depois.</p>
+          </div>
+          <div id="opcao-som-novo" class="segmentos segmentos-abas">
+            <button data-valor="ligado" data-exemplo="som-ligado">Ligado</button>
+            <button data-valor="mudo" data-exemplo="som-mudo">Mudo</button>
+          </div>
+        </div>
       </section>
 
       <!-- Editor de tema: so as cinco cores, o resto e calculado
@@ -377,15 +382,17 @@
 
         <div class="grupo-config">
           <div class="titulo-grupo">Papel de parede</div>
-          <p class="descricao-opcao">Aparece no fundo, atrás das telas e na entrada.</p>
+          <p class="descricao-opcao">Aparece no fundo, atrás das telas e na entrada. Arraste a imagem para escolher a parte que aparece.</p>
           <div class="linha-papel">
-            <div id="previa-papel" class="previa-papel vazio"></div>
+            <div id="previa-papel" class="previa-papel vazio" title="Arraste para posicionar"><div class="camada-papel"></div></div>
             <div class="controles-papel">
               <div class="botoes-foto">
                 <button id="btn-escolher-papel">Escolher imagem</button>
                 <button id="btn-remover-papel" class="oculto">Remover</button>
                 <input id="arquivo-papel" type="file" accept="image/*" class="oculto">
               </div>
+              <label for="zoom-papel">Zoom</label>
+              <input id="zoom-papel" type="range" min="1" max="3" step="0.01" value="1">
               <label for="escurecer-papel">Escurecer</label>
               <input id="escurecer-papel" type="range" min="0" max="0.85" step="0.01" value="0.35">
             </div>
@@ -408,6 +415,22 @@
         <div class="acoes-editor">
           <button id="btn-cancelar-tema">Cancelar</button>
           <button id="btn-salvar-tema" class="principal">Salvar tema</button>
+        </div>
+      </section>
+
+      <!-- Saida de audio: era uma janela propria, aberta pela engrenagem da
+           minha linha na lista de pessoas. Desde a 1.6.0 mora aqui; aquela
+           engrenagem abre as configuracoes direto nesta aba. -->
+      <section class="secao-config oculto" data-secao="audio">
+        <h3>Áudio</h3>
+        <p class="descricao-config">Por onde você ouve os amigos.</p>
+
+        <div class="grupo-config">
+          <div class="campo">
+            <label for="campo-saida">Tocar o som em</label>
+            <span class="caixa-select"><select id="campo-saida"></select></span>
+          </div>
+          <p class="nota-dialogo">Vale só para o LiveOn. O resto do computador continua usando a saída do Windows.</p>
         </div>
       </section>
 
@@ -512,6 +535,7 @@
 <script src="js/sinal.js"></script>
 <script src="js/perfil.js"></script>
 <script src="js/exemplos.js"></script>
+<script src="js/assistir.js"></script>
 <script src="js/preferencias.js"></script>
 <script src="js/ligacoes.js"></script>
 <script src="js/partida.js"></script>

@@ -151,16 +151,12 @@ $('#campo-saida').onchange = () => {
   aplicarSaidaEmTodos()
 }
 
-$('#btn-fechar-saida').onclick = () => $('#saida').classList.add('oculto')
-
-$('#saida').onclick = (evento) => {
-  if (evento.target === $('#saida')) $('#saida').classList.add('oculto')
-}
-
 // Headset conectado ou desconectado no meio da sala: a lista aberta atualiza,
 // e o som vai para onde ainda existe.
 navigator.mediaDevices.addEventListener('devicechange', () => {
-  if (!$('#saida').classList.contains('oculto')) abrirSaida()
+  const abaAberta = !$('#config').classList.contains('oculto') &&
+    !document.querySelector('[data-secao=audio]').classList.contains('oculto')
+  if (abaAberta) preencherSaidas()
   aplicarSaidaEmTodos()
 })
 
@@ -176,6 +172,8 @@ for (const aba of document.querySelectorAll('.aba-config')) aba.onclick = () => 
 for (const tema of document.querySelectorAll('.tema')) tema.onclick = () => escolherTema(tema.dataset.tema)
 for (const botao of document.querySelectorAll('#opcao-camera button')) botao.onclick = () => escolherFormatoDaCamera(botao.dataset.valor)
 for (const botao of document.querySelectorAll('#opcao-selo button')) botao.onclick = () => definirNomeNoCard(botao.dataset.valor)
+for (const botao of document.querySelectorAll('#opcao-assistir button')) botao.onclick = () => definirModoAssistir(botao.dataset.valor)
+for (const botao of document.querySelectorAll('#opcao-som-novo button')) botao.onclick = () => definirSomDasNovas(botao.dataset.valor)
 for (const campo of document.querySelectorAll('.editor-tema-cor')) campo.oninput = () => mudarCorDoEditor(campo)
 $('#btn-escolher-papel').onclick = () => $('#arquivo-papel').click()
 $('#arquivo-papel').onchange = () => {
@@ -185,6 +183,8 @@ $('#arquivo-papel').onchange = () => {
 }
 $('#btn-remover-papel').onclick = removerPapel
 $('#escurecer-papel').oninput = mudarEscurecer
+$('#zoom-papel').oninput = () => mudarZoomDoPapel(Number($('#zoom-papel').value))
+ligarPreviaDoPapel()
 $('#campo-base-tema').onchange = mudarBaseDoTema
 $('#btn-salvar-tema').onclick = salvarTema
 $('#btn-cancelar-tema').onclick = () => mostrarAbaConfig('aparencia')
