@@ -63,6 +63,7 @@ function voltarParaEntrada () {
   volumePorId.clear()
   fotosPorId.clear()
   esquecerTelas()
+  fecharMiniTela()
   aguardandoEntrada = false
   if (sessao) sessao.credencial = null
   volumeAntesDeMudo.clear()

@@ -6,6 +6,7 @@
   // Primeiro de tudo, para a tela nao nascer num tema e trocar para outro.
   aplicarTema(lembrar('liveon:tema'))
   aplicarNomeNoCard()
+  aplicarTamanhoDaCamera()
 
   // Nome e qualidade voltam entre sessoes. O codigo da sala nao: e o segredo
   // dela, e sala nova ganha codigo novo.

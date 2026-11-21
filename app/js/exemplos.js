@@ -49,6 +49,14 @@ function webcamDeExemplo (formato) {
   return cam
 }
 
+function camDeTamanho (tamanho, legenda) {
+  const card = cardDeExemplo()
+  const cam = webcamDeExemplo('canto')
+  cam.classList.add('ex-cam-' + tamanho)
+  card.append(cam, seloDeExemplo())
+  return [card, legenda]
+}
+
 function altoFalanteDeExemplo (qual) {
   const botao = document.createElement('span')
   botao.className = 'ex-alto-falante' + (qual === 'mudo' ? ' mudo' : '')
@@ -65,7 +73,7 @@ const EXEMPLOS = {
   'camera-selo': () => {
     const card = cardDeExemplo()
     card.appendChild(webcamDeExemplo('selo'))
-    return [card, 'A webcam fica redonda, no lugar da inicial.']
+    return [card, 'A webcam fica redonda, no lugar da foto.']
   },
   // Dois cards: parado, sem nada; com o mouse mexendo, a inicial aparece.
   'selo-mouse': () => {
@@ -78,7 +86,29 @@ const EXEMPLOS = {
     cursor.appendChild(icone('cursor', 14, 1.8))
     mexendo.append(seloDeExemplo(), cursor)
     par.append(parado, mexendo)
-    return [par, 'Parado, o card fica limpo. Com o mouse mexendo em cima, a inicial aparece.']
+    return [par, 'Parado, o card fica limpo. Com o mouse mexendo em cima, a foto e o nome aparecem.']
+  },
+  'cam-pequena': () => camDeTamanho('pequena', 'A webcam dos amigos fica pequena, no canto.'),
+  'cam-media': () => camDeTamanho('media', 'O tamanho de sempre.'),
+  'cam-grande': () => camDeTamanho('grande', 'A webcam dos amigos fica grande, para ver melhor quem fala.'),
+  'minha-tela-mostrar': () => {
+    const par = document.createElement('div')
+    par.className = 'ex-par'
+    const amigo = cardDeExemplo()
+    amigo.appendChild(seloDeExemplo())
+    const eu = cardDeExemplo()
+    eu.classList.add('ex-eu')
+    const tag = document.createElement('span')
+    tag.className = 'ex-tag'
+    tag.textContent = 'você'
+    eu.appendChild(tag)
+    par.append(amigo, eu)
+    return [par, 'A sua tela aparece na grade junto com a dos amigos.']
+  },
+  'minha-tela-esconder': () => {
+    const card = cardDeExemplo()
+    card.appendChild(seloDeExemplo())
+    return [card, 'Só a tela dos amigos ocupa a grade. A sua continua indo para eles.']
   },
   'assistir-auto': () => {
     const card = cardDeExemplo()
@@ -111,7 +141,7 @@ const EXEMPLOS = {
   'selo-sempre': () => {
     const card = cardDeExemplo()
     card.appendChild(seloDeExemplo())
-    return [card, 'A inicial fica sempre no canto do card.']
+    return [card, 'A foto e o nome ficam sempre no canto do card.']
   }
 }
 

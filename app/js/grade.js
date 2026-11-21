@@ -49,6 +49,7 @@ function aplicarVideo (id) {
   if (!card) return
 
   const video = mostrarNoCard(card, streamsRecebidos.get(id), camerasRecebidas.get(id))
+  atualizarMiniDe(id)
   if (!video) return
 
   // Agora que a pessoa tem trilha, a saida escolhida pode ser aplicada. Se o
@@ -74,6 +75,7 @@ function limparVideo (id) {
   streamsRecebidos.delete(id)
   aplicarVideo(id)
   sincronizarGrade()
+  atualizarMiniDe(id)
 }
 
 // Sem foco:      todas as telas do mesmo tamanho, preenchendo a area.
@@ -324,6 +326,16 @@ function criarCard (id, nome, souEu) {
   // O proprio card nao tem volume nem ajustes: ele e mudo para nao dar eco,
   // e a qualidade da minha transmissao sai do seletor de fontes.
   if (!souEu) {
+    // Sair desta tela (assistir.js): volta ao "Assistir" e quem transmite
+    // para de mandar para mim. O primeiro da esquerda, em vermelho, a pedido
+    // do dono. So para a TELA: webcam sozinha nao tem convite.
+    const botaoSair = document.createElement('button')
+    botaoSair.className = 'icone-card btn-sair-tela'
+    botaoSair.title = 'Sair desta tela'
+    botaoSair.appendChild(icone('sair'))
+    botaoSair.onclick = () => deixarDeAssistir(id)
+    flutuantes.append(botaoSair)
+
     const engrenagem = document.createElement('button')
     engrenagem.className = 'icone-card'
     engrenagem.title = 'Configurações da tela'
@@ -379,7 +391,19 @@ function criarCard (id, nome, souEu) {
   botaoFaixa.appendChild(icone('camera'))
   botaoFaixa.onclick = alternarFaixa
 
-  flutuantes.append(botaoFaixa, botaoExpandir, botaoCheia)
+  flutuantes.append(botaoFaixa)
+
+  // Mini tela (mini.js): a tela desta pessoa numa janelinha sempre por cima.
+  if (!souEu) {
+    const botaoMini = document.createElement('button')
+    botaoMini.className = 'icone-card'
+    botaoMini.title = 'Mini tela: sempre por cima, até de um jogo'
+    botaoMini.appendChild(icone('pip'))
+    botaoMini.onclick = () => abrirMiniTela(id)
+    flutuantes.append(botaoMini)
+  }
+
+  flutuantes.append(botaoExpandir, botaoCheia)
 
   // A webcam de quem tambem transmite a tela, por cima dela. Fica escondida
   // ate ter o que mostrar (classe com-cam). Sempre muda: webcam vai sem som.
@@ -455,7 +479,11 @@ function sincronizarGrade () {
   // So quem esta mandando alguma coisa ganha um card: a tela, a webcam, ou as
   // duas. Quem esta na sala sem mandar nada nao ocupa espaco na grade, aparece
   // so na contagem da barra. A regra e a mesma da lista de pessoas.
-  const esperados = quemEstaNaSala().filter((pessoa) => pessoa.noAr)
+  //
+  // A minha tela pode ficar fora da MINHA grade (Aparencia, "Sua tela na
+  // grade"): ela continua indo para os amigos e na lista de pessoas.
+  const todos = quemEstaNaSala()
+  const esperados = todos.filter((pessoa) => pessoa.noAr && !(pessoa.souEu && minhaTelaEscondida()))
 
   // Remove cards de quem saiu. Busca por .card e nao por filhos diretos,
   // porque no modo foco parte deles vive dentro da faixa de miniaturas.
@@ -484,8 +512,15 @@ function sincronizarGrade () {
   // A contagem de gente e os avatares do botao saem daqui tambem.
   desenharPessoas()
 
-  // Grade vazia precisa dizer o porque, senao parece que o app travou.
+  // Grade vazia precisa dizer o porque, senao parece que o app travou. Com a
+  // minha tela no ar mas escondida, "ninguem esta transmitindo" seria mentira.
   $('#grade-vazia').classList.toggle('oculto', esperados.length > 0)
+  const souEuNoAr = todos.some((p) => p.souEu && p.noAr)
+  $('#grade-vazia-titulo').textContent = souEuNoAr ? 'Sua tela está no ar' : 'Ninguém está transmitindo'
+  $('#grade-vazia-texto').textContent = souEuNoAr
+    ? 'Ela está escondida só na sua grade. Os outros continuam vendo.'
+    : 'Comece você, ou espere alguém entrar no ar.'
+  $('#btn-transmitir-vazio').classList.toggle('oculto', souEuNoAr)
 
   // Recoloca cada card no lugar certo (foco ou grade normal) e reencaixa
   // os tamanhos, inclusive quando alguem entra ou sai.

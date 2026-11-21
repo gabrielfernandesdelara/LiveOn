@@ -173,6 +173,10 @@ for (const tema of document.querySelectorAll('.tema')) tema.onclick = () => esco
 for (const botao of document.querySelectorAll('#opcao-camera button')) botao.onclick = () => escolherFormatoDaCamera(botao.dataset.valor)
 for (const botao of document.querySelectorAll('#opcao-selo button')) botao.onclick = () => definirNomeNoCard(botao.dataset.valor)
 for (const botao of document.querySelectorAll('#opcao-assistir button')) botao.onclick = () => definirModoAssistir(botao.dataset.valor)
+for (const botao of document.querySelectorAll('#opcao-tamanho-cam button')) botao.onclick = () => definirTamanhoDaCamera(botao.dataset.valor)
+for (const botao of document.querySelectorAll('#opcao-minha-tela button')) botao.onclick = () => definirMinhaTela(botao.dataset.valor)
+$('#btn-atalho-mini').onclick = capturarAtalhoDaMini
+$('#btn-atalho-padrao').onclick = voltarAtalhoPadrao
 for (const botao of document.querySelectorAll('#opcao-som-novo button')) botao.onclick = () => definirSomDasNovas(botao.dataset.valor)
 for (const campo of document.querySelectorAll('.editor-tema-cor')) campo.oninput = () => mudarCorDoEditor(campo)
 $('#btn-escolher-papel').onclick = () => $('#arquivo-papel').click()

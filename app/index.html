@@ -98,8 +98,8 @@
     </div>
 
     <div id="grade-vazia" class="oculto">
-      <strong>Ninguém está transmitindo</strong>
-      <span>Comece você, ou espere alguém entrar no ar.</span>
+      <strong id="grade-vazia-titulo">Ninguém está transmitindo</strong>
+      <span id="grade-vazia-texto">Comece você, ou espere alguém entrar no ar.</span>
       <button id="btn-transmitir-vazio" class="principal"><span data-icone="transmitir" data-traco="2"></span>Transmitir tela</button>
     </div>
   </div>
@@ -229,7 +229,9 @@
       <h2 id="titulo-config">Configurações</h2>
       <button class="aba-config ativa" data-aba="perfil"><span data-icone="usuario"></span>Perfil</button>
       <button class="aba-config" data-aba="aparencia"><span data-icone="pincel"></span>Aparência</button>
+      <button class="aba-config" data-aba="telas"><span data-icone="janela"></span>Telas</button>
       <button class="aba-config" data-aba="audio"><span data-icone="som"></span>Áudio</button>
+      <button class="aba-config" data-aba="mini"><span data-icone="pip"></span>Mini tela</button>
       <button class="aba-config" data-aba="desempenho"><span data-icone="desempenho"></span>Desempenho</button>
       <span class="cresce"></span>
       <span id="config-versao" class="versao-config"></span>
@@ -305,50 +307,6 @@
                miniatura com editar e apagar. -->
           <div id="temas-pessoais" class="temas"></div>
         </div>
-
-        <div class="grupo-config linha-opcao">
-          <div>
-            <div class="titulo-grupo">Webcam dos amigos</div>
-            <p class="descricao-opcao">Por cima da tela de quem também transmite.</p>
-          </div>
-          <div id="opcao-camera" class="segmentos segmentos-abas">
-            <button data-valor="canto" data-exemplo="camera-canto">No canto</button>
-            <button data-valor="selo" data-exemplo="camera-selo">Redonda</button>
-          </div>
-        </div>
-
-        <div class="grupo-config linha-opcao">
-          <div>
-            <div class="titulo-grupo">Inicial do nome no card</div>
-            <p class="descricao-opcao">Com o mouse, ela some quando ele para.</p>
-          </div>
-          <div id="opcao-selo" class="segmentos segmentos-abas">
-            <button data-valor="mouse" data-exemplo="selo-mouse">Com o mouse</button>
-            <button data-valor="sempre" data-exemplo="selo-sempre">Sempre</button>
-          </div>
-        </div>
-
-        <div class="grupo-config linha-opcao">
-          <div>
-            <div class="titulo-grupo">Quando alguém abre a tela</div>
-            <p class="descricao-opcao">Com um clique, quem transmite não manda nada até você clicar.</p>
-          </div>
-          <div id="opcao-assistir" class="segmentos segmentos-abas">
-            <button data-valor="auto" data-exemplo="assistir-auto">Assistir na hora</button>
-            <button data-valor="clique" data-exemplo="assistir-clique">Com um clique</button>
-          </div>
-        </div>
-
-        <div class="grupo-config linha-opcao">
-          <div>
-            <div class="titulo-grupo">Som das telas novas</div>
-            <p class="descricao-opcao">Como cada tela começa. O alto-falante do card troca depois.</p>
-          </div>
-          <div id="opcao-som-novo" class="segmentos segmentos-abas">
-            <button data-valor="ligado" data-exemplo="som-ligado">Ligado</button>
-            <button data-valor="mudo" data-exemplo="som-mudo">Mudo</button>
-          </div>
-        </div>
       </section>
 
       <!-- Editor de tema: so as cinco cores, o resto e calculado
@@ -418,20 +376,120 @@
         </div>
       </section>
 
+      <!-- Telas: como as telas dos amigos e a minha aparecem na sala. Era
+           tudo da Aparencia ate a 1.6.3, e saiu de la a pedido do dono: la
+           ficam so os temas. -->
+      <section class="secao-config oculto" data-secao="telas">
+        <h3>Telas</h3>
+        <p class="descricao-config">Como as telas aparecem para você. Cada amigo escolhe o dele.</p>
+
+        <h4 class="bloco-config">Ao abrir uma tela</h4>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Abrir a tela de um amigo</div>
+            <p class="descricao-opcao">Com um clique, ele não manda nada até você clicar em Assistir.</p>
+          </div>
+          <div id="opcao-assistir" class="segmentos segmentos-abas">
+            <button data-valor="auto" data-exemplo="assistir-auto">Na hora</button>
+            <button data-valor="clique" data-exemplo="assistir-clique">Com um clique</button>
+          </div>
+        </div>
+
+        <h4 class="bloco-config">Na grade</h4>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Sua própria tela</div>
+            <p class="descricao-opcao">Quando você transmite. Os outros continuam vendo.</p>
+          </div>
+          <div id="opcao-minha-tela" class="segmentos segmentos-abas">
+            <button data-valor="mostrar" data-exemplo="minha-tela-mostrar">Mostrar</button>
+            <button data-valor="esconder" data-exemplo="minha-tela-esconder">Esconder</button>
+          </div>
+        </div>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Foto e nome no card</div>
+            <p class="descricao-opcao">Com o mouse, somem quando ele para.</p>
+          </div>
+          <div id="opcao-selo" class="segmentos segmentos-abas">
+            <button data-valor="mouse" data-exemplo="selo-mouse">Com o mouse</button>
+            <button data-valor="sempre" data-exemplo="selo-sempre">Sempre</button>
+          </div>
+        </div>
+
+        <h4 class="bloco-config">Webcam dos amigos</h4>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Formato</div>
+            <p class="descricao-opcao">Por cima da tela de quem também transmite.</p>
+          </div>
+          <div id="opcao-camera" class="segmentos segmentos-abas">
+            <button data-valor="canto" data-exemplo="camera-canto">No canto</button>
+            <button data-valor="selo" data-exemplo="camera-selo">Redonda</button>
+          </div>
+        </div>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Tamanho</div>
+            <p class="descricao-opcao">Vale para os dois formatos.</p>
+          </div>
+          <div id="opcao-tamanho-cam" class="segmentos segmentos-abas">
+            <button data-valor="pequena" data-exemplo="cam-pequena">Pequena</button>
+            <button data-valor="media" data-exemplo="cam-media">Média</button>
+            <button data-valor="grande" data-exemplo="cam-grande">Grande</button>
+          </div>
+        </div>
+      </section>
       <!-- Saida de audio: era uma janela propria, aberta pela engrenagem da
            minha linha na lista de pessoas. Desde a 1.6.0 mora aqui; aquela
            engrenagem abre as configuracoes direto nesta aba. -->
       <section class="secao-config oculto" data-secao="audio">
         <h3>Áudio</h3>
-        <p class="descricao-config">Por onde você ouve os amigos.</p>
+        <p class="descricao-config">Como você ouve os amigos.</p>
 
         <div class="grupo-config">
-          <div class="campo">
+          <div class="titulo-grupo">Saída de som</div>
+          <div class="campo campo-saida">
             <label for="campo-saida">Tocar o som em</label>
             <span class="caixa-select"><select id="campo-saida"></select></span>
           </div>
           <p class="nota-dialogo">Vale só para o LiveOn. O resto do computador continua usando a saída do Windows.</p>
         </div>
+
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Som de quem abre a tela</div>
+            <p class="descricao-opcao">Como cada tela começa. O alto-falante do card troca depois.</p>
+          </div>
+          <div id="opcao-som-novo" class="segmentos segmentos-abas">
+            <button data-valor="ligado" data-exemplo="som-ligado">Ligado</button>
+            <button data-valor="mudo" data-exemplo="som-mudo">Mudo</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Mini tela (mini.js): a tecla que destrava. Ela e guardada pela
+           posicao fisica, para valer em qualquer teclado. -->
+      <section class="secao-config oculto" data-secao="mini">
+        <h3>Mini tela</h3>
+        <p class="descricao-config">A tela de um amigo numa janelinha sempre por cima, até de um jogo. Abra pelo botão de mini tela no card.</p>
+
+        <div class="grupo-config">
+          <div class="titulo-grupo">Travar</div>
+          <p class="descricao-opcao">Travada, o mouse passa direto por ela e não atrapalha o jogo. Para travar, passe o mouse na mini tela e clique no cadeado do meio.</p>
+        </div>
+
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Tecla para destravar</div>
+            <p class="descricao-opcao">Pode ser uma combinação, como Ctrl + '. Alt+Tab até a mini tela também destrava.</p>
+          </div>
+          <div class="campo-atalho">
+            <button id="btn-atalho-mini" class="atalho" title="Clique e aperte a tecla"></button>
+            <button id="btn-atalho-padrao" class="botao-icone" title="Voltar para a tecla padrão ( ' )"><span data-icone="atualizar"></span></button>
+          </div>
+        </div>
+        <p class="nota-dialogo">Enquanto a mini tela estiver travada, essa tecla fica reservada para destravar: em outros programas ela não funciona até você destravar.</p>
       </section>
 
       <section class="secao-config oculto" data-secao="desempenho">
@@ -536,6 +594,7 @@
 <script src="js/perfil.js"></script>
 <script src="js/exemplos.js"></script>
 <script src="js/assistir.js"></script>
+<script src="js/mini.js"></script>
 <script src="js/preferencias.js"></script>
 <script src="js/ligacoes.js"></script>
 <script src="js/partida.js"></script>

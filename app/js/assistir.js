@@ -80,6 +80,18 @@ function assistir (id) {
   aplicarVideo(id)
 }
 
+// O botao de sair da tela, no card (1.6.2): volta ao convite, e quem
+// transmite para de mandar para mim, como no "com um clique". Vale qualquer
+// que seja o modo: e a pessoa dizendo "agora nao quero mais ver".
+function deixarDeAssistir (id) {
+  assistindo.delete(id)
+  telasDecididas.add(id)
+  pedirQualidade(id)
+  anotar(`deixei de assistir ${id.slice(0, 8)}`)
+  if (miniId === id) fecharMiniTela()
+  atualizarConvite(id)
+}
+
 // O card de quem esta com a tela no ar e eu ainda nao cliquei: o convite por
 // cima, o video escondido e mudo (aplicarVolume tambem respeita isso).
 function atualizarConvite (id) {

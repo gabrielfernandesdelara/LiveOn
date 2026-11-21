@@ -275,6 +275,7 @@ function tratar (msg) {
 
     case 'entrou': {
       anotar(`${msg.nome}/${msg.id.slice(0, 8)} entrou na sala`)
+      tocarEntrouNaSala()
       participantes.set(msg.id, { id: msg.id, nome: msg.nome, transmitindo: false, camera: '' })
       // Se eu ja estou no ar, o recem-chegado precisa receber minhas trilhas.
       // Ele ja sabe da minha webcam: veio na lista do 'bemvindo' dele.
@@ -289,8 +290,15 @@ function tratar (msg) {
     case 'saiu': {
       const quem = participantes.get(msg.id)
       anotar(`${quem ? quem.nome : '?'}/${msg.id.slice(0, 8)} saiu da sala`)
-      // Saiu da sala com a tela no ar: para quem fica, e o mesmo que sair do ar.
-      if (quem && quem.transmitindo) tocarSaida()
+      // Saiu da sala com a tela no ar: para quem fica, e tambem sair do ar.
+      // Os dois sons, um depois do outro.
+      if (quem && quem.transmitindo) {
+        tocarSaida()
+        setTimeout(tocarSaiuDaSala, 380)
+      } else {
+        tocarSaiuDaSala()
+      }
+      if (miniId === msg.id) fecharMiniTela()
       const par = pares.get(msg.id)
       if (par) { par.pc.close(); pares.delete(msg.id) }
       streamsRecebidos.delete(msg.id)

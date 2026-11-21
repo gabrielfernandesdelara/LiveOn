@@ -61,6 +61,21 @@ contextBridge.exposeInMainWorld('ponte', {
 
   copiar: (texto) => ipcRenderer.invoke('copiar', texto),
 
+  // Mini tela (a janela sempre por cima): travar deixa o mouse passar direto
+  // por ela; o atalho destrava. A janela em si e aberta pela pagina.
+  miniTravar: (atalho) => ipcRenderer.invoke('mini:travar', atalho),
+  miniDestravar: () => ipcRenderer.invoke('mini:destravar'),
+  aoMudarMini: (aoMudar) => {
+    const travada = (_evento, valor) => aoMudar({ travada: valor })
+    const fechada = () => aoMudar({ fechada: true })
+    ipcRenderer.on('mini:travada', travada)
+    ipcRenderer.on('mini:fechada', fechada)
+    return () => {
+      ipcRenderer.removeListener('mini:travada', travada)
+      ipcRenderer.removeListener('mini:fechada', fechada)
+    }
+  },
+
   // Tela cheia da janela do app.
   telaCheia: (ligar) => ipcRenderer.invoke('janela:telaCheia', ligar),
   aoMudarTelaCheia: (aoMudar) => {

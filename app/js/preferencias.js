@@ -25,6 +25,38 @@ let videoAtivo = 'gpu'
 // máquinas que o PC travou.
 let temAmd = false
 
+// Tamanho da webcam sobreposta dos amigos (1.6.2): pequena, media ou grande.
+// So muda uma classe na grade; os tamanhos estao no CSS.
+let tamanhoDaCamera = ['pequena', 'grande'].includes(lembrar('liveon:camera-tamanho')) ? lembrar('liveon:camera-tamanho') : 'media'
+
+function aplicarTamanhoDaCamera () {
+  $('#grade').classList.toggle('cam-pequena', tamanhoDaCamera === 'pequena')
+  $('#grade').classList.toggle('cam-grande', tamanhoDaCamera === 'grande')
+}
+
+function definirTamanhoDaCamera (valor) {
+  tamanhoDaCamera = ['pequena', 'grande'].includes(valor) ? valor : 'media'
+  guardar('liveon:camera-tamanho', tamanhoDaCamera)
+  aplicarTamanhoDaCamera()
+  marcarAparencia()
+}
+
+// A minha propria tela na grade quando eu transmito (1.6.2): mostrar ou
+// esconder. Escondida, ela continua indo para os amigos e continua na lista
+// de pessoas; so nao ocupa espaco na MINHA grade.
+let minhaTela = lembrar('liveon:minha-tela') === 'esconder' ? 'esconder' : 'mostrar'
+
+function minhaTelaEscondida () {
+  return minhaTela === 'esconder'
+}
+
+function definirMinhaTela (valor) {
+  minhaTela = valor === 'esconder' ? 'esconder' : 'mostrar'
+  guardar('liveon:minha-tela', minhaTela)
+  marcarAparencia()
+  if (meuId) sincronizarGrade()
+}
+
 // Se a inicial do nome (o selo) aparece so com o mouse mexendo ou sempre.
 let nomeNoCard = lembrar('liveon:nome-no-card') === 'sempre' ? 'sempre' : 'mouse'
 
@@ -58,6 +90,8 @@ function marcarAparencia () {
   marcar(document.querySelectorAll('#opcao-camera button'), formatoDaCamera)
   marcar(document.querySelectorAll('#opcao-selo button'), nomeNoCard)
   marcar(document.querySelectorAll('#opcao-assistir button'), modoAssistir)
+  marcar(document.querySelectorAll('#opcao-tamanho-cam button'), tamanhoDaCamera)
+  marcar(document.querySelectorAll('#opcao-minha-tela button'), minhaTela)
   marcar(document.querySelectorAll('#opcao-som-novo button'), somDasNovas)
 }
 
@@ -76,6 +110,7 @@ function mostrarAbaConfig (aba) {
   if (aba === 'aparencia') desenharTemasPessoais()
   if (aba === 'perfil') desenharPerfil()
   if (aba === 'audio') preencherSaidas()
+  if (aba === 'mini') mostrarAtalhoDaMini()
   mostrarSecaoConfig(aba, aba)
 }
 

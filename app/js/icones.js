@@ -65,6 +65,15 @@ const DESENHOS = {
     ['path', { d: 'M3.34 19a10 10 0 1 1 17.32 0' }]
   ],
   mais: [['path', { d: 'M12 5v14M5 12h14' }]],
+  cadeado: [
+    ['rect', { x: 4, y: 11, width: 16, height: 10, rx: 2 }],
+    ['path', { d: 'M8 11V7a4 4 0 0 1 8 0v4' }]
+  ],
+  // Mini tela: uma tela com uma menor no canto.
+  pip: [
+    ['rect', { x: 2, y: 4, width: 20, height: 16, rx: 2 }],
+    ['rect', { x: 12, y: 12, width: 7, height: 5, rx: 1 }]
+  ],
   cursor: [['path', { d: 'M5 3l14 7-6 2-2 6z' }]],
   usuario: [
     ['circle', { cx: 12, cy: 8, r: 4 }],

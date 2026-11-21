@@ -1126,6 +1126,19 @@ html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-ev
 #btn-reiniciar { margin-top: 14px; }
 
 .grupo-config { padding: 20px 0; border-top: 1px solid var(--borda); }
+/* Titulo de um bloco dentro da aba (Telas: "Ao abrir uma tela", "Na grade",
+   "Webcam dos amigos"). O primeiro grupo depois dele dispensa a linha: o
+   titulo ja separa. */
+.bloco-config {
+  margin: 26px 0 0;
+  padding-bottom: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .3px;
+  color: var(--realce);
+}
+.bloco-config + .grupo-config { border-top: 0; padding-top: 10px; }
+.campo-saida { max-width: 380px; margin-top: 12px; }
 .titulo-grupo { font-size: 13px; font-weight: 600; }
 .descricao-opcao { margin: 2px 0 0; font-size: 12px; color: var(--apagado); }
 .linha-opcao { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
@@ -1419,6 +1432,123 @@ html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-ev
   color: #fff;
 }
 .ex-alto-falante.mudo { color: var(--mudo); }
+
+.ex-cam-pequena { width: 18%; }
+.ex-cam-grande { width: 36%; }
+.ex-eu .ex-tela { background: linear-gradient(135deg, #2b3a2f, #1f2f45); }
+.ex-tag {
+  position: absolute;
+  left: 6%;
+  bottom: 8%;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--vidro);
+  color: #fff;
+  font-size: 9px;
+}
+
+/* Tamanho da webcam sobreposta dos amigos (Aparencia). Media e o de sempre,
+   sem classe. No formato redondo, muda o circulo e o quanto ele cresce. */
+#grade.cam-pequena .cam { width: 18%; }
+#grade.cam-grande .cam { width: 34%; }
+#grade.cam-selo.cam-pequena #principal .card.com-cam:not(.minusculo) .cam { width: 32px; height: 32px; }
+#grade.cam-selo.cam-pequena #principal .card.com-cam:not(.minusculo) .cam:hover { width: 110px; height: 110px; }
+#grade.cam-selo.cam-grande #principal .card.com-cam:not(.minusculo) .cam { width: 54px; height: 54px; }
+#grade.cam-selo.cam-grande #principal .card.com-cam:not(.minusculo) .cam:hover { width: 180px; height: 180px; }
+#grade.cam-selo.cam-grande #principal .card.com-cam:not(.minusculo) .selo { left: 68px; bottom: 20px; }
+
+/* Sair desta tela: so faz sentido com a tela no ar e aberta. Webcam sozinha
+   nao tem convite, e no convite o botao nao teria o que fazer. */
+.card.so-cam .btn-sair-tela,
+.card.aguardando .btn-sair-tela { display: none; }
+.btn-sair-tela { color: var(--no-ar); }
+
+/* O campo da tecla de destravar a mini tela (aba Mini tela). */
+.campo-atalho { display: flex; align-items: center; gap: 6px; }
+.atalho {
+  min-width: 140px;
+  height: 36px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 18px;
+  font-weight: 600;
+}
+.atalho.capturando { font-size: 13px; }
+.atalho.capturando { border-color: var(--realce); color: var(--realce); }
+
+/* A mini tela (mini.js): uma janela propria, sem moldura, com este mesmo
+   CSS. Arrastar a imagem move a janela; os botoes aparecem com o mouse em
+   cima. Travada, o mouse passa direto, entao nada nela reage. */
+body.mini-tela {
+  height: 100vh;
+  background: #000;
+  -webkit-app-region: drag;
+}
+.mini-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.mini-topo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 14px;
+  background: linear-gradient(rgba(0, 0, 0, .65), transparent);
+  opacity: 0;
+  transition: opacity .15s;
+}
+body.mini-tela:hover .mini-topo { opacity: 1; }
+body.mini-tela.travada .mini-topo,
+body.mini-tela.travada .mini-travar { display: none; }
+.mini-travar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: auto;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 14px;
+  background: rgba(8, 10, 14, .78);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity .15s;
+  -webkit-app-region: no-drag;
+}
+.mini-travar:hover:not(:disabled) { background: rgba(0, 0, 0, .92); border-color: transparent; }
+body.mini-tela:hover .mini-travar { opacity: 1; }
+.mini-nome { padding-left: 4px; color: #fff; font-size: 12px; font-weight: 600; text-shadow: 0 1px 2px rgba(0, 0, 0, .8); }
+.mini-botao {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(8, 10, 14, .72);
+  color: #fff;
+  -webkit-app-region: no-drag;
+}
+.mini-botao:hover:not(:disabled) { background: rgba(0, 0, 0, .9); border-color: transparent; }
+.mini-aviso {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: rgba(8, 10, 14, .82);
+  color: #fff;
+  font-size: 12px;
+  transform: translateX(-50%);
+}
+body.mini-tela.mostrar-aviso .mini-aviso { display: flex; }
 
 /* "Com um clique" (assistir.js): o convite cobre o card de quem abriu a tela
    ate a pessoa clicar em Assistir. O video fica escondido e mudo. */

@@ -1,7 +1,7 @@
 // Processo principal: janela, seletor de fontes por IPC e o handler de
 // getDisplayMedia, que é onde o áudio do sistema entra (audio: 'loopback').
 
-const { app, BrowserWindow, clipboard, desktopCapturer, ipcMain, powerMonitor, screen, session, sharedTexture, shell } = require('electron')
+const { app, BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, powerMonitor, screen, session, sharedTexture, shell } = require('electron')
 const path = require('node:path')
 const os = require('node:os')
 const fs = require('node:fs')
@@ -43,6 +43,22 @@ function ficarNoApp (evento, url) {
 app.on('web-contents-created', (_evento, conteudo) => {
   conteudo.on('will-navigate', ficarNoApp)
   conteudo.on('will-redirect', ficarNoApp)
+
+  // Nada de janelas novas, em NENHUM conteudo: links externos vao para o
+  // navegador do sistema. A unica excecao e a mini tela (ver "mini tela",
+  // mais abaixo), e so quando quem pede e a pagina do app: em branco, com o
+  // nome dela, e montada pela propria pagina. Vale aqui, e nao so na janela
+  // principal, para nao depender de lembrar disto numa janela nova.
+  conteudo.setWindowOpenHandler(({ url, frameName }) => {
+    if (url === 'about:blank' && frameName === MINI_NOME && !miniTela && ehDoApp(conteudo.getURL())) {
+      return { action: 'allow', overrideBrowserWindowOptions: opcoesDaMiniTela() }
+    }
+    if (url.startsWith('https://')) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  conteudo.on('did-create-window', (filha, detalhes) => {
+    if (detalhes.frameName === MINI_NOME) prepararMiniTela(filha, conteudo)
+  })
 })
 
 const recusados = new Set()
@@ -299,6 +315,124 @@ ipcMain.handle('app:reiniciar', apenasDoApp(() => {
   app.quit()
   return true
 }))
+
+// --- mini tela -----------------------------------------------------------------
+//
+// A tela de um amigo numa janelinha sempre por cima de tudo (1.6.2, a pedido
+// do dono), para deixar em cima de um jogo. Ela pode ser TRAVADA: o mouse
+// passa direto por ela (setIgnoreMouseEvents), como se ela nao estivesse ali.
+// Destrava com a tecla escolhida nas configuracoes (atalho global, registrado
+// so enquanto ela estiver travada, para nao roubar a tecla dos outros
+// programas o tempo todo) ou com Alt+Tab ate ela.
+//
+// A janela e aberta pela pagina com window.open('about:blank', MINI_NOME):
+// assim ela fica no MESMO processo e na mesma origem da pagina, que monta o
+// conteudo e entrega o video (um MediaStream nao atravessa processos). Nada
+// e carregado nela: o setWindowOpenHandler so deixa passar esse caso, e o
+// will-navigate de sempre segura qualquer navegacao.
+const MINI_NOME = 'liveon-mini-tela'
+let miniTela = null
+// A pagina que abriu a mini: e para ela que vao os avisos de travada e
+// fechada.
+let miniDono = null
+let miniTravada = false
+let miniPerdeuFoco = false
+let miniAtalho = ''
+
+function opcoesDaMiniTela () {
+  // No canto de baixo a direita da tela onde o app esta.
+  const area = screen.getDisplayMatching(janela ? janela.getBounds() : { x: 0, y: 0, width: 1, height: 1 }).workArea
+  const largura = 480
+  const altura = 270
+  return {
+    width: largura,
+    height: altura,
+    x: area.x + area.width - largura - 24,
+    y: area.y + area.height - altura - 24,
+    minWidth: 192,
+    minHeight: 108,
+    // Os testes nao mostram nada na tela de quem roda (pedido do dono).
+    show: process.env.LIVEON_MINI_ESCONDIDA !== '1',
+    frame: false,
+    alwaysOnTop: true,
+    maximizable: false,
+    fullscreenable: false,
+    backgroundColor: '#000000',
+    title: 'LiveOn: mini tela',
+    autoHideMenuBar: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false
+    }
+  }
+}
+
+function avisarDonoDaMini (canal, ...args) {
+  if (miniDono && !miniDono.isDestroyed()) miniDono.send(canal, ...args)
+}
+
+function prepararMiniTela (filha, dono) {
+  miniTela = filha
+  miniDono = dono
+  // 'screen-saver' e o nivel mais alto: fica por cima de jogo em janela sem
+  // borda. Jogo em tela cheia EXCLUSIVA nao deixa nada por cima, e nao ha o
+  // que fazer quanto a isso.
+  filha.setAlwaysOnTop(true, 'screen-saver')
+  filha.setAspectRatio(16 / 9)
+  filha.on('blur', () => { if (miniTravada) miniPerdeuFoco = true })
+  // Alt+Tab ate ela destrava. So conta depois de ela ter perdido o foco ao
+  // travar, senao o proprio foco do clique em "Travar" destravava na hora.
+  filha.on('focus', () => { if (miniTravada && miniPerdeuFoco) destravarMiniTela('alt+tab') })
+  filha.on('closed', () => {
+    destravarMiniTela('fechada')
+    avisarDonoDaMini('mini:fechada')
+    miniTela = null
+    miniDono = null
+  })
+  registrar('mini', 'mini tela aberta')
+}
+
+function destravarMiniTela (motivo) {
+  if (!miniTravada) return
+  miniTravada = false
+  if (miniAtalho) {
+    try { globalShortcut.unregister(miniAtalho) } catch { /* ja solto */ }
+    miniAtalho = ''
+  }
+  if (miniTela && !miniTela.isDestroyed()) miniTela.setIgnoreMouseEvents(false)
+  registrar('mini', `destravada (${motivo})`)
+  avisarDonoDaMini('mini:travada', false)
+}
+
+// Trava (o mouse passa direto) e liga o atalho de destravar. Devolve se o
+// atalho pegou: tecla invalida ou ja usada por outro programa nao pega, e a
+// pagina avisa que sobra o Alt+Tab.
+ipcMain.handle('mini:travar', apenasDoApp((_evento, atalho) => {
+  if (!miniTela || miniTela.isDestroyed()) return { ok: false }
+  if (miniTravada) return { ok: true, atalho: Boolean(miniAtalho) }
+  let pegou = false
+  const acelerador = typeof atalho === 'string' ? atalho.slice(0, 40) : ''
+  if (acelerador) {
+    try { pegou = globalShortcut.register(acelerador, () => destravarMiniTela('atalho')) } catch { pegou = false }
+  }
+  miniAtalho = pegou ? acelerador : ''
+  miniTravada = true
+  miniPerdeuFoco = !miniTela.isFocused()
+  miniTela.setIgnoreMouseEvents(true)
+  miniTela.blur()
+  registrar('mini', `travada, atalho ${pegou ? acelerador : 'nao pegou'}`)
+  avisarDonoDaMini('mini:travada', true)
+  return { ok: true, atalho: pegou }
+}))
+
+ipcMain.handle('mini:destravar', apenasDoApp(() => {
+  destravarMiniTela('pedido')
+  return true
+}))
+
+app.on('will-quit', () => globalShortcut.unregisterAll())
 
 ipcMain.handle('janela:telaCheia', apenasDoApp((_evento, ligar) => {
   if (!janela) return false
@@ -560,13 +694,14 @@ function criarJanela () {
   janela.on('enter-full-screen', () => janela.webContents.send('janela:telaCheia', true))
   janela.on('leave-full-screen', () => janela.webContents.send('janela:telaCheia', false))
 
-  // Nada de janelas novas: links externos vão para o navegador do sistema.
-  janela.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://')) shell.openExternal(url)
-    return { action: 'deny' }
-  })
+  // Janelas novas: ver o setWindowOpenHandler do web-contents-created, no
+  // topo, que vale para todo conteudo.
 
-  janela.on('closed', () => { janela = null })
+  janela.on('closed', () => {
+    janela = null
+    // A mini tela vive da pagina principal: sem ela, nao tem o que mostrar.
+    if (miniTela && !miniTela.isDestroyed()) miniTela.close()
+  })
 }
 
 function configurarCaptura () {

@@ -73,6 +73,32 @@ function tocarSaida () {
     // Som e enfeite: nunca pode derrubar a sala.
   }
 }
+// Entrar e sair da SALA (1.6.2, escolhido pelo dono): a "Bolha", um bloop
+// curto que sobe ao entrar e desce ao sair. Mais discreto que o da tela,
+// porque acontece mais vezes.
+function bolha (de, para) {
+  try {
+    const c = contextoDeAviso()
+    const t = c.currentTime + 0.01
+    const o = c.createOscillator()
+    const g = c.createGain()
+    o.type = 'sine'
+    o.frequency.setValueAtTime(de, t)
+    o.frequency.exponentialRampToValueAtTime(para, t + 0.112)
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.exponentialRampToValueAtTime(0.045, t + 0.012)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16)
+    o.connect(g).connect(c.destination)
+    o.start(t)
+    o.stop(t + 0.21)
+  } catch {
+    // Som e enfeite: nunca pode derrubar a sala.
+  }
+}
+
+function tocarEntrouNaSala () { bolha(420, 1000) }
+function tocarSaiuDaSala () { bolha(1000, 420) }
+
 // Volume de uma pessoa, aplicado em todo lugar que o mostra: o video, a
 // barrinha do card e o painel de ajustes, se estiver aberto naquela pessoa.
 function aplicarVolume (id, nivel) {
