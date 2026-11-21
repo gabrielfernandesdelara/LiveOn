@@ -4,39 +4,75 @@
 
 // --- som de aviso ------------------------------------------------------------
 
+// A assinatura sonora do LiveOn (1.6.1, escolhida pelo dono entre varias
+// ideias): o "Pop duplo Elastico". Dois pops que passam do tom e voltam,
+// como uma mola, subindo quando alguem ENTRA no ar com a tela e descendo, o
+// espelho, quando SAI. Vem em par de proposito: e o par que faz o grupo
+// reconhecer o que aconteceu sem olhar para a tela.
+//
 // Gerado na hora com Web Audio: nao precisa de arquivo no pacote, e o volume
-// fica sob controle. Dois toques curtos e baixos, presente sem assustar quem
-// esta no meio de uma partida.
+// fica sob controle, baixo, para nao assustar quem esta no meio de uma
+// partida. Nao e copia do som de nenhum outro app.
 let contextoAviso = null
 
+function contextoDeAviso () {
+  if (!contextoAviso) contextoAviso = new AudioContext()
+  if (contextoAviso.state === 'suspended') contextoAviso.resume()
+  return contextoAviso
+}
+
+// Um pop: um triangulo que sai de longe do tom, passa dele e assenta, com um
+// grave curto embaixo para dar corpo. `sobe` decide de que lado ele vem.
+function popElastico (c, alvo, t, sobe) {
+  const o = c.createOscillator()
+  const g = c.createGain()
+  o.type = 'triangle'
+  o.frequency.setValueAtTime(sobe ? alvo * 0.6 : alvo * 1.5, t)
+  o.frequency.exponentialRampToValueAtTime(sobe ? alvo * 1.25 : alvo * 0.8, t + 0.05)
+  o.frequency.exponentialRampToValueAtTime(alvo, t + 0.12)
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.exponentialRampToValueAtTime(0.04, t + 0.008)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16)
+  o.connect(g).connect(c.destination)
+  o.start(t)
+  o.stop(t + 0.2)
+
+  const grave = c.createOscillator()
+  const gg = c.createGain()
+  grave.type = 'sine'
+  grave.frequency.setValueAtTime(alvo * 0.28, t)
+  grave.frequency.exponentialRampToValueAtTime(alvo * 0.14, t + 0.14)
+  gg.gain.setValueAtTime(0.0001, t)
+  gg.gain.exponentialRampToValueAtTime(0.022, t + 0.01)
+  gg.gain.exponentialRampToValueAtTime(0.0001, t + 0.14)
+  grave.connect(gg).connect(c.destination)
+  grave.start(t)
+  grave.stop(t + 0.19)
+}
+
+// Alguem entrou no ar com a tela.
 function tocarAviso () {
   try {
-    if (!contextoAviso) contextoAviso = new AudioContext()
-    if (contextoAviso.state === 'suspended') contextoAviso.resume()
-
-    const agora = contextoAviso.currentTime
-
-    for (const [atraso, frequencia] of [[0, 660], [0.13, 880]]) {
-      const oscilador = contextoAviso.createOscillator()
-      const ganho = contextoAviso.createGain()
-
-      oscilador.type = 'sine'
-      oscilador.frequency.value = frequencia
-
-      // Sobe rapido e decai: sem estalo no inicio nem cauda arrastada.
-      ganho.gain.setValueAtTime(0.0001, agora + atraso)
-      ganho.gain.exponentialRampToValueAtTime(0.05, agora + atraso + 0.02)
-      ganho.gain.exponentialRampToValueAtTime(0.0001, agora + atraso + 0.13)
-
-      oscilador.connect(ganho).connect(contextoAviso.destination)
-      oscilador.start(agora + atraso)
-      oscilador.stop(agora + atraso + 0.15)
-    }
+    const c = contextoDeAviso()
+    const t = c.currentTime + 0.01
+    popElastico(c, 900, t, true)
+    popElastico(c, 1500, t + 0.15, true)
   } catch {
     // Som e enfeite: nunca pode derrubar a sala.
   }
 }
 
+// Alguem saiu do ar: o mesmo desenho, descendo.
+function tocarSaida () {
+  try {
+    const c = contextoDeAviso()
+    const t = c.currentTime + 0.01
+    popElastico(c, 1500, t, false)
+    popElastico(c, 900, t + 0.15, false)
+  } catch {
+    // Som e enfeite: nunca pode derrubar a sala.
+  }
+}
 // Volume de uma pessoa, aplicado em todo lugar que o mostra: o video, a
 // barrinha do card e o painel de ajustes, se estiver aberto naquela pessoa.
 function aplicarVolume (id, nivel) {

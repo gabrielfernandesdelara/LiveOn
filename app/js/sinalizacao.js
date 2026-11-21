@@ -289,6 +289,8 @@ function tratar (msg) {
     case 'saiu': {
       const quem = participantes.get(msg.id)
       anotar(`${quem ? quem.nome : '?'}/${msg.id.slice(0, 8)} saiu da sala`)
+      // Saiu da sala com a tela no ar: para quem fica, e o mesmo que sair do ar.
+      if (quem && quem.transmitindo) tocarSaida()
       const par = pares.get(msg.id)
       if (par) { par.pc.close(); pares.delete(msg.id) }
       streamsRecebidos.delete(msg.id)
@@ -342,6 +344,7 @@ function tratar (msg) {
       // Aviso sonoro so na virada: quem ja estava no ar quando entrei nao
       // dispara nada, senao seria uma saraivada ao abrir a sala.
       if (comecouAgora) tocarAviso()
+      if (telaMudou && !transmitindo) tocarSaida()
 
       // Tela nova: assistir na hora ou esperar o clique, e com que som.
       if (transmitindo) aoAbrirTela(msg.de)
