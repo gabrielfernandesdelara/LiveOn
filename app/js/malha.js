@@ -219,6 +219,11 @@ function adicionarTrilhas (par) {
     // teto ficava sem ser aplicado, calado.
     aplicarQualidade(par, remetente)
   }
+  // Um par a mais recebendo a tela: o teto dos outros pode cair. Sempre
+  // reaplica (o -1): no comeco da transmissao os pares ganham a tela um por
+  // um, e o primeiro tinha recebido o teto de uma plateia so.
+  plateiaAplicada = -1
+  conferirPlateia()
 }
 
 // Tudo o que eu estou mandando, para um par que acabou de aparecer (alguem
@@ -243,6 +248,27 @@ function adicionarMidia (par) {
 // para assistir e o envio continuava desligado. Cada chamada le o estado do
 // par na HORA de aplicar, entao a ultima palavra e sempre a do pedido mais
 // recente.
+// Quantos amigos estao recebendo a imagem da minha tela agora: quem tem
+// remetente de video, esta assistindo e nao pausou. E o que divide o teto de
+// banda (FATOR_POR_PLATEIA, configuracao.js).
+function plateiaDaTela () {
+  let n = 0
+  for (const par of pares.values()) {
+    if (par.remetentePorTipo && par.remetentePorTipo.get('video') && par.assistindo !== false && !par.semImagem) n++
+  }
+  return n
+}
+
+// Mudou o tamanho da plateia (alguem comecou ou parou de assistir, pausou,
+// saiu): o teto de TODOS muda junto.
+let plateiaAplicada = 0
+function conferirPlateia () {
+  const agora = plateiaDaTela()
+  if (agora === plateiaAplicada) return
+  plateiaAplicada = agora
+  if (typeof reaplicarQualidade === 'function') reaplicarQualidade()
+}
+
 function aplicarQualidade (par, remetente) {
   const anterior = filaDeParametros.get(remetente) || Promise.resolve()
   const proxima = anterior.then(() => aplicarQualidadeAgora(par, remetente))
@@ -277,7 +303,7 @@ async function aplicarQualidadeAgora (par, remetente) {
   return definirParametros(remetente, (params) => {
     params.encodings[0].scaleResolutionDownBy = Math.max(1, alturaFonte / altura)
     params.encodings[0].maxFramerate = fps
-    params.encodings[0].maxBitrate = bitrateDe(altura, fps)
+    params.encodings[0].maxBitrate = bitrateDe(altura, fps, plateiaDaTela())
     // Pausado (o LiveOn do amigo nao esta a vista): so a imagem para, o
     // audio, no ramo de cima, continua.
     params.encodings[0].active = ativo && !par.semImagem

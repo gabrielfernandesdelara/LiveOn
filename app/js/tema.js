@@ -27,6 +27,19 @@
 //   comprimida na hora (até PAPEL_MAXIMO) e fica numa chave própria,
 //   'liveon:papel-<lugar>', para o JSON dos temas não carregar 400 KB a cada
 //   leitura.
+//
+// Desde a 2.0.0 (pedido do dono):
+// - PAPEIS PRONTOS: seis papeis de parede desenhados pelo proprio LiveOn
+//   (scripts/papeis.js gera os arquivos de app/papeis/). Escolhido um deles,
+//   o tema guarda so o caminho ('papeis/aurora.webp'), e nao a imagem;
+// - a POSICAO DA ENTRADA: centro, esquerda, direita ou livre (onde a pessoa
+//   arrastar), para o papel de parede nao ficar escondido atras da foto e do
+//   codigo. Os temas prontos ficam no centro;
+// - "Tirar as cores da imagem": sugere o destaque a partir do papel;
+// - o FUNDO DA SALA: igual ao papel de parede, uma cor, ou uma imagem propria
+//   com os mesmos efeitos. A imagem da sala mora em 'liveon:papel-sala-<lugar>'.
+//   Quem escolhe qual fundo vai para a tela e aplicarFundoDaVez(), pela
+//   classe na-sala do <html> (posta pelo navegacao.js).
 
 'use strict'
 
@@ -58,6 +71,68 @@ const ESCURECER_PADRAO = 0.35
 const POSICAO_PADRAO = { x: 50, y: 50, zoom: 1 }
 const ZOOM_PAPEL_MAXIMO = 3
 const FORMATO_DE_PAPEL = /^data:image\/webp;base64,[A-Za-z0-9+/]+=*$/
+
+// Os papeis que vem com o LiveOn. O id e o nome do arquivo em app/papeis/.
+const PAPEIS_PRONTOS = [
+  { id: 'aurora', nome: 'Aurora' },
+  { id: 'montanhas', nome: 'Montanhas' },
+  { id: 'dunas', nome: 'Dunas' },
+  { id: 'ondas', nome: 'Ondas' },
+  { id: 'oceano', nome: 'Oceano' },
+  { id: 'cristais', nome: 'Cristais' }
+]
+const caminhoDoPapelPronto = (id) => `papeis/${id}.webp`
+
+// Imagem escolhida pela pessoa (data: em WebP) ou um dos prontos.
+function papelValido (papel) {
+  if (typeof papel !== 'string') return false
+  return FORMATO_DE_PAPEL.test(papel) || PAPEIS_PRONTOS.some((p) => caminhoDoPapelPronto(p.id) === papel)
+}
+
+// Onde fica a entrada (a foto e o codigo) na tela inicial. Livre guarda o
+// ponto, em porcentagem da janela.
+const POSICOES_DA_ENTRADA = ['centro', 'esquerda', 'direita', 'livre']
+const ENTRADA_PADRAO = { posicao: 'centro', x: 50, y: 50 }
+
+function entradaValida (e) {
+  const numero = (v, padrao) => Number.isFinite(Number(v)) ? Math.min(100, Math.max(0, Number(v))) : padrao
+  return {
+    posicao: POSICOES_DA_ENTRADA.includes(e && e.posicao) ? e.posicao : 'centro',
+    x: numero(e && e.x, 50),
+    y: numero(e && e.y, 50)
+  }
+}
+
+function aplicarPosicaoDaEntrada (entrada) {
+  const e = entradaValida(entrada)
+  const raiz = document.documentElement
+  raiz.dataset.entrada = e.posicao
+  raiz.style.setProperty('--entrada-x', e.x + '%')
+  raiz.style.setProperty('--entrada-y', e.y + '%')
+}
+
+// De que lado da entrada fica o trilho dos amigos (2.0.0, pedido do dono:
+// "deixe a lista de amigos personalizavel"). Automatico e o lado oposto ao
+// da coluna, para nunca ficar em cima da foto e do codigo.
+const LADOS_DOS_AMIGOS = ['auto', 'esquerda', 'direita']
+const AMIGOS_PADRAO = { lado: 'auto' }
+
+function amigosValidos (a) {
+  return { lado: LADOS_DOS_AMIGOS.includes(a && a.lado) ? a.lado : 'auto' }
+}
+
+function ladoDosAmigos (amigos, entrada) {
+  const lado = amigosValidos(amigos).lado
+  if (lado !== 'auto') return lado
+  const e = entradaValida(entrada)
+  if (e.posicao === 'direita') return 'esquerda'
+  if (e.posicao === 'livre' && e.x > 50) return 'esquerda'
+  return 'direita'
+}
+
+function aplicarLadoDosAmigos (amigos, entrada) {
+  document.documentElement.dataset.amigos = ladoDosAmigos(amigos, entrada)
+}
 
 // O que está em uso: um dos prontos ou 'pessoal-0' a 'pessoal-3'.
 let temaAtual = 'grafite'
@@ -145,27 +220,82 @@ function posicaoValida (p) {
   }
 }
 
+// Efeitos do papel de parede (2.0.0, a pedido do dono): a pessoa escolhe
+// quanto de cada um e pode combinar. Viram filtros de CSS na camada do papel
+// (estilo.css), entao nao mexem na imagem guardada: tirar o efeito traz a
+// imagem de volta igual. O Escurecer, que ja existia, e o veu da cor do
+// fundo e continua a parte.
+//
+// - desfoque, em px da janela (a previa recebe proporcional ao tamanho dela);
+// - brilho e contraste, em % (100 = como a imagem e);
+// - cores, a saturacao em %: 0 e preto e branco, 200 e cor forte;
+// - vinheta, em %: escurece as bordas e deixa o meio.
+const EFEITOS_PADRAO = { desfoque: 0, brilho: 100, cores: 100, contraste: 100, vinheta: 0 }
+const LIMITES_DOS_EFEITOS = {
+  desfoque: [0, 40],
+  brilho: [40, 160],
+  cores: [0, 200],
+  contraste: [50, 150],
+  vinheta: [0, 100]
+}
+
+// O fundo da sala de um tema. 'igual' usa o papel de parede (o de sempre).
+const MODOS_DO_FUNDO_DA_SALA = ['igual', 'cor', 'imagem']
+
+function salaValida (s, fundo) {
+  const escurecer = Number(s && s.escurecer)
+  return {
+    modo: MODOS_DO_FUNDO_DA_SALA.includes(s && s.modo) ? s.modo : 'igual',
+    cor: corValida(s && s.cor) ? s.cor.toLowerCase() : fundo,
+    papel: Boolean(s && s.papel),
+    escurecer: Number.isFinite(escurecer) ? Math.min(0.9, Math.max(0, escurecer)) : ESCURECER_PADRAO,
+    posicao: posicaoValida(s && s.posicao),
+    efeitos: efeitosValidos(s && s.efeitos)
+  }
+}
+
+function efeitosValidos (e) {
+  const certos = {}
+  for (const [nome, [min, max]] of Object.entries(LIMITES_DOS_EFEITOS)) {
+    const v = Number(e && e[nome])
+    certos[nome] = Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : EFEITOS_PADRAO[nome]
+  }
+  return certos
+}
+
 // As variaveis do papel num elemento: o <html> para o app, ou a previa do
 // editor. O CSS faz o resto (html.com-papel body::before e .camada-papel).
-function variaveisDoPapel (elemento, papel, escurecer, fundo, posicao) {
+const VARIAVEIS_DO_PAPEL = ['--papel', '--veu-papel', '--papel-x', '--papel-y', '--papel-zoom',
+  '--papel-desfoque', '--papel-brilho', '--papel-cores', '--papel-contraste', '--papel-vinheta']
+
+function variaveisDoPapel (elemento, papel, escurecer, fundo, posicao, efeitos) {
   if (!papel) {
-    for (const v of ['--papel', '--veu-papel', '--papel-x', '--papel-y', '--papel-zoom']) elemento.style.removeProperty(v)
+    for (const v of VARIAVEIS_DO_PAPEL) elemento.style.removeProperty(v)
     return
   }
   const [r, g, b] = paraRgb(fundo)
   const p = posicaoValida(posicao)
-  elemento.style.setProperty('--papel', `url("${papel}")`)
+  const e = efeitosValidos(efeitos)
+  elemento.style.setProperty('--papel', corValida(papel) ? `linear-gradient(${papel}, ${papel})` : `url("${papel}")`)
   elemento.style.setProperty('--veu-papel', `rgba(${r}, ${g}, ${b}, ${Math.min(0.9, Math.max(0, escurecer))})`)
   elemento.style.setProperty('--papel-x', p.x + '%')
   elemento.style.setProperty('--papel-y', p.y + '%')
   elemento.style.setProperty('--papel-zoom', String(p.zoom))
+  // O desfoque e em px: na previa, que e uma janela em miniatura, ele
+  // encolhe na mesma proporcao, senao a previa borraria muito mais que o app.
+  const escala = elemento === document.documentElement ? 1 : (elemento.clientWidth || 256) / Math.max(1, window.innerWidth)
+  elemento.style.setProperty('--papel-desfoque', (e.desfoque * escala).toFixed(2) + 'px')
+  elemento.style.setProperty('--papel-brilho', String(e.brilho / 100))
+  elemento.style.setProperty('--papel-cores', String(e.cores / 100))
+  elemento.style.setProperty('--papel-contraste', String(e.contraste / 100))
+  elemento.style.setProperty('--papel-vinheta', String((e.vinheta / 100) * 0.9))
 }
 
 // O papel de parede no fundo do app, com o véu da cor do fundo por cima.
 // Sem papel, tira.
-function pintarPapel (papel, escurecer, fundo, posicao) {
+function pintarPapel (papel, escurecer, fundo, posicao, efeitos) {
   const raiz = document.documentElement
-  variaveisDoPapel(raiz, papel, escurecer, fundo, posicao)
+  variaveisDoPapel(raiz, papel, escurecer, fundo, posicao, efeitos)
   raiz.classList.toggle('com-papel', Boolean(papel))
 }
 
@@ -201,7 +331,11 @@ function temasPessoais () {
       cores,
       papel: t.papel === true,
       escurecer: Number.isFinite(escurecer) ? Math.min(0.9, Math.max(0, escurecer)) : ESCURECER_PADRAO,
-      posicao: posicaoValida(t.posicao)
+      posicao: posicaoValida(t.posicao),
+      entrada: entradaValida(t.entrada),
+      amigos: amigosValidos(t.amigos),
+      efeitos: efeitosValidos(t.efeitos),
+      sala: salaValida(t.sala, cores.fundo)
     }
   })
 }
@@ -209,7 +343,13 @@ function temasPessoais () {
 // O papel de parede de um lugar, ou '' se nao tiver (ou se vier quebrado).
 function papelDoLugar (lugar) {
   const papel = lembrar('liveon:papel-' + lugar)
-  return FORMATO_DE_PAPEL.test(papel) ? papel : ''
+  return papelValido(papel) ? papel : ''
+}
+
+// A imagem do fundo da sala de um lugar, ou ''.
+function papelDaSala (lugar) {
+  const papel = lembrar('liveon:papel-sala-' + lugar)
+  return papelValido(papel) ? papel : ''
 }
 
 function guardarTemasPessoais (lista) {
@@ -219,7 +359,18 @@ function guardarTemasPessoais (lista) {
 // Tudo de um tema, pronto ou da pessoa: as cores, o papel e o quanto ele
 // escurece. É o ponto de partida do editor.
 function temaCompleto (nome) {
-  if (CORES_PRONTAS[nome]) return { cores: { ...CORES_PRONTAS[nome] }, papel: '', escurecer: ESCURECER_PADRAO, posicao: { ...POSICAO_PADRAO } }
+  if (CORES_PRONTAS[nome]) {
+    return {
+      cores: { ...CORES_PRONTAS[nome] },
+      papel: '',
+      escurecer: ESCURECER_PADRAO,
+      posicao: { ...POSICAO_PADRAO },
+      entrada: { ...ENTRADA_PADRAO },
+      amigos: { ...AMIGOS_PADRAO },
+      efeitos: { ...EFEITOS_PADRAO },
+      sala: { ...salaValida(null, CORES_PRONTAS[nome].fundo), papel: '' }
+    }
+  }
   const m = /^pessoal-(\d)$/.exec(nome || '')
   const pessoal = m && temasPessoais()[Number(m[1])]
   if (!pessoal) return temaCompleto('grafite')
@@ -227,7 +378,11 @@ function temaCompleto (nome) {
     cores: { ...pessoal.cores },
     papel: pessoal.papel ? papelDoLugar(Number(m[1])) : '',
     escurecer: pessoal.escurecer,
-    posicao: { ...pessoal.posicao }
+    posicao: { ...pessoal.posicao },
+    entrada: { ...pessoal.entrada },
+    amigos: { ...pessoal.amigos },
+    efeitos: { ...pessoal.efeitos },
+    sala: { ...pessoal.sala, posicao: { ...pessoal.sala.posicao }, efeitos: { ...pessoal.sala.efeitos }, papel: pessoal.sala.papel ? papelDaSala(Number(m[1])) : '' }
   }
 }
 
@@ -235,10 +390,31 @@ function temaCompleto (nome) {
 
 // Mostra um tema sem guardar nada: é o que o editor usa enquanto a pessoa
 // escolhe. aplicarTema() desfaz.
-function previaDeTema ({ cores, papel, escurecer, posicao }) {
+// O tema que esta pintado agora (o da pessoa, ou null num pronto), para a
+// troca de fundo entre a entrada e a sala.
+let temaNaTela = null
+
+function previaDeTema (tema) {
+  temaNaTela = tema
   document.documentElement.dataset.tema = 'pessoal'
-  pintar(document.documentElement, cores)
-  pintarPapel(papel, escurecer, cores.fundo, posicao)
+  pintar(document.documentElement, tema.cores)
+  aplicarPosicaoDaEntrada(tema.entrada)
+  aplicarLadoDosAmigos(tema.amigos, tema.entrada)
+  aplicarFundoDaVez()
+}
+
+// O fundo certo para onde a pessoa esta: na sala, o fundo da sala do tema
+// (uma cor ou uma imagem); fora dela, ou com o fundo da sala 'igual', o papel
+// de parede.
+function aplicarFundoDaVez () {
+  const t = temaNaTela
+  const naSala = document.documentElement.classList.contains('na-sala')
+  const s = t && t.sala
+  if (!t) pintarPapel('')
+  else if (naSala && s && s.modo === 'cor') pintarPapel(s.cor, 0, t.cores.fundo, POSICAO_PADRAO, EFEITOS_PADRAO)
+  else if (naSala && s && s.modo === 'imagem' && s.papel) pintarPapel(s.papel, s.escurecer, t.cores.fundo, s.posicao, s.efeitos)
+  else pintarPapel(t.papel, t.escurecer, t.cores.fundo, t.posicao, t.efeitos)
+  if (typeof atualizarFundoDaEntrada === 'function') atualizarFundoDaEntrada()
 }
 
 function aplicarTema (nome) {
@@ -250,11 +426,64 @@ function aplicarTema (nome) {
     previaDeTema(temaCompleto(nome))
   } else {
     temaAtual = TEMAS.includes(nome) ? nome : 'grafite'
+    temaNaTela = null
     pintar(document.documentElement, null)
-    pintarPapel('')
+    aplicarPosicaoDaEntrada(ENTRADA_PADRAO)
+    aplicarLadoDosAmigos(AMIGOS_PADRAO, ENTRADA_PADRAO)
     document.documentElement.dataset.tema = temaAtual
+    aplicarFundoDaVez()
   }
 
   guardar('liveon:tema', temaAtual)
   return temaAtual
+}
+
+// --- tirar as cores da imagem -------------------------------------------------
+
+// O destaque sugerido por um papel de parede: a cor viva que mais aparece
+// nele. A imagem e reduzida para 96x54, cada pixel vai para uma de 24 faixas
+// de matiz, pesado pelo quanto ele e vivo (saturado e nem escuro nem claro
+// demais), e a faixa mais pesada vence. A cor sai com o brilho de um botao:
+// saturada e com luminosidade media, para o texto branco continuar legivel.
+// Sem nenhuma cor viva (imagem cinza), devolve ''.
+async function corDoPapel (papel) {
+  const imagem = new Image()
+  imagem.src = papel
+  try { await imagem.decode() } catch { return '' }
+  const tela = new OffscreenCanvas(96, 54)
+  const ctx = tela.getContext('2d')
+  ctx.drawImage(imagem, 0, 0, 96, 54)
+  const dados = ctx.getImageData(0, 0, 96, 54).data
+  const faixas = Array.from({ length: 24 }, () => ({ peso: 0, h: 0, s: 0 }))
+  for (let i = 0; i < dados.length; i += 4) {
+    const r = dados[i] / 255
+    const g = dados[i + 1] / 255
+    const b = dados[i + 2] / 255
+    const max = Math.max(r, g, b)
+    const min = Math.min(r, g, b)
+    const l = (max + min) / 2
+    const d = max - min
+    if (d < 0.08) continue
+    const s = d / (1 - Math.abs(2 * l - 1))
+    let h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4
+    h = (h * 60 + 360) % 360
+    const peso = s * (1 - Math.abs(2 * l - 1))
+    const faixa = faixas[Math.floor(h / 15) % 24]
+    faixa.peso += peso
+    faixa.h += h * peso
+    faixa.s += s * peso
+  }
+  const melhor = faixas.reduce((a, b) => (b.peso > a.peso ? b : a))
+  if (melhor.peso < 3) return ''
+  const h = melhor.h / melhor.peso
+  const s = Math.max(0.55, Math.min(0.85, melhor.s / melhor.peso))
+  return deHsl(h, s, 0.56)
+}
+
+function deHsl (h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = l - c / 2
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]
+  return paraHex([(r + m) * 255, (g + m) * 255, (b + m) * 255])
 }

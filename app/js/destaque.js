@@ -54,6 +54,7 @@ document.addEventListener('keydown', (evento) => {
   if (evento.key !== 'Escape') return
   if (fecharDialogo()) return
   if (pessoasAbertas()) return fecharPessoas()
+  if (listaDeAmigosAberta()) return fecharListaDeAmigos()
   sairDaTelaCheia()
 })
 

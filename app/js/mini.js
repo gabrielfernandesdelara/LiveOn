@@ -161,6 +161,7 @@ function montarMiniTela () {
   estilo.href = new URL('estilo.css', location.href).href
   doc.head.appendChild(estilo)
   doc.body.className = 'mini-tela'
+  aparecerMini(doc)
 
   const video = doc.createElement('video')
   video.className = 'mini-video'

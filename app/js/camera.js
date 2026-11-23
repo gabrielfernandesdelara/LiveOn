@@ -126,6 +126,7 @@ async function desenharCameras () {
 
 async function abrirCamera () {
   $('#camera').classList.remove('oculto')
+  abrirDoBotao($('#camera > *'), $('#btn-camera'))
   await abrirPrevia(lembrar('liveon:camera'))
   if (cameraAberta()) await desenharCameras()
 }

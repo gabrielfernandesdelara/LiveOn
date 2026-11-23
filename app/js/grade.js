@@ -178,6 +178,10 @@ function acomodar (lista, destino) {
 function organizarGrade () {
   const grade = $('#grade')
   const cards = [...grade.querySelectorAll('.card')]
+  // Quem chamou direto (foco, tela cheia) mede aqui; o sincronizarGrade ja
+  // mediu antes de mexer nos cards.
+  const antes = posicoesAntes || medirCards()
+  posicoesAntes = null
 
   // Quem saiu da sala nao continua em foco.
   for (const id of [...focados]) {
@@ -225,6 +229,7 @@ function organizarGrade () {
   atualizarFaixa(grandes, emFoco.length > 0)
 
   distribuir()
+  animarGrade(antes)
 }
 
 function distribuir () {
@@ -482,19 +487,24 @@ function sincronizarGrade () {
   //
   // A minha tela pode ficar fora da MINHA grade (Aparencia, "Sua tela na
   // grade"): ela continua indo para os amigos e na lista de pessoas.
+  // Onde cada card estava, para a grade deslizar ate o lugar novo
+  // (animacoes.js). Medido ANTES de tirar e por cards.
+  guardarPosicoesDaGrade()
+
   const todos = quemEstaNaSala()
   const esperados = todos.filter((pessoa) => pessoa.noAr && !(pessoa.souEu && minhaTelaEscondida()))
 
   // Remove cards de quem saiu. Busca por .card e nao por filhos diretos,
   // porque no modo foco parte deles vive dentro da faixa de miniaturas.
   for (const card of [...grade.querySelectorAll('.card')]) {
-    if (!esperados.some((e) => e.id === card.dataset.id)) card.remove()
+    if (!esperados.some((e) => e.id === card.dataset.id)) retirarCard(card)
   }
 
   for (const pessoa of esperados) {
     let card = cardDe(pessoa.id)
     if (!card) {
       card = criarCard(pessoa.id, pessoa.nome, pessoa.souEu)
+      card.dataset.novo = '1'
       $('#principal').appendChild(card)
       if (!pessoa.souEu) {
         aplicarVideo(pessoa.id)

@@ -1,7 +1,7 @@
 // Processo principal: janela, seletor de fontes por IPC e o handler de
 // getDisplayMedia, que é onde o áudio do sistema entra (audio: 'loopback').
 
-const { app, BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, powerMonitor, screen, session, sharedTexture, shell } = require('electron')
+const { app, BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, Notification, powerMonitor, screen, session, sharedTexture, shell } = require('electron')
 const path = require('node:path')
 const os = require('node:os')
 const fs = require('node:fs')
@@ -134,6 +134,14 @@ let arquivoLog = null
 let salaDoLog = null
 const cabecalho = []
 
+// O registro pode ser desligado na aba Debug (2.0.0, a pedido do dono). Mora
+// no config.json, e nao no localStorage, porque o registro comeca antes da
+// janela existir. Ligado e o padrao: e a unica ferramenta para bug que so
+// aparece com dois participantes. Desligado, nada vai para o disco; a
+// abertura (placa, prioridade) continua guardada na memoria, e religar no
+// meio da execucao abre um arquivo novo com ela no topo.
+let registroLigado = lerConfig().registro !== false
+
 // Sempre C:\Users\<nome>\Documents, e NÃO o app.getPath('documents'): com o
 // backup do OneDrive ligado, o Windows aponta os Documentos para
 // OneDrive\Documentos, e o log iria parar na nuvem. Pedido do dono.
@@ -195,7 +203,7 @@ function limparLogsAntigos () {
 
 // --- monitoria ----------------------------------------------------------------
 //
-// Medição detalhada, ligada na aba Debug (1.6.4, a pedido do dono). É o
+// Medição detalhada, ligada na aba Debug (2.0.0, a pedido do dono). É o
 // registro de [medicao] e de "video" em dose maior: a cada 5 s, numa
 // planilha CSV própria em LiveOn\Monitorias, um arquivo por abertura do app.
 // Formato "longo" (hora; quem; medida; valor), que aceita qualquer medida nova
@@ -293,12 +301,14 @@ ipcMain.handle('log:abrirPasta', apenasDoApp((_evento, qual) => {
 }))
 
 function iniciarLog () {
-  try {
-    fs.mkdirSync(pastaDosLogs(), { recursive: true })
-    arquivoLog = caminhoLivre(`sem sala ${carimbo()}`)
-    fs.writeFileSync(arquivoLog, '')
-  } catch {
-    arquivoLog = null // sem log é melhor que não abrir
+  if (registroLigado) {
+    try {
+      fs.mkdirSync(pastaDosLogs(), { recursive: true })
+      arquivoLog = caminhoLivre(`sem sala ${carimbo()}`)
+      fs.writeFileSync(arquivoLog, '')
+    } catch {
+      arquivoLog = null // sem log é melhor que não abrir
+    }
   }
   limparLogsAntigos()
 
@@ -320,6 +330,10 @@ function registrarCabecalho (origem, texto) {
 }
 
 function abrirLogDaSala (rotulo) {
+  if (!registroLigado) {
+    salaDoLog = rotulo
+    return
+  }
   const destino = caminhoLivre(`${nomeSeguro(rotulo)} ${carimbo()}`)
   try {
     if (arquivoLog && !salaDoLog) {
@@ -361,6 +375,31 @@ function vigiarJanela (alvo) {
   })
 }
 
+// Ligar no meio da execucao: arquivo novo, com o nome da sala se estiver
+// numa, e a abertura no topo. Desligar: a ultima linha diz que foi de
+// proposito, e o arquivo para de crescer.
+function ligarRegistro (ligar) {
+  if (!ligar) {
+    if (arquivoLog) registrar('log', 'registro desligado nas configuracoes')
+    registroLigado = false
+    arquivoLog = null
+    return
+  }
+  registroLigado = true
+  if (arquivoLog) return
+  try {
+    fs.mkdirSync(pastaDosLogs(), { recursive: true })
+    const destino = caminhoLivre(`${naSala && salaDoLog ? nomeSeguro(salaDoLog) : 'sem sala'} ${carimbo()}`)
+    fs.writeFileSync(destino, cabecalho.map((linha) => `(abertura) ${linha}
+`).join(''))
+    arquivoLog = destino
+    registrar('log', 'registro ligado nas configuracoes')
+  } catch (erro) {
+    arquivoLog = null
+    registrar('log', `nao consegui criar o arquivo: ${erro.message}`)
+  }
+}
+
 ipcMain.on('log:registrar', apenasDoApp((_evento, texto) => registrar('app', String(texto).slice(0, 2000))))
 ipcMain.handle('log:caminho', apenasDoApp(() => arquivoLog))
 
@@ -384,19 +423,25 @@ ipcMain.handle('config:ler', apenasDoApp(async () => {
     video: lerConfig().video === 'cpu' ? 'cpu' : 'gpu',
     videoAtivo,
     prioridade: prioridadeEscolhida(),
+    registro: registroLigado,
     placa: placa.nome,
     amd: placa.amd
   }
 }))
 
-// Grava UMA escolha por vez. O vídeo só vale ao reiniciar; a prioridade vale
-// na hora, porque dá para mudar a classe de um processo que já está rodando.
-ipcMain.handle('config:gravar', apenasDoApp((_evento, { video, prioridade } = {}) => {
-  const soVideo = (video === 'gpu' || video === 'cpu') && prioridade === undefined
-  const soPrioridade = (prioridade === 'normal' || prioridade === 'alta') && video === undefined
-  if (!soVideo && !soPrioridade) return false
+// Grava UMA escolha por vez. O vídeo só vale ao reiniciar; a prioridade e o
+// registro valem na hora.
+ipcMain.handle('config:gravar', apenasDoApp((_evento, { video, prioridade, registro } = {}) => {
+  const quantas = [video, prioridade, registro].filter((v) => v !== undefined).length
+  const soVideo = (video === 'gpu' || video === 'cpu') && quantas === 1
+  const soPrioridade = (prioridade === 'normal' || prioridade === 'alta') && quantas === 1
+  const soRegistro = typeof registro === 'boolean' && quantas === 1
+  if (!soVideo && !soPrioridade && !soRegistro) return false
   try {
-    if (soVideo) {
+    if (soRegistro) {
+      gravarConfig({ ...lerConfig(), registro })
+      ligarRegistro(registro)
+    } else if (soVideo) {
       gravarConfig({ ...lerConfig(), video })
       registrar('config', `video: ${video === 'cpu' ? 'processador' : 'placa de video'} (vale ao reiniciar)`)
     } else {
@@ -537,7 +582,7 @@ ipcMain.handle('mini:destravar', apenasDoApp(() => {
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
 // Se a janela de quem pergunta esta a vista (pausa "quando nao esta a
-// vista", 1.6.4): minimizada, e quanto dela outras janelas cobrem (addon;
+// vista", 2.0.0): minimizada, e quanto dela outras janelas cobrem (addon;
 // null se ele faltar). A janela e a de quem perguntou, e nao a principal fixa,
 // para valer tambem nos testes.
 ipcMain.handle('janela:visibilidade', apenasDoApp((evento) => {
@@ -565,6 +610,54 @@ ipcMain.handle('copiar', apenasDoApp((_evento, texto) => {
   clipboard.writeText(String(texto))
   return clipboard.readText() === String(texto)
 }))
+
+// O codigo de sala no meio de um texto colado ("entra ai: rr29-vtxa-ntxd").
+// Mesmo alfabeto do gerarCodigo (configuracao.js): 12 caracteres, com ou
+// sem os hifens que a tela de entrada mostra. Mudou la, muda aqui.
+const LETRA_DO_CODIGO = '[2-9abcdefghjkmnpqrstuvwxyz]'
+const CODIGO_NO_TEXTO = new RegExp(
+  `(?:^|[^a-z0-9])(${LETRA_DO_CODIGO}{4})[- ]?(${LETRA_DO_CODIGO}{4})[- ]?(${LETRA_DO_CODIGO}{4})(?![a-z0-9])`, 'i')
+
+function codigoNoTexto (texto) {
+  const achado = CODIGO_NO_TEXTO.exec(String(texto || ''))
+  return achado ? (achado[1] + achado[2] + achado[3]).toLowerCase() : ''
+}
+
+// Botao de colar da entrada: e um clique da pessoa, entao devolve o texto,
+// mas so o codigo se houver um, e nunca mais que cabe no campo.
+ipcMain.handle('colar', apenasDoApp(() => {
+  const texto = clipboard.readText()
+  return codigoNoTexto(texto) || texto.trim().slice(0, 60)
+}))
+
+// Aviso do Windows para os amigos (pedido para entrar, convite, pedido de
+// amizade), so quando a janela nao esta com o foco: quem esta olhando para o
+// app ja ve o aviso dentro dele. Pelo processo principal, e nao pelo
+// Notification da pagina, porque o handler de permissao nega tudo que nao e
+// captura. O clique traz a janela para a frente. Sem som proprio: o do
+// Windows ja basta.
+// LIVEON_SEM_AVISOS desliga: teste nao mostra nada na tela de quem roda.
+ipcMain.handle('notificar', apenasDoApp((_evento, dados) => {
+  if (process.env.LIVEON_SEM_AVISOS) return false
+  if (!Notification.isSupported() || !janela || janela.isDestroyed() || janela.isFocused()) return false
+  const titulo = String((dados && dados.titulo) || '').slice(0, 80)
+  const texto = String((dados && dados.texto) || '').slice(0, 160)
+  if (!titulo) return false
+  const aviso = new Notification({ title: titulo, body: texto })
+  aviso.on('click', () => {
+    if (!janela || janela.isDestroyed()) return
+    if (janela.isMinimized()) janela.restore()
+    janela.show()
+    janela.focus()
+  })
+  aviso.show()
+  return true
+}))
+
+// A entrada pergunta sozinha, ao abrir e ao voltar o foco, se ha um codigo
+// copiado. Sem clique da pessoa, entao devolve SO o codigo: o resto do que
+// ela copiou nao sai daqui.
+ipcMain.handle('codigo:copiado', apenasDoApp(() => codigoNoTexto(clipboard.readText())))
 
 // A ponte expunha 'ambiente' e ninguem respondia do lado de ca: a chamada
 // rejeitava, a pilula de versao ficava vazia (um quadradinho solto na barra)
@@ -1236,6 +1329,10 @@ async function descreverMaquina () {
     ? 'captura de audio por processo: disponivel'
     : `captura de audio por processo: INDISPONIVEL (${audioNativo.motivo})`)
 }
+
+// Sem isto, no Windows, o aviso dos amigos sai sem nome de app (ou nem sai,
+// rodando da pasta do projeto). O instalador usa o mesmo appId.
+if (process.platform === 'win32') app.setAppUserModelId('com.gabrieldelara.liveon')
 
 app.whenReady().then(() => {
   iniciarLog()

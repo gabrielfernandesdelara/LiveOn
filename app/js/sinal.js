@@ -24,7 +24,10 @@
 'use strict'
 
 const INTERVALO_SINAL = 2000
-const MEDICOES_PARA_ACENDER = 2
+// 3 medicoes ruins (6 s) para acender: com 2, um soluco de perda de um
+// instante (11% num momento, 0% no seguinte) ja acendia (registro de
+// 22/11/2026). Conexao ruim de verdade dura mais que isso.
+const MEDICOES_PARA_ACENDER = 3
 const MEDICOES_PARA_APAGAR = 3
 
 // Por quanto tempo a resolução recebida serve de referência para dizer que
@@ -36,7 +39,10 @@ const JANELA_REFERENCIA = 15000
 const LIMITES_SINAL = {
   perdaFraca: 0.03,
   perdaMuitoFraca: 0.10,
-  jitterFraco: 0.08,
+  // 150 ms, e nao 80: tela compartilhada manda os quadros em rajadas, e um
+  // amigo acendia o icone com 80 a 135 ms de jitter e 0% de perda, a imagem
+  // chegando inteira (registro de 22/11/2026).
+  jitterFraco: 0.15,
   quedaFraca: 0.7,
   quedaMuitoFraca: 0.45,
   // Do lado de quem envia: a fração que o amigo diz ter perdido.
@@ -44,7 +50,10 @@ const LIMITES_SINAL = {
   perdaRemotaMuitoFraca: 0.15,
   // E a resolução que sai em relação à que foi pedida.
   envioFraco: 0.8,
-  envioMuitoFraco: 0.5
+  envioMuitoFraco: 0.5,
+  // Upload medido acima disto vezes o teto: a queda foi do teto, nao da
+  // conexao.
+  folgaDoTeto: 1.3
 }
 
 let temporizadorSinal = null
@@ -165,18 +174,37 @@ async function nivelEnviado (par) {
   })
   if (!r) return null
 
+  // O upload que o WebRTC mede para este amigo (o par de candidatos em uso).
+  let disponivel = 0
+  try {
+    ;(await par.pc.getStats()).forEach((item) => {
+      if (item.type === 'candidate-pair' && item.nominated && item.state === 'succeeded' && item.availableOutgoingBitrate) {
+        disponivel = item.availableOutgoingBitrate
+      }
+    })
+  } catch { /* sem a medida, fica o criterio antigo */ }
+
   // A resolucao que DEVIA sair para esse amigo: a da captura dividida pela
   // escala que aplicarQualidade() pos para ele.
   const encoding = (remetente.getParameters().encodings || [])[0] || {}
   const fonte = (remetente.track.getSettings() || {}).height || qualidadeLocal.altura
   const esperada = fonte / (encoding.scaleResolutionDownBy || 1)
   const saindo = r.frameHeight ? r.frameHeight / esperada : 1
-  const porBanda = r.qualityLimitationReason === 'bandwidth'
+  // "Falta de banda" so e a CONEXAO quando o upload medido nao tem folga
+  // acima do teto do LiveOn. Com folga, quem segurou a resolucao foi o
+  // proprio teto (maxBitrate), num trecho de muito movimento: o WebRTC
+  // tambem chama isso de 'bandwidth', e o icone acendia com o upload do
+  // dono sobrando 10 Mbps (registro de 23/11/2026).
+  const L = LIMITES_SINAL
+  const teto = encoding.maxBitrate || 0
+  const peloTeto = Boolean(teto && disponivel && disponivel > teto * L.folgaDoTeto)
+  const porBanda = r.qualityLimitationReason === 'bandwidth' && !peloTeto
   const perdaRemota = remoto && typeof remoto.fractionLost === 'number' ? remoto.fractionLost : 0
 
-  const L = LIMITES_SINAL
   const motivo = `saindo ${r.frameHeight || '?'}p de ${Math.round(esperada)}p` +
-    `${porBanda ? ' (falta de banda)' : ''}, amigo perdendo ${Math.round(perdaRemota * 100)}%`
+    `${porBanda ? ' (falta de banda)' : ''}${peloTeto && r.qualityLimitationReason === 'bandwidth' ? ' (no teto do LiveOn, nao e a conexao)' : ''}` +
+    `, amigo perdendo ${Math.round(perdaRemota * 100)}%` +
+    `${disponivel ? `, upload medido ${Math.round(disponivel / 1000)}kbps` : ''}`
 
   if ((porBanda && saindo < L.envioMuitoFraco) || perdaRemota > L.perdaRemotaMuitoFraca) return { nivel: 2, motivo }
   if ((porBanda && saindo < L.envioFraco) || perdaRemota > L.perdaRemotaFraca) return { nivel: 1, motivo }

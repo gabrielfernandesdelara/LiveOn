@@ -21,6 +21,14 @@
 // tentar criar sala com "132" por fora do app.
 const CODIGO_MINIMO = 10
 
+// Amigos (código de amigo, presença, pedido para entrar): arquivo próprio.
+import { Pessoa, Etiqueta, idDoSegredo } from './amigos.js'
+export { Pessoa, Etiqueta }
+
+// O segredo de cada pessoa, sorteado no app: 32 caracteres do alfabeto do
+// código da sala (~158 bits). Quem tem o segredo É a pessoa.
+const FORMATO_DO_SEGREDO = /^[a-z0-9]{32}$/
+
 // Recolhimento de quem sumiu calado. O objeto só limpa em webSocketClose, e
 // esse evento pode simplesmente não chegar, daí o alarme como segunda linha.
 const JANELA_SILENCIO = 45000   // sem sinal de vida por mais que isso: fora
@@ -112,6 +120,23 @@ export default {
     }
 
     const partes = url.pathname.split('/').filter(Boolean)
+
+    // Amigos: /amigos/<segredo>. O objeto é nomeado pelo HASH do segredo,
+    // que é o id que os amigos guardam; o segredo em si nunca sai do PC
+    // de quem o sorteou, a não ser para este endereço.
+    if (partes[0] === 'amigos') {
+      if (requisicao.headers.get('Upgrade') !== 'websocket') {
+        return new Response('esperava um WebSocket', { status: 426 })
+      }
+      const segredo = partes[1] || ''
+      if (!FORMATO_DO_SEGREDO.test(segredo)) return new Response('segredo inválido', { status: 400 })
+      const origem = requisicao.headers.get('CF-Connecting-IP') || 'desconhecida'
+      const { success } = await ambiente.LIMITE_ENTRADA.limit({ key: 'amigos:' + origem })
+      if (!success) return new Response('muitas tentativas, espere um pouco', { status: 429 })
+      const id = await idDoSegredo(segredo)
+      return ambiente.PESSOA.get(ambiente.PESSOA.idFromName(id)).fetch(requisicao)
+    }
+
     if (partes[0] !== 'sala' || !partes[1]) {
       return new Response('use /sala/<codigo>', { status: 404 })
     }

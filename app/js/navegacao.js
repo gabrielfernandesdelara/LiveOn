@@ -41,8 +41,15 @@ function fecharDialogo () {
 }
 
 function mostrarSala (sala) {
-  $('#entrada').classList.add('oculto')
-  $('#sala').classList.remove('oculto')
+  // A entrada cresce um pouco e some, a sala chega de leve (animacoes.js), e
+  // o fundo passa a ser o da sala, se o tema tiver um.
+  document.documentElement.classList.add('na-sala')
+  // O "entrando" (o anel vermelho) sai no fim da troca, com a entrada ja
+  // escondida (terminarTroca).
+  trocarDeTela($('#entrada'), $('#sala'), true)
+  const papelAntes = getComputedStyle(document.documentElement).getPropertyValue('--papel')
+  aplicarFundoDaVez()
+  animarFundoNaTroca(getComputedStyle(document.documentElement).getPropertyValue('--papel') !== papelAntes)
   // O nome cortado com reticências na barra continua inteiro no title.
   $('#rotulo-sala').textContent = sala
   $('#rotulo-sala').title = sala
@@ -93,9 +100,16 @@ function voltarParaEntrada () {
   pares.clear()
   participantes.clear()
   meuId = null
+  // Os amigos deixam de me ver na sala (amigos.js).
+  atualizarPresencaNaSala()
 
   $('#principal').textContent = ''
   $('#miniaturas').textContent = ''
-  $('#sala').classList.add('oculto')
-  $('#entrada').classList.remove('oculto')
+  document.documentElement.classList.remove('na-sala')
+  esquecerPontosDaSala()
+  trocarDeTela($('#sala'), $('#entrada'), false)
+  const papelAntes = getComputedStyle(document.documentElement).getPropertyValue('--papel')
+  aplicarFundoDaVez()
+  animarFundoNaTroca(getComputedStyle(document.documentElement).getPropertyValue('--papel') !== papelAntes)
+  reabrirEntrada()
 }

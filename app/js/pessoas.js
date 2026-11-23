@@ -32,9 +32,11 @@ function criarAvatar (nome, noAr = true, id = null) {
     avatar.classList.add('com-foto')
   }
 
+  // Quem acabou de entrar no ar ganha a onda no ponto, uma vez (animacoes.js).
+  const acendeu = id && typeof acabouDeAcender === 'function' && acabouDeAcender(id, noAr)
   if (noAr) {
     const ponto = document.createElement('span')
-    ponto.className = 'ponto'
+    ponto.className = acendeu ? 'ponto acendendo' : 'ponto'
     avatar.appendChild(ponto)
   }
   return avatar
@@ -99,8 +101,15 @@ function desenharPessoas () {
 
   // O botão: até três avatares empilhados, e o total.
   const pilha = $('#pilha-pessoas')
+  // Onde cada avatar estava, para deslizarem ate o lugar novo (animacoes.js).
+  const antes = medirPilha()
   pilha.textContent = ''
-  for (const pessoa of todos.slice(0, 3)) pilha.appendChild(criarAvatar(pessoa.nome, pessoa.noAr, pessoa.id))
+  for (const pessoa of todos.slice(0, 3)) {
+    const avatar = criarAvatar(pessoa.nome, pessoa.noAr, pessoa.id)
+    avatar.dataset.id = pessoa.id
+    pilha.appendChild(avatar)
+  }
+  animarPilha(antes)
   $('#total-pessoas').textContent = String(todos.length)
 
   // O cabeçalho do pop-over.
@@ -160,6 +169,9 @@ function desenharPessoas () {
 
     alvo.appendChild(linha)
   }
+
+  // Quem entra e sai muda a lotacao que os amigos veem (amigos.js).
+  if (meuId) atualizarPresencaNaSala()
 }
 
 // --- pop-over ----------------------------------------------------------------

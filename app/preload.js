@@ -60,6 +60,12 @@ contextBridge.exposeInMainWorld('ponte', {
   // --- registro em arquivo ---
 
   copiar: (texto) => ipcRenderer.invoke('copiar', texto),
+  // O codigo de sala que estiver copiado: colar devolve o texto (clique da
+  // pessoa), codigoCopiado so o codigo (a entrada pergunta sozinha).
+  colar: () => ipcRenderer.invoke('colar'),
+  codigoCopiado: () => ipcRenderer.invoke('codigo:copiado'),
+  // Aviso do Windows dos amigos, so com a janela sem foco (main.js decide).
+  notificar: (titulo, texto) => ipcRenderer.invoke('notificar', { titulo, texto }),
 
   // Mini tela (a janela sempre por cima): travar deixa o mouse passar direto
   // por ela; o atalho destrava. A janela em si e aberta pela pagina.

@@ -10,12 +10,11 @@
 
   // Nome e qualidade voltam entre sessoes. O codigo da sala nao: e o segredo
   // dela, e sala nova ganha codigo novo.
-  $('#campo-nome').value = lembrar('liveon:nome') || ''
   $('#campo-resolucao').value = lembrar('liveon:resolucao') || '720'
   $('#campo-fps').value = lembrar('liveon:fps') || '30'
 
-  definirModo('entrar')
-  $('#campo-nome').focus()
+  // O nome, a primeira vez, o cursor no codigo e o codigo copiado.
+  iniciarEntrada()
 
   if (!window.ponte) return anotar('sem ponte: rodando fora do Electron')
 
@@ -36,6 +35,7 @@
     $('#rotulo-versao').textContent = 'LiveOn ' + amb.versao
     $('#rotulo-versao').title = `Electron ${amb.electron} / Chrome ${amb.chrome}`
     $('#config-versao').textContent = 'LiveOn ' + amb.versao
+    $('#versao-entrada').textContent = amb.versao
     anotar(`iniciando LiveOn ${amb.versao}`)
     if (!amb.loopbackNativo) {
       avisar('Electron ' + amb.electron + ': o áudio do sistema exige a versão 39 ou maior.')

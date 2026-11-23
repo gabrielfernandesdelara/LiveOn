@@ -1,4 +1,4 @@
-// Pausar a imagem quando o LiveOn não está à vista (1.6.4, a pedido do dono,
+// Pausar a imagem quando o LiveOn não está à vista (2.0.0, a pedido do dono,
 // aba Desempenho). Minimizado, ou coberto por outro programa, eu não estou
 // vendo as telas, e receber e decodificar vídeo que ninguém vê gasta
 // processador, memória e a internet dos dois lados.

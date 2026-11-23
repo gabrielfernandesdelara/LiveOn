@@ -71,9 +71,30 @@ function definirNomeNoCard (valor) {
   marcarAparencia()
 }
 
+// Banda de envio (aba Desempenho, 2.0.0): automatica ou um limite total. Vale
+// na hora: o teto de cada amigo e refeito (reaplicarQualidade).
+function definirBanda (valor) {
+  const fixa = BANDAS_FIXAS.includes(Number(valor)) ? String(Number(valor)) : 'auto'
+  guardar('liveon:banda', fixa)
+  anotar(`banda de envio: ${fixa === 'auto' ? 'automatica' : fixa + ' Mbps'}`)
+  if (typeof reaplicarQualidade === 'function') reaplicarQualidade()
+  mostrarBanda()
+}
+
+// O campo e, com um limite escolhido, a nota lembrando que ele e so teto
+// (texto do dono; antes ela fazia a conta da divisao entre os amigos).
+function mostrarBanda () {
+  const fixa = bandaFixa()
+  $('#campo-banda').value = fixa ? String(fixa) : 'auto'
+  $('#nota-banda').textContent = fixa ? 'A banda escolhida é o limite apenas.' : ''
+}
+
+// A troca de tema esmaece de um para o outro (animacoes.js).
 function escolherTema (tema) {
-  aplicarTema(tema)
-  marcarAparencia()
+  trocarTemaSuave(() => {
+    aplicarTema(tema)
+    marcarAparencia()
+  })
 }
 
 function escolherFormatoDaCamera (formato) {
@@ -94,6 +115,7 @@ function marcarAparencia () {
   marcar(document.querySelectorAll('#opcao-minha-tela button'), minhaTela)
   marcar(document.querySelectorAll('#opcao-pausa button'), modoPausa)
   marcar(document.querySelectorAll('#opcao-som-novo button'), somDasNovas)
+  if (typeof modoAnimacoes !== 'undefined') marcar(document.querySelectorAll('#opcao-animacoes button'), modoAnimacoes)
 }
 
 // A aba acesa na lateral e a seção que aparece. O editor de tema e uma seção
@@ -113,7 +135,10 @@ function mostrarAbaConfig (aba) {
   if (aba === 'audio') preencherSaidas()
   if (aba === 'mini') mostrarAtalhoDaMini()
   if (aba === 'debug') mostrarMonitoria()
-  if (aba === 'desempenho') lerInfoDaPlaca().then(mostrarCodificador)
+  if (aba === 'desempenho') {
+    lerInfoDaPlaca().then(mostrarCodificador)
+    mostrarBanda()
+  }
   mostrarSecaoConfig(aba, aba)
 }
 
@@ -217,6 +242,7 @@ function apagarTemaPessoal (i, botao) {
   lista[i] = null
   guardarTemasPessoais(lista)
   guardar('liveon:papel-' + i, '')
+  guardar('liveon:papel-sala-' + i, '')
   // O tema em uso sumiu: volta para o padrao.
   if (temaAtual === 'pessoal-' + i) aplicarTema('grafite')
   desenharTemasPessoais()
@@ -248,15 +274,16 @@ function abrirEditorDeTema (lugar, novo) {
   }
   temaEmEdicao = temaCompleto(novo ? temaAtual : 'pessoal-' + lugar)
 
+  desenharPapeisProntos()
   mostrarTemaNoEditor()
   mostrarSecaoConfig('editor', 'aparencia')
   $('#campo-nome-tema').focus()
 }
 
-// Os campos, o codigo de cada cor, o papel, o app inteiro e o aviso, tudo a
-// partir de temaEmEdicao.
+// Os campos, o codigo de cada cor, os dois fundos, o app inteiro e o aviso,
+// tudo a partir de temaEmEdicao.
 function mostrarTemaNoEditor () {
-  const { cores, papel, escurecer } = temaEmEdicao
+  const { cores } = temaEmEdicao
   // O icone segue o destaque ate a pessoa escolher outra cor para ele.
   const visivel = { ...cores, marca: cores.marca || cores.destaque, marcaPonto: cores.marcaPonto || PONTO_PADRAO }
   for (const campo of document.querySelectorAll('.editor-tema-cor')) {
@@ -265,17 +292,237 @@ function mostrarTemaNoEditor () {
     campo.parentNode.querySelector('.hex-cor').textContent = cor.toUpperCase()
   }
 
-  variaveisDoPapel($('#previa-papel'), papel, escurecer, cores.fundo, temaEmEdicao.posicao)
-  $('#previa-papel').classList.toggle('vazio', !papel)
-  $('#btn-remover-papel').classList.toggle('oculto', !papel)
-  $('#btn-escolher-papel').textContent = papel ? 'Trocar imagem' : 'Escolher imagem'
-  $('#escurecer-papel').value = String(escurecer)
-  $('#escurecer-papel').disabled = !papel
-  $('#zoom-papel').value = String(temaEmEdicao.posicao.zoom)
-  $('#zoom-papel').disabled = !papel
+  mostrarFundoNoEditor('entrada')
+  mostrarFundoDaSalaNoEditor()
+  parteDoFundo('entrada', 'cores-da-imagem').disabled = !temaEmEdicao.papel
+  mostrarEntradaNoEditor()
+  mostrarAmigosNoEditor()
 
   previaDeTema(temaEmEdicao)
   $('#aviso-contraste').textContent = avisoDeContraste(cores)
+}
+
+// --- os dois fundos no editor: o papel de parede e o fundo da sala ----------
+//
+// Os dois blocos saem do mesmo molde no index.html (.editor-fundo com
+// data-alvo), e cada peca e achada pelo data-parte. O que eles editam tem os
+// mesmos campos (papel, escurecer, posicao, efeitos): o papel de parede mora
+// no proprio temaEmEdicao, e o fundo da sala em temaEmEdicao.sala.
+
+function fundoEmEdicao (alvo) {
+  return alvo === 'sala' ? temaEmEdicao.sala : temaEmEdicao
+}
+
+function parteDoFundo (alvo, parte) {
+  return document.querySelector(`.editor-fundo[data-alvo="${alvo}"] [data-parte="${parte}"]`)
+}
+
+function avisarNoFundo (alvo, texto) {
+  parteDoFundo(alvo, 'aviso').textContent = texto
+}
+
+// Como cada efeito aparece ao lado da barra.
+const VALOR_DO_EFEITO = {
+  desfoque: (v) => v ? String(Math.round(v)) : 'Nenhum',
+  brilho: (v) => Math.round(v) + '%',
+  cores: (v) => v === 0 ? 'Preto e branco' : Math.round(v) + '%',
+  contraste: (v) => Math.round(v) + '%',
+  vinheta: (v) => v ? Math.round(v) + '%' : 'Nenhuma'
+}
+
+function mostrarFundoNoEditor (alvo) {
+  const fundo = fundoEmEdicao(alvo)
+  const { papel } = fundo
+  const previa = parteDoFundo(alvo, 'previa')
+  variaveisDoPapel(previa, papel, fundo.escurecer, temaEmEdicao.cores.fundo, fundo.posicao, fundo.efeitos)
+  previa.classList.toggle('vazio', !papel)
+  parteDoFundo(alvo, 'remover').classList.toggle('oculto', !papel)
+  parteDoFundo(alvo, 'escolher').textContent = papel ? 'Trocar imagem' : 'Escolher imagem'
+  for (const botao of document.querySelectorAll(`.editor-fundo[data-alvo="${alvo}"] .papel-pronto`)) {
+    botao.classList.toggle('ativo', botao.dataset.papel === papel)
+  }
+  mostrarEfeitosNoEditor(alvo)
+}
+
+function mostrarEfeitosNoEditor (alvo = 'entrada') {
+  const fundo = fundoEmEdicao(alvo)
+  const efeitos = efeitosValidos(fundo.efeitos)
+  fundo.efeitos = efeitos
+  const semPapel = !fundo.papel
+  for (const barra of document.querySelectorAll(`.editor-fundo[data-alvo="${alvo}"] .barra-efeito`)) {
+    const nome = barra.dataset.efeito
+    barra.value = String(efeitos[nome])
+    barra.disabled = semPapel
+    barra.closest('.efeito').querySelector('.valor-efeito').textContent = VALOR_DO_EFEITO[nome](efeitos[nome])
+  }
+  // O Zoom e o Escurecer moram na lista dos efeitos desde que o dono pediu
+  // tudo junto, mas continuam guardados onde sempre estiveram (posicao.zoom
+  // e escurecer).
+  const { zoom } = fundo.posicao
+  const escurecer = fundo.escurecer
+  parteDoFundo(alvo, 'zoom').value = String(zoom)
+  parteDoFundo(alvo, 'zoom').disabled = semPapel
+  parteDoFundo(alvo, 'escurecer').value = String(escurecer)
+  parteDoFundo(alvo, 'escurecer').disabled = semPapel
+  parteDoFundo(alvo, 'valor-zoom').textContent = zoom <= 1 ? 'Nenhum' : zoom.toFixed(1).replace('.', ',') + 'x'
+  parteDoFundo(alvo, 'valor-escurecer').textContent = escurecer ? Math.round(escurecer * 100) + '%' : 'Nenhum'
+  const mexido = Object.keys(EFEITOS_PADRAO).some((nome) => efeitos[nome] !== EFEITOS_PADRAO[nome]) ||
+    zoom !== 1 || escurecer !== ESCURECER_PADRAO
+  parteDoFundo(alvo, 'sem-efeitos').disabled = semPapel || !mexido
+}
+
+// O fundo da sala: os segmentos, a cor, e o bloco da imagem so no modo
+// Imagem. O app mostra a escolha na hora se a pessoa estiver numa sala.
+function mostrarFundoDaSalaNoEditor () {
+  const sala = temaEmEdicao.sala
+  for (const botao of document.querySelectorAll('#opcao-fundo-sala button')) {
+    botao.classList.toggle('ativo', botao.dataset.valor === sala.modo)
+  }
+  parteDoFundo('sala', 'bloco-cor').classList.toggle('oculto', sala.modo !== 'cor')
+  parteDoFundo('sala', 'bloco-imagem').classList.toggle('oculto', sala.modo !== 'imagem')
+  const cor = parteDoFundo('sala', 'cor')
+  cor.value = sala.cor
+  cor.parentNode.querySelector('.hex-cor').textContent = sala.cor.toUpperCase()
+  mostrarFundoNoEditor('sala')
+}
+
+function definirModoDoFundoDaSala (modo) {
+  if (!temaEmEdicao) return
+  temaEmEdicao.sala = { ...temaEmEdicao.sala, modo: MODOS_DO_FUNDO_DA_SALA.includes(modo) ? modo : 'igual' }
+  mostrarTemaNoEditor()
+}
+
+function mudarCorDoFundoDaSala (valor) {
+  if (!temaEmEdicao || !corValida(valor)) return
+  temaEmEdicao.sala.cor = valor.toLowerCase()
+  mostrarTemaNoEditor()
+}
+
+function mudarEfeito (nome, valor, alvo = 'entrada') {
+  const fundo = temaEmEdicao && fundoEmEdicao(alvo)
+  if (!fundo || !fundo.papel) return
+  fundo.efeitos = efeitosValidos({ ...fundo.efeitos, [nome]: valor })
+  mostrarTemaNoEditor()
+}
+
+// Volta tudo da lista: os efeitos, o zoom e o escurecer. A parte da imagem
+// escolhida arrastando (x e y) fica.
+function tirarEfeitos (alvo = 'entrada') {
+  if (!temaEmEdicao) return
+  const fundo = fundoEmEdicao(alvo)
+  fundo.efeitos = { ...EFEITOS_PADRAO }
+  fundo.escurecer = ESCURECER_PADRAO
+  fundo.posicao = { ...fundo.posicao, zoom: 1 }
+  mostrarTemaNoEditor()
+}
+
+// --- papeis prontos, cores da imagem e posicao da entrada (2.0.0) -----------
+
+function desenharPapeisProntos () {
+  for (const alvo of ['entrada', 'sala']) {
+    const caixa = parteDoFundo(alvo, 'prontos')
+    if (caixa.childElementCount) continue
+    for (const p of PAPEIS_PRONTOS) {
+      const botao = document.createElement('button')
+      botao.className = 'papel-pronto'
+      botao.dataset.papel = caminhoDoPapelPronto(p.id)
+      botao.title = p.nome
+      botao.style.backgroundImage = `url("${caminhoDoPapelPronto(p.id)}")`
+      const nome = document.createElement('span')
+      nome.className = 'nome-papel'
+      nome.textContent = p.nome
+      botao.appendChild(nome)
+      botao.onclick = () => escolherPapelPronto(p.id, alvo)
+      caixa.appendChild(botao)
+    }
+  }
+}
+
+function escolherPapelPronto (id, alvo = 'entrada') {
+  if (!temaEmEdicao) return
+  avisarNoFundo(alvo, '')
+  const fundo = fundoEmEdicao(alvo)
+  fundo.papel = caminhoDoPapelPronto(id)
+  fundo.posicao = { ...POSICAO_PADRAO }
+  anotar(`papel pronto escolhido (${alvo}): ${id}`)
+  mostrarTemaNoEditor()
+}
+
+// Sugere o destaque a partir do papel de parede. O icone segue o destaque, a
+// nao ser que a pessoa ja tenha escolhido outra cor para ele.
+async function tirarCoresDoPapel () {
+  if (!temaEmEdicao || !temaEmEdicao.papel) return
+  const cor = await corDoPapel(temaEmEdicao.papel)
+  if (!temaEmEdicao) return
+  if (!cor) return avisarNoFundo('entrada', 'Essa imagem não tem uma cor forte o bastante para virar destaque.')
+  avisarNoFundo('entrada', '')
+  temaEmEdicao.cores.destaque = cor
+  anotar(`cor tirada do papel de parede: ${cor}`)
+  mostrarTemaNoEditor()
+}
+
+// A previa da entrada no editor: o papel, o degrade e o marcador no lugar.
+function mostrarEntradaNoEditor () {
+  const { papel, escurecer, cores } = temaEmEdicao
+  const entrada = entradaValida(temaEmEdicao.entrada)
+  temaEmEdicao.entrada = entrada
+  for (const botao of document.querySelectorAll('#opcao-entrada button')) {
+    botao.classList.toggle('ativo', botao.dataset.valor === entrada.posicao)
+  }
+  const previa = $('#previa-entrada')
+  variaveisDoPapel(previa, papel, escurecer, cores.fundo, temaEmEdicao.posicao, temaEmEdicao.efeitos)
+  previa.classList.toggle('sem-papel', !papel)
+  previa.dataset.posicao = entrada.posicao
+  previa.style.setProperty('--x', entrada.x + '%')
+  previa.style.setProperty('--y', entrada.y + '%')
+  $('#nota-entrada').textContent = entrada.posicao === 'livre' ? 'Arraste a prévia para escolher o lugar.' : ''
+}
+
+// O lado do trilho dos amigos, com a previa da entrada mostrando onde ele cai.
+function mostrarAmigosNoEditor () {
+  if (!temaEmEdicao) return
+  const amigos = amigosValidos(temaEmEdicao.amigos)
+  temaEmEdicao.amigos = amigos
+  for (const botao of document.querySelectorAll('#opcao-amigos button')) {
+    botao.classList.toggle('ativo', botao.dataset.valor === amigos.lado)
+  }
+  $('#previa-entrada').dataset.amigos = ladoDosAmigos(amigos, temaEmEdicao.entrada)
+}
+
+function definirLadoDosAmigos (lado) {
+  if (!temaEmEdicao) return
+  temaEmEdicao.amigos = amigosValidos({ lado })
+  mostrarTemaNoEditor()
+}
+
+function definirPosicaoDaEntrada (posicao) {
+  if (!temaEmEdicao) return
+  temaEmEdicao.entrada = { ...entradaValida(temaEmEdicao.entrada), posicao }
+  mostrarTemaNoEditor()
+}
+
+// Livre: arrastar (ou clicar) na previa poe o meio da coluna ali.
+function ligarPreviaDaEntrada () {
+  const previa = $('#previa-entrada')
+  let arrastando = false
+  const mover = (evento) => {
+    if (!temaEmEdicao) return
+    const r = previa.getBoundingClientRect()
+    const x = Math.round(Math.min(100, Math.max(0, ((evento.clientX - r.left) / r.width) * 100)))
+    const y = Math.round(Math.min(100, Math.max(0, ((evento.clientY - r.top) / r.height) * 100)))
+    temaEmEdicao.entrada = { posicao: 'livre', x, y }
+    mostrarTemaNoEditor()
+  }
+  previa.addEventListener('pointerdown', (evento) => {
+    if (!temaEmEdicao || entradaValida(temaEmEdicao.entrada).posicao !== 'livre') return
+    arrastando = true
+    previa.setPointerCapture(evento.pointerId)
+    mover(evento)
+  })
+  previa.addEventListener('pointermove', (evento) => { if (arrastando) mover(evento) })
+  const soltar = () => { arrastando = false }
+  previa.addEventListener('pointerup', soltar)
+  previa.addEventListener('pointercancel', soltar)
 }
 
 function mudarCorDoEditor (campo) {
@@ -292,64 +539,67 @@ function mudarBaseDoTema () {
 // Arrastar na previa move a imagem junto com o mouse: o ponto escolhido
 // anda no sentido contrario do arraste. Com zoom, o mesmo arraste anda menos
 // na imagem, por isso a divisao.
-function moverPapel (dx, dy) {
-  if (!temaEmEdicao || !temaEmEdicao.papel) return
-  const previa = $('#previa-papel')
-  const p = temaEmEdicao.posicao
+function moverPapel (dx, dy, alvo = 'entrada') {
+  const fundo = temaEmEdicao && fundoEmEdicao(alvo)
+  if (!fundo || !fundo.papel) return
+  const previa = parteDoFundo(alvo, 'previa')
+  const p = fundo.posicao
   p.x = Math.min(100, Math.max(0, p.x - (dx / previa.clientWidth) * 100 / p.zoom))
   p.y = Math.min(100, Math.max(0, p.y - (dy / previa.clientHeight) * 100 / p.zoom))
   mostrarTemaNoEditor()
 }
 
-function mudarZoomDoPapel (valor) {
-  if (!temaEmEdicao || !temaEmEdicao.papel) return
-  temaEmEdicao.posicao.zoom = Math.min(ZOOM_PAPEL_MAXIMO, Math.max(1, valor))
+function mudarZoomDoPapel (valor, alvo = 'entrada') {
+  const fundo = temaEmEdicao && fundoEmEdicao(alvo)
+  if (!fundo || !fundo.papel) return
+  fundo.posicao.zoom = Math.min(ZOOM_PAPEL_MAXIMO, Math.max(1, valor))
   mostrarTemaNoEditor()
 }
 
-function ligarPreviaDoPapel () {
-  const previa = $('#previa-papel')
+function ligarPreviaDoPapel (alvo = 'entrada') {
+  const previa = parteDoFundo(alvo, 'previa')
   let ultimo = null
+  const temPapel = () => temaEmEdicao && fundoEmEdicao(alvo).papel
   previa.addEventListener('pointerdown', (evento) => {
-    if (!temaEmEdicao || !temaEmEdicao.papel) return
+    if (!temPapel()) return
     previa.setPointerCapture(evento.pointerId)
     ultimo = { x: evento.clientX, y: evento.clientY }
   })
   previa.addEventListener('pointermove', (evento) => {
     if (!ultimo) return
-    moverPapel(evento.clientX - ultimo.x, evento.clientY - ultimo.y)
+    moverPapel(evento.clientX - ultimo.x, evento.clientY - ultimo.y, alvo)
     ultimo = { x: evento.clientX, y: evento.clientY }
   })
   const soltar = () => { ultimo = null }
   previa.addEventListener('pointerup', soltar)
   previa.addEventListener('pointercancel', soltar)
   previa.addEventListener('wheel', (evento) => {
-    if (!temaEmEdicao || !temaEmEdicao.papel) return
+    if (!temPapel()) return
     evento.preventDefault()
-    mudarZoomDoPapel(temaEmEdicao.posicao.zoom * (evento.deltaY < 0 ? 1.06 : 1 / 1.06))
+    mudarZoomDoPapel(fundoEmEdicao(alvo).posicao.zoom * (evento.deltaY < 0 ? 1.06 : 1 / 1.06), alvo)
   }, { passive: false })
 }
 
-function mudarEscurecer () {
+function mudarEscurecer (alvo = 'entrada') {
   if (!temaEmEdicao) return
-  temaEmEdicao.escurecer = Number($('#escurecer-papel').value)
+  fundoEmEdicao(alvo).escurecer = Number(parteDoFundo(alvo, 'escurecer').value)
   mostrarTemaNoEditor()
 }
 
 // Qualquer imagem vira papel de parede: reduzida ate PAPEL_LADO no maior
 // lado e comprimida em WebP ate caber em PAPEL_MAXIMO. Se nem na qualidade
 // mais baixa couber, diminui a imagem e tenta de novo.
-async function escolherPapel (arquivo) {
-  $('#aviso-papel').textContent = ''
+async function escolherPapel (arquivo, alvo = 'entrada') {
+  avisarNoFundo(alvo, '')
   if (!arquivo || !temaEmEdicao) return
-  if (!arquivo.type.startsWith('image/')) return ($('#aviso-papel').textContent = 'Esse arquivo não é uma imagem.')
-  if (arquivo.size > ARQUIVO_MAXIMO) return ($('#aviso-papel').textContent = 'Imagem grande demais. O limite é 20 MB.')
+  if (!arquivo.type.startsWith('image/')) return avisarNoFundo(alvo, 'Esse arquivo não é uma imagem.')
+  if (arquivo.size > ARQUIVO_MAXIMO) return avisarNoFundo(alvo, 'Imagem grande demais. O limite é 20 MB.')
 
   let bitmap
   try {
     bitmap = await createImageBitmap(arquivo)
   } catch {
-    return ($('#aviso-papel').textContent = 'Não consegui abrir essa imagem.')
+    return avisarNoFundo(alvo, 'Não consegui abrir essa imagem.')
   }
 
   let lado = PAPEL_LADO
@@ -367,34 +617,44 @@ async function escolherPapel (arquivo) {
     lado = Math.round(lado * 0.75)
   }
   bitmap.close()
-  if (!blob) return ($('#aviso-papel').textContent = 'Não consegui deixar a imagem leve o bastante.')
+  if (!blob) return avisarNoFundo(alvo, 'Não consegui deixar a imagem leve o bastante.')
 
   if (!temaEmEdicao) return
-  temaEmEdicao.papel = await paraDataUrl(blob)
+  const fundo = fundoEmEdicao(alvo)
+  fundo.papel = await paraDataUrl(blob)
   // Imagem nova comeca no meio, sem zoom.
-  temaEmEdicao.posicao = { ...POSICAO_PADRAO }
-  anotar(`papel de parede escolhido: ${Math.round(blob.size / 1024)} KB`)
+  fundo.posicao = { ...POSICAO_PADRAO }
+  anotar(`imagem de fundo escolhida (${alvo}): ${Math.round(blob.size / 1024)} KB`)
   mostrarTemaNoEditor()
 }
 
-function removerPapel () {
+function removerPapel (alvo = 'entrada') {
   if (!temaEmEdicao) return
-  temaEmEdicao.papel = ''
+  fundoEmEdicao(alvo).papel = ''
   mostrarTemaNoEditor()
+}
+
+// Guarda uma imagem e confere: guardar() engole erro, e sem espaco no
+// armazenamento o tema seria salvo sem ela, calado.
+function guardarImagemDoFundo (chave, papel, alvo) {
+  guardar(chave, papel)
+  if (papel && lembrar(chave) !== papel) {
+    avisarNoFundo(alvo, 'Sem espaço para guardar essa imagem. Tente uma menor ou apague um tema.')
+    return false
+  }
+  return true
 }
 
 function salvarTema () {
   if (!edicaoTema) return
   const { lugar } = edicaoTema
-  const { cores, papel, escurecer } = temaEmEdicao
+  const { cores, papel, escurecer, sala } = temaEmEdicao
 
-  // O papel vai primeiro, e confere: guardar() engole erro, e sem espaco no
-  // armazenamento o tema seria salvo sem o papel, calado.
-  guardar('liveon:papel-' + lugar, papel)
-  if (papel && lembrar('liveon:papel-' + lugar) !== papel) {
-    $('#aviso-papel').textContent = 'Sem espaço para guardar esse papel de parede. Tente uma imagem menor ou apague um tema.'
-    return
-  }
+  // As imagens vao primeiro. A da sala so e guardada no modo Imagem: nos
+  // outros ela nao aparece, e nao precisa ocupar espaco.
+  const papelDaSalaGuardado = sala.modo === 'imagem' ? sala.papel : ''
+  if (!guardarImagemDoFundo('liveon:papel-' + lugar, papel, 'entrada')) return
+  if (!guardarImagemDoFundo('liveon:papel-sala-' + lugar, papelDaSalaGuardado, 'sala')) return
 
   const lista = temasPessoais()
   lista[lugar] = {
@@ -402,7 +662,18 @@ function salvarTema () {
     cores: { ...cores },
     papel: Boolean(papel),
     escurecer,
-    posicao: { ...temaEmEdicao.posicao }
+    posicao: { ...temaEmEdicao.posicao },
+    entrada: entradaValida(temaEmEdicao.entrada),
+    amigos: amigosValidos(temaEmEdicao.amigos),
+    efeitos: efeitosValidos(temaEmEdicao.efeitos),
+    sala: {
+      modo: sala.modo,
+      cor: sala.cor,
+      papel: Boolean(papelDaSalaGuardado),
+      escurecer: sala.escurecer,
+      posicao: { ...sala.posicao },
+      efeitos: efeitosValidos(sala.efeitos)
+    }
   }
   guardarTemasPessoais(lista)
   edicaoTema = null
@@ -432,8 +703,8 @@ async function abrirConfig (aba) {
     temAmd = config.amd
     $('#campo-video').value = config.video
     $('#campo-prioridade').value = config.prioridade
-    $('#config-placa').textContent = config.placa
-    $('#config-placa').title = 'Placa de vídeo deste computador'
+    $('#config-placa').textContent = config.placa ? `Sua placa de vídeo: ${config.placa}.` : ''
+    mostrarRegistro(config.registro !== false)
   } catch (erro) {
     $('#config-placa').textContent = ''
     anotar('nao consegui ler as configuracoes: ' + erro.message)
@@ -452,9 +723,8 @@ function atualizarNotaConfig () {
   const escolhido = $('#campo-video').value
   const pendente = escolhido !== videoAtivo
   $('#btn-reiniciar').classList.toggle('oculto', !pendente)
-  $('#config-nota').textContent = pendente
-    ? 'Vale depois de reiniciar o LiveOn.'
-    : 'Se o computador travar com o LiveOn aberto, teste o processador.'
+  // O "se travar, teste o processador" ja esta na descricao da opcao.
+  $('#config-nota').textContent = pendente ? 'Vale depois de reiniciar o LiveOn.' : ''
 
   // O aviso aparece SEMPRE, e não só depois de escolher: a pessoa precisa
   // saber o risco antes de ligar, não depois.
@@ -465,7 +735,7 @@ function atualizarNotaConfig () {
     ? (temAmd
         ? 'Ligada. Com placa AMD, já travou PCs. Se travar, volte para Normal.'
         : 'Ligada. Se o PC travar ou o som falhar, volte para Normal.')
-    : 'Alta pode deixar a tela mais fluida com jogo aberto, mas trava alguns PCs.'
+    : 'Alta pode deixar a transmissão mais fluida com jogo aberto, mas já travou alguns PCs.'
 }
 
 async function trocarVideo () {
@@ -476,6 +746,25 @@ async function trocarVideo () {
     $('#campo-video').value = videoAtivo
   }
   atualizarNotaConfig()
+}
+
+// O registro (aba Debug) mora no config.json do processo principal, e nao
+// no localStorage: ele comeca a gravar antes de a janela existir. Vale na
+// hora, nos dois sentidos.
+function mostrarRegistro (ligado) {
+  for (const botao of document.querySelectorAll('#opcao-registro button')) {
+    botao.classList.toggle('ativo', (botao.dataset.valor === 'ligado') === ligado)
+  }
+}
+
+async function definirRegistro (ligado) {
+  let certo = false
+  try { certo = await window.ponte.gravarConfig({ registro: ligado }) } catch { certo = false }
+  if (!certo) {
+    avisar('Não consegui salvar a configuração.')
+    ligado = !ligado
+  }
+  mostrarRegistro(ligado)
 }
 
 async function trocarPrioridade () {

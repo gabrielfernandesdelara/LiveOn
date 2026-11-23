@@ -1,5 +1,5 @@
 // Monitoria: a parte da medição detalhada que só a página enxerga, os vídeos.
-// Ligada na aba Debug (1.6.4); o processo principal grava o arquivo e mede os
+// Ligada na aba Debug (2.0.0); o processo principal grava o arquivo e mede os
 // processos do app (ver "monitoria" no main.js).
 //
 // A cada 5 s, para cada amigo: o que eu recebo e o que eu mando (resolução,

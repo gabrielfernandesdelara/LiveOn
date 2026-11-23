@@ -297,9 +297,11 @@ function desenharFontes () {
     return
   }
 
-  for (const fonte of lista) {
+  lista.forEach((fonte, ordem) => {
     const item = document.createElement('div')
     item.className = 'fonte' + (fonte.id === fonteEscolhida ? ' escolhida' : '')
+    // A ordem e o atraso da cascata ao abrir (estilo.css, animacoes).
+    item.style.setProperty('--i', String(Math.min(ordem, 12)))
 
     const previa = document.createElement('img')
     previa.className = 'previa'
@@ -327,6 +329,7 @@ function desenharFontes () {
       fonteEscolhida = fonte.id
       $('#btn-confirmar-fonte').disabled = false
       for (const outro of alvo.querySelectorAll('.fonte')) outro.classList.toggle('escolhida', outro === item)
+      destacarEscolhida(item)
       // "Apenas o audio desta janela" so vale quando ha uma janela escolhida.
       atualizarOpcoesDeAudio()
     }
@@ -337,5 +340,5 @@ function desenharFontes () {
       $('#btn-confirmar-fonte').click()
     }
     alvo.appendChild(item)
-  }
+  })
 }

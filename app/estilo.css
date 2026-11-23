@@ -237,17 +237,25 @@ option:disabled { color: var(--fraco); }
    aproximar: o ponto escolhido (--papel-x/y) e o centro do zoom. A mesma
    regra pinta a previa do editor (.camada-papel), que recebe as variaveis
    no proprio elemento. */
+/* Os efeitos (2.0.0) sao filtros nessa mesma camada, e a vinheta e mais uma
+   imagem por cima: uma elipse transparente no meio que escurece nas bordas.
+   Com desfoque, a camada passa da janela em volta (inset negativo): sem isso
+   o borrado puxava o transparente de fora e as bordas ficavam claras. */
 html.com-papel body::before,
 .camada-papel {
   content: "";
-  background-image: linear-gradient(var(--veu-papel), var(--veu-papel)), var(--papel);
+  background-image:
+    radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, var(--papel-vinheta, 0)) 100%),
+    linear-gradient(var(--veu-papel), var(--veu-papel)),
+    var(--papel);
   background-size: cover;
-  background-position: center, var(--papel-x, 50%) var(--papel-y, 50%);
+  background-position: center, center, var(--papel-x, 50%) var(--papel-y, 50%);
   background-repeat: no-repeat;
   transform: scale(var(--papel-zoom, 1));
   transform-origin: var(--papel-x, 50%) var(--papel-y, 50%);
+  filter: blur(var(--papel-desfoque, 0px)) brightness(var(--papel-brilho, 1)) saturate(var(--papel-cores, 1)) contrast(var(--papel-contraste, 1));
 }
-html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+html.com-papel body::before { position: fixed; inset: calc(var(--papel-desfoque, 0px) * -3); z-index: -1; pointer-events: none; }
 .marca-nome {
   font-family: "Sora", "Segoe UI", sans-serif;
   font-weight: 600;
@@ -261,43 +269,213 @@ html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-ev
 .marca-barra .marca-icone { width: 26px; height: 26px; border-radius: 7px; }
 .marca-barra .marca-nome { font-size: 15px; letter-spacing: -.3px; }
 
-/* ---------- tela de entrada ---------- */
+/* ---------- tela de entrada ----------
 
-#entrada { height: 100vh; display: grid; place-items: center; padding: 24px; }
+   "Voce em destaque" (2.0.0, escolhida pelo dono): sem cartao, a foto grande
+   no meio, a saudacao, o nome e uma linha so com o campo e o botao. A coluna
+   fica onde o tema mandar (data-entrada no <html>, posto por
+   aplicarPosicaoDaEntrada em tema.js). Com papel de parede ou com a foto
+   desfocada no fundo (classe com-fundo), o lado da coluna escurece num
+   degrade, para o texto continuar legivel sem apagar a imagem toda. */
 
-.cartao-entrada {
+#entrada { position: relative; height: 100vh; overflow: hidden; display: grid; place-items: center; padding: 24px 48px; }
+:root[data-entrada="esquerda"] #entrada { justify-items: start; padding-left: max(48px, 8vw); }
+:root[data-entrada="direita"] #entrada { justify-items: end; padding-right: max(48px, 8vw); }
+/* Livre: o meio da coluna vai no ponto escolhido, mas nunca para fora da
+   janela (meia coluna de folga em cada lado). */
+:root[data-entrada="livre"] .coluna-entrada {
+  position: absolute;
+  left: clamp(220px, var(--entrada-x, 50%), calc(100% - 220px));
+  top: clamp(240px, var(--entrada-y, 50%), calc(100% - 240px));
+  transform: translate(-50%, -50%);
+}
+
+/* Sem papel de parede, a foto da pessoa, aumentada e bem desfocada. */
+.fundo-foto {
+  position: absolute;
+  left: -12%;
+  top: -12%;
+  width: 124%;
+  height: 124%;
+  object-fit: cover;
+  filter: blur(56px) saturate(1.3);
+  opacity: .45;
+  pointer-events: none;
+}
+.degrade-entrada {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .3s ease;
+  background: radial-gradient(ellipse 46% 62% at 50% 50%, color-mix(in srgb, var(--fundo) 62%, transparent), transparent);
+}
+#entrada.com-fundo .degrade-entrada { opacity: 1; }
+:root[data-entrada="esquerda"] .degrade-entrada {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--fundo) 90%, transparent) 0%, color-mix(in srgb, var(--fundo) 62%, transparent) 34%, transparent 64%);
+}
+:root[data-entrada="direita"] .degrade-entrada {
+  background: linear-gradient(270deg, color-mix(in srgb, var(--fundo) 90%, transparent) 0%, color-mix(in srgb, var(--fundo) 62%, transparent) 34%, transparent 64%);
+}
+:root[data-entrada="livre"] .degrade-entrada {
+  background: radial-gradient(circle 560px at var(--entrada-x, 50%) var(--entrada-y, 50%), color-mix(in srgb, var(--fundo) 80%, transparent), transparent);
+}
+
+.topo-entrada { position: absolute; left: 24px; top: 20px; z-index: 1; }
+#btn-config {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  z-index: 1;
+  width: 38px;
+  height: 38px;
+  background: color-mix(in srgb, var(--painel) 70%, transparent);
+}
+.versao-entrada { position: absolute; left: 24px; bottom: 14px; z-index: 1; font-size: 11px; color: var(--fraco); }
+
+.coluna-entrada {
   position: relative;
-  width: 100%;
-  max-width: 380px;
-  background: var(--painel);
-  border: 1px solid var(--borda);
-  border-radius: 10px;
-  padding: 28px;
+  z-index: 1;
+  width: min(400px, 100%);
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
-/* Engrenagem no canto do cartão, alinhada com a marca. */
-#btn-config { position: absolute; top: 22px; right: 22px; }
-.subtitulo { color: var(--apagado); font-size: 13px; margin-top: 6px; }
 
-#entrada .segmentos { margin-top: 22px; }
-#entrada label { margin: 16px 0 6px; }
-#entrada .segmentos + label { margin-top: 18px; }
+/* A foto: anel na cor de destaque, vermelho de "no ar" entrando, ambar se a
+   conexao caiu ou o nome deu erro. O lapis aparece com o mouse em cima. */
+button.foto-entrada,
+button.foto-entrada:hover:not(:disabled) {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 0 0 4px var(--fundo), 0 0 0 7px var(--anel-entrada, var(--realce)), 0 14px 40px rgba(0, 0, 0, .45);
+  transition: box-shadow .3s ease;
+}
+.avatar-entrada, .avatar-entrada .avatar { width: 112px; height: 112px; border-radius: 50%; }
+.avatar-entrada .avatar { font-size: 44px; background: var(--avatar); color: var(--texto-avatar); }
+.lapis-entrada {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .5);
+  color: #fff;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+.foto-entrada:hover .lapis-entrada,
+.foto-entrada:focus-visible .lapis-entrada { opacity: 1; }
+.ponto-entrada {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--avatar);
+  box-shadow: 0 0 0 4px var(--fundo);
+  transition: background .3s ease;
+}
+#entrada.entrando .foto-entrada { --anel-entrada: var(--no-ar); }
+#entrada.entrando .ponto-entrada { background: var(--no-ar); }
+#entrada.caiu .foto-entrada,
+.foto-entrada.com-erro { --anel-entrada: var(--alerta); }
+#entrada.caiu .ponto-entrada { background: var(--alerta); }
 
-/* Código com os botões de sortear e copiar ao lado. */
-.linha-codigo { display: flex; gap: 8px; }
-.linha-codigo input { flex: 1; min-width: 0; }
-#campo-codigo { font-family: ui-monospace, Consolas, monospace; font-size: 13px; letter-spacing: .3px; }
-#btn-gerar-codigo { width: 40px; height: 40px; color: var(--texto); }
-#btn-copiar-codigo { height: 40px; }
+.saudacao { margin-top: 20px; font-size: 14px; color: var(--apagado); }
+.nome-entrada { max-width: 100%; margin-top: 2px; overflow: hidden; font-size: 28px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.estado-entrada { margin-top: 6px; font-size: 13px; color: var(--apagado); }
+#entrada.caiu .estado-entrada { color: var(--alerta); }
+#entrada.com-fundo .saudacao,
+#entrada.com-fundo .nome-entrada,
+#entrada.com-fundo .estado-entrada,
+#entrada.com-fundo .trocar-modo { text-shadow: 0 1px 10px rgba(0, 0, 0, .55); }
 
-#btn-entrar { margin-top: 24px; height: 42px; font-size: 14px; }
+#primeira-vez { display: flex; flex-direction: column; width: 100%; margin-top: 24px; }
+#formulario-entrada { display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: 24px; }
+.linha-entrada { display: flex; gap: 10px; width: 100%; }
+
+/* O campo e uma caixa com o input sem borda dentro, para caber o botao de
+   colar na mesma linha. */
+.campo-entrada {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 48px;
+  padding-right: 6px;
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--campo) 88%, transparent);
+}
+.campo-entrada:focus-within { border-color: var(--realce); }
+.campo-entrada.com-erro { border-color: var(--alerta); }
+.campo-entrada input[type=text] { flex: 1; min-width: 0; height: 100%; padding: 0 14px; border: 0; background: transparent; font-size: 14px; }
+#campo-primeiro-nome { height: 48px; border-radius: 12px; font-size: 14px; }
+#campo-codigo { font-family: ui-monospace, Consolas, monospace; font-size: 14px; letter-spacing: .5px; }
+/* O placeholder nao e codigo: vai na fonte de sempre. */
+#campo-codigo::placeholder { font-family: system-ui, "Segoe UI", sans-serif; letter-spacing: 0; }
+
+button.icone-campo,
+button.icone-campo:hover:not(:disabled) {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--apagado);
+}
+button.icone-campo:hover:not(:disabled) { background: var(--painel-hover); color: var(--texto); }
+
+#btn-entrar, #btn-continuar { height: 48px; padding: 0 24px; border-radius: 12px; font-size: 14px; }
+#btn-continuar { margin-top: 12px; }
 /* Apagado enquanto falta algo, mas clicável: o clique diz o que falta, e o
    Enter dos campos continua respondendo. Desabilitar de verdade calaria os
    dois. */
-#btn-entrar.incompleto { opacity: .45; }
+#btn-entrar.incompleto { opacity: .55; }
 
-.dica { font-size: 12px; color: var(--apagado); margin-top: 12px; line-height: 1.45; }
+.erro-entrada { align-self: stretch; margin-top: 8px; font-size: 12px; line-height: 1.4; text-align: left; color: var(--alerta); }
+
+/* "Usar o código copiado": um link discreto, que some se ninguem clicar. */
+button.sugestao-codigo,
+button.sugestao-codigo:hover:not(:disabled) {
+  align-self: flex-start;
+  height: auto;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--apagado);
+  font-size: 12px;
+}
+button.sugestao-codigo:hover:not(:disabled) { color: var(--realce); }
+
+button.trocar-modo,
+button.trocar-modo:hover:not(:disabled) {
+  height: auto;
+  margin-top: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--apagado);
+  font-size: 13px;
+  gap: 5px;
+}
+.trocar-modo b { font-weight: 600; color: var(--texto); }
+.trocar-modo:hover b { color: var(--realce); }
+
+/* O nome na aba Perfil. */
+.campo-nome-perfil { flex: 0 0 240px; width: 240px; }
+#aviso-nome:empty { display: none; }
 
 /* ---------- sala: barra do topo ---------- */
 
@@ -1067,16 +1245,17 @@ html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-ev
 
 /* ---------- configurações ----------
 
-   Quase do tamanho da janela, com as abas numa lateral. Em janela muito
-   grande ela para de crescer: um painel de 1900px com meia dúzia de opções
-   ficaria vazio. */
+   Quase do tamanho da janela, com as abas numa lateral. Cresce junto com a
+   janela (pedido do dono, 1.6.5: maximizado em 2560x1440 ela ficava um
+   quadrado pequeno no meio), mas com teto: um painel de 2400px com meia
+   dúzia de opções ficaria vazio. Em janela pequena continua ocupando tudo. */
 
 #config { padding: 32px; }
 .painel-config {
   position: relative;
   display: flex;
-  width: min(1100px, 100%);
-  height: min(760px, 100%);
+  width: min(1320px, max(1100px, 80%), 100%);
+  height: min(980px, max(760px, 84%), 100%);
   background: var(--painel);
   border: 1px solid var(--borda);
   border-radius: 10px;
@@ -1116,7 +1295,9 @@ html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-ev
   padding: 28px 40px 32px;
 }
 .fechar-config { position: absolute; top: 18px; right: 18px; }
-.secao-config { max-width: 660px; }
+/* Cresce junto com o painel, para nao sobrar um vazio a direita. A grade de
+   temas tem teto de 4 colunas (ver .temas): mais larga, os cards crescem. */
+.secao-config { max-width: 880px; }
 .secao-config h3 { margin: 0; font-size: 20px; font-weight: 600; }
 .descricao-config { margin: 4px 0 22px; font-size: 13px; color: var(--apagado); }
 .secao-config .quem-dialogo { margin: 4px 0 22px; }
@@ -1140,8 +1321,26 @@ html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-ev
 .bloco-config + .grupo-config { border-top: 0; padding-top: 10px; }
 .campo-saida { max-width: 380px; margin-top: 12px; }
 #opcao-pausa button { padding: 0 12px; }
+/* Lista do lado de uma opcao (o select do Desempenho, o Audio). */
+.linha-opcao > .caixa-select { flex: 0 0 240px; }
+.linha-opcao .nota-dialogo:empty { display: none; }
+.linha-opcao #btn-reiniciar { margin-top: 10px; }
+
+/* Debug: o que cada arquivo guarda fica recolhido, embaixo da opcao. */
+.detalhes-debug { margin: -6px 0 0; padding-bottom: 18px; }
+.detalhes-debug summary {
+  width: fit-content;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--apagado);
+}
+.detalhes-debug summary:hover,
+.detalhes-debug[open] summary { color: var(--texto); }
 .lista-debug { margin: 10px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.6; color: var(--apagado); }
-.lista-debug li + li { margin-top: 4px; }
+.lista-debug li + li { margin-top: 2px; }
+.lista-debug strong { font-weight: 600; color: var(--texto); }
+.privacidade-debug { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 12px; color: var(--apagado); }
+.controles-debug { display: flex; align-items: center; gap: 8px; }
 .user-select-texto, .lista-debug, .descricao-opcao { user-select: text; }
 .titulo-grupo { font-size: 13px; font-weight: 600; }
 .descricao-opcao { margin: 2px 0 0; font-size: 12px; color: var(--apagado); }
@@ -1151,7 +1350,9 @@ html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-ev
    (a classe amostra-* troca as variáveis só ali dentro). */
 .temas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  /* No minimo 140px, e no maximo 4 por linha: sao 4 prontos e 4 lugares, e
+     uma quinta coluna deixaria um buraco no fim de cada linha. */
+  grid-template-columns: repeat(auto-fill, minmax(max(140px, calc((100% - 36px) / 4)), 1fr));
   gap: 12px;
   margin-top: 12px;
 }
@@ -1298,6 +1499,80 @@ html.com-papel body::before { position: fixed; inset: 0; z-index: -1; pointer-ev
 #escurecer-papel, #zoom-papel { width: 100%; margin: 0; accent-color: var(--realce); cursor: pointer; }
 #escurecer-papel:disabled, #zoom-papel:disabled { opacity: .4; cursor: default; }
 .previa-tema.com-papel { background-size: cover; background-position: center; }
+#btn-cores-do-papel { margin-top: 6px; align-self: flex-start; }
+.titulo-papeis { margin-top: 16px; font-size: 12px; color: var(--apagado); }
+.papeis-prontos { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+button.papel-pronto,
+button.papel-pronto:hover:not(:disabled) {
+  position: relative;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--borda);
+  border-radius: 7px;
+  background-color: var(--fundo);
+  background-size: cover;
+  background-position: center;
+}
+button.papel-pronto:hover:not(:disabled) { border-color: var(--borda-hover); }
+button.papel-pronto.ativo { border-color: var(--realce); box-shadow: 0 0 0 1px var(--realce); }
+.papel-pronto .nome-papel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 6px 4px;
+  font-size: 11px;
+  text-align: left;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, .65));
+}
+
+/* A previa da entrada: a janela em miniatura, com o papel, o degrade e um
+   marcador no lugar da coluna. Livre: arrastar move o marcador. */
+.previa-entrada {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  aspect-ratio: 16 / 9;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid var(--borda);
+  border-radius: 7px;
+  background-color: var(--fundo);
+  touch-action: none;
+}
+.previa-entrada .camada-papel { position: absolute; inset: 0; pointer-events: none; }
+.previa-entrada.sem-papel .camada-papel,
+.previa-entrada.sem-papel .degrade-previa { display: none; }
+.previa-entrada[data-posicao="livre"] { cursor: grab; }
+.previa-entrada[data-posicao="livre"]:active { cursor: grabbing; }
+.degrade-previa { position: absolute; inset: 0; pointer-events: none; }
+.previa-entrada[data-posicao="centro"] .degrade-previa { background: radial-gradient(ellipse 46% 62% at 50% 50%, color-mix(in srgb, var(--fundo) 62%, transparent), transparent); }
+.previa-entrada[data-posicao="esquerda"] .degrade-previa { background: linear-gradient(90deg, color-mix(in srgb, var(--fundo) 90%, transparent), color-mix(in srgb, var(--fundo) 62%, transparent) 34%, transparent 64%); }
+.previa-entrada[data-posicao="direita"] .degrade-previa { background: linear-gradient(270deg, color-mix(in srgb, var(--fundo) 90%, transparent), color-mix(in srgb, var(--fundo) 62%, transparent) 34%, transparent 64%); }
+.previa-entrada[data-posicao="livre"] .degrade-previa { background: radial-gradient(circle 120px at var(--x, 50%) var(--y, 50%), color-mix(in srgb, var(--fundo) 80%, transparent), transparent); }
+.marcador-entrada {
+  position: absolute;
+  left: var(--x, 50%);
+  top: var(--y, 50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 64px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.previa-entrada[data-posicao="esquerda"] .marcador-entrada { left: 20%; top: 50%; }
+.previa-entrada[data-posicao="direita"] .marcador-entrada { left: 80%; top: 50%; }
+.previa-entrada[data-posicao="centro"] .marcador-entrada { left: 50%; top: 50%; }
+.marcador-foto { width: 22px; height: 22px; border-radius: 50%; background: var(--avatar); box-shadow: 0 0 0 2px var(--realce); }
+.marcador-linha { width: 64px; height: 8px; border-radius: 3px; background: var(--realce); opacity: .85; }
+.marcador-linha.curta { width: 30px; height: 4px; background: var(--texto); opacity: .5; }
+#nota-entrada:empty { display: none; }
+
 
 .linha-icone { display: flex; align-items: center; gap: 18px; margin-top: 12px; }
 .previa-marca .marca-icone { width: 56px; height: 56px; border-radius: 14px; }
@@ -1808,3 +2083,395 @@ body.mini-tela.mostrar-aviso .mini-aviso { display: flex; }
   color: #ffb4b5;
   font-size: 13px;
 }
+
+/* Primeira vez na entrada: sem nome ainda, a foto e um circulo tracejado
+   com uma camera, que abre o Perfil. */
+.camera-entrada { position: absolute; inset: 0; display: none; place-items: center; color: var(--apagado); }
+#entrada.primeira:not(.tem-foto) button.foto-entrada { box-shadow: none; outline: 2px dashed var(--borda-hover); outline-offset: -2px; }
+#entrada.primeira:not(.tem-foto) .avatar-entrada,
+#entrada.primeira:not(.tem-foto) .ponto-entrada,
+#entrada.primeira:not(.tem-foto) .lapis-entrada { display: none; }
+#entrada.primeira:not(.tem-foto) .camera-entrada { display: grid; }
+#entrada.primeira:not(.tem-foto) .foto-entrada:hover .camera-entrada { color: var(--texto); }
+
+/* Efeitos do papel no editor (2.0.0): uma barra por efeito, com o valor ao
+   lado. A camada da previa tambem passa da borda com desfoque. */
+.previa-papel .camada-papel,
+.previa-entrada .camada-papel { inset: calc(var(--papel-desfoque, 0px) * -3); }
+.cabeca-efeitos { display: flex; align-items: baseline; justify-content: space-between; max-width: 574px; }
+.efeitos-papel { display: grid; gap: 6px; max-width: 574px; margin-top: 8px; }
+.efeito { display: grid; grid-template-columns: 90px minmax(0, 1fr) 104px; align-items: center; gap: 12px; margin: 0; font-size: 12px; color: var(--texto); }
+.barra-efeito { width: 100%; margin: 0; accent-color: var(--realce); cursor: pointer; }
+.barra-efeito:disabled { opacity: .4; cursor: default; }
+.valor-efeito { color: var(--apagado); font-variant-numeric: tabular-nums; }
+button.botao-texto,
+button.botao-texto:hover:not(:disabled) { height: auto; padding: 0; border: 0; background: transparent; color: var(--realce); font-size: 12px; }
+button.botao-texto:disabled { color: var(--fraco); opacity: 1; }
+
+/* O papel no editor (2.0.0, pedido do dono): a previa com os botoes embaixo
+   e, do lado, todos os ajustes numa lista so, o Zoom e o Escurecer junto. */
+.linha-papel { align-items: flex-start; }
+.coluna-previa-papel { display: flex; flex-direction: column; gap: 10px; flex: 0 0 256px; }
+.coluna-previa-papel .botoes-foto { margin-top: 0; }
+.coluna-previa-papel #btn-cores-do-papel { margin-top: 0; align-self: stretch; }
+.linha-papel .controles-papel { max-width: none; gap: 0; }
+.controles-papel .efeito { margin: 0; }
+.controles-papel .efeitos-papel { max-width: none; }
+.controles-papel .cabeca-efeitos { max-width: none; }
+.efeito { grid-template-columns: 76px minmax(0, 1fr) 96px; }
+.barra-papel { width: 100%; margin: 0; accent-color: var(--realce); cursor: pointer; }
+.barra-papel:disabled { opacity: .4; cursor: default; }
+/* Trocar e Remover dividem a linha ao meio, alinhados com a previa e com o
+   botao de baixo. Sem imagem, o Remover some e o Escolher ocupa tudo. */
+.coluna-previa-papel .botoes-foto { display: flex; gap: 8px; }
+.coluna-previa-papel .botoes-foto button { flex: 1 1 0; min-width: 0; }
+
+/* Fundo da sala no editor de tema (2.0.0). */
+.bloco-cor-sala { margin-top: 12px; max-width: 200px; }
+.editor-fundo[data-alvo="sala"] [data-parte="bloco-imagem"] { margin-top: 12px; }
+
+/* ---------- animacoes (2.0.0, animacoes.js) ----------
+
+   So transform e opacity. Todas param com a classe sem-animacoes no <html>
+   (a opcao da aba Aparencia, o "Mostrar animacoes" do Windows, ou a janela
+   escondida). As que dependem de medir (a grade e a troca de tela) sao feitas
+   pelo animacoes.js e olham a mesma regra. */
+
+/* A tela que sai fica por cima, parada no lugar, sem receber clique. */
+.tela-saindo { position: fixed !important; inset: 0; z-index: 60; pointer-events: none; }
+
+/* O card de quem saiu do ar, solto por cima enquanto encolhe. */
+.card-saindo { position: fixed !important; z-index: 5; margin: 0 !important; pointer-events: none; }
+
+/* A entrada em cascata: cada parte da coluna sobe um pouco, uma depois da
+   outra, quando a entrada aparece. */
+@keyframes sobe-um-pouco { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+html:not(.sem-animacoes) #entrada:not(.oculto) .coluna-entrada > * { animation: sobe-um-pouco .42s cubic-bezier(.2, .8, .2, 1) both; }
+html:not(.sem-animacoes) #entrada:not(.oculto) .coluna-entrada > :nth-child(2) { animation-delay: .06s; }
+html:not(.sem-animacoes) #entrada:not(.oculto) .coluna-entrada > :nth-child(3) { animation-delay: .12s; }
+html:not(.sem-animacoes) #entrada:not(.oculto) .coluna-entrada > :nth-child(4) { animation-delay: .16s; }
+html:not(.sem-animacoes) #entrada:not(.oculto) .coluna-entrada > :nth-child(n+5) { animation-delay: .2s; }
+
+/* Entrando: um arco vermelho gira em volta da foto ate a sala abrir. */
+.arco-entrada {
+  position: absolute;
+  inset: -11px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--no-ar);
+  border-right-color: var(--no-ar);
+  opacity: 0;
+  pointer-events: none;
+}
+@keyframes gira { to { transform: rotate(360deg); } }
+html:not(.sem-animacoes) #entrada.entrando .arco-entrada { opacity: 1; animation: gira .8s linear infinite; }
+
+/* O ponto de "no ar" de quem acabou de entrar no ar: uma onda, uma vez. */
+@keyframes onda-no-ar { from { transform: scale(1); opacity: .7; } to { transform: scale(3.2); opacity: 0; } }
+.ponto.acendendo::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--no-ar);
+  opacity: 0;
+}
+html:not(.sem-animacoes) .ponto.acendendo::after { animation: onda-no-ar .7s ease-out; }
+
+/* A lista de pessoas cresce do botao; as janelas sobem com o fundo
+   escurecendo; a aba das configuracoes troca suave; o aviso sobe de baixo. */
+@keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cresce-do-canto { from { opacity: 0; transform: scale(.95) translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes sobe-janela { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes sobe-aviso { from { opacity: 0; transform: translate(-50%, 12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+html:not(.sem-animacoes) #pessoas:not(.oculto) { transform-origin: top right; animation: cresce-do-canto .18s cubic-bezier(.2, .8, .2, 1); }
+html:not(.sem-animacoes) .dialogo:not(.oculto) { animation: aparece .2s ease; }
+html:not(.sem-animacoes) .dialogo:not(.oculto) > * { animation: sobe-janela .26s cubic-bezier(.2, .8, .2, 1); }
+html:not(.sem-animacoes) .conteudo-config .secao-config:not(.oculto) { animation: aparece .18s ease; }
+html:not(.sem-animacoes) #recado:not(.oculto) { animation: sobe-aviso .24s cubic-bezier(.2, .8, .2, 1); }
+
+/* ---------- barras de rolagem ----------
+
+   No lugar da barra do Windows (branca, com setas), uma fina e arredondada
+   com as cores do tema em uso, pedido do dono: o trilho some, a alca e a
+   cor das bordas e clareia com o mouse em cima. Vale para tudo que rola
+   (configuracoes, seletor, lista de pessoas), e segue o tema da pessoa
+   sozinha, porque so usa as variaveis. A borda transparente com
+   background-clip deixa a alca mais fina que a area de pegar. */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: var(--borda-hover);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--apagado); }
+::-webkit-scrollbar-thumb:active { background-color: var(--realce); }
+::-webkit-scrollbar-button { display: none; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* Segunda leva de animacoes (2.0.0, animacoes.js). */
+
+/* Trocar de tema: a mistura do antes e do depois (View Transitions). */
+::view-transition-old(root),
+::view-transition-new(root) { animation-duration: .45s; animation-timing-function: ease; }
+
+/* Seletor de telas: as miniaturas em cascata, pela ordem de cada uma (--i). */
+html:not(.sem-animacoes) #seletor:not(.oculto) .fonte {
+  animation: sobe-um-pouco .32s cubic-bezier(.2, .8, .2, 1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+/* Controles do card: entram da esquerda para a direita quando o mouse chega. */
+html:not(.sem-animacoes) .card:hover .controles-flutuantes > * { animation: sobe-um-pouco .26s cubic-bezier(.2, .8, .2, 1) both; }
+html:not(.sem-animacoes) .card:hover .controles-flutuantes > :nth-child(2) { animation-delay: .04s; }
+html:not(.sem-animacoes) .card:hover .controles-flutuantes > :nth-child(3) { animation-delay: .08s; }
+html:not(.sem-animacoes) .card:hover .controles-flutuantes > :nth-child(4) { animation-delay: .12s; }
+html:not(.sem-animacoes) .card:hover .controles-flutuantes > :nth-child(n+5) { animation-delay: .16s; }
+
+/* Sinal fraco: quando o icone aparece, as barras de cima apagam uma por uma
+   (a de cima primeiro). Muito fraco apaga a segunda tambem. */
+@keyframes apaga-barra { from { stroke: var(--alerta); opacity: 1; } to { stroke: var(--apagado); opacity: .45; } }
+html:not(.sem-animacoes) .selo .sinal .barra-4 { animation: apaga-barra .3s ease .1s both; }
+html:not(.sem-animacoes) .selo .sinal .barra-3 { animation: apaga-barra .3s ease .35s both; }
+html:not(.sem-animacoes) .selo .sinal.muito-fraco .barra-2 { animation: apaga-barra .3s ease .6s both; }
+
+/* Copiar: o certo fica verde enquanto diz "Copiado". */
+button.copiado svg { color: #4cc38a; }
+
+/* A previa da webcam cresce do botao pelo animacoes.js, e nao sobe como as
+   outras janelas. */
+html:not(.sem-animacoes) #camera:not(.oculto) > * { animation: none; }
+
+/* Entrada em pilha (2.0.0, pedido do dono): o campo e o botao um embaixo do
+   outro, na largura toda, para tudo ficar no mesmo eixo da foto. A sugestao
+   do codigo copiado e o erro ficam entre os dois, centralizados. */
+.linha-entrada { flex-direction: column; gap: 10px; }
+.linha-entrada > .campo-entrada { flex: 0 0 auto; }
+.linha-entrada #btn-entrar { width: 100%; }
+.linha-entrada .erro-entrada { margin-top: -2px; text-align: center; }
+button.sugestao-codigo,
+button.sugestao-codigo:hover:not(:disabled) { align-self: center; margin-top: -2px; }
+
+/* O ponto da foto so aparece quando tem algo a dizer (pedido do dono, "veja
+   o que ficaria melhor"): apagado e escuro em cima da foto parecia um
+   buraco. Vermelho entrando, ambar quando a conexao caiu ou sem internet. */
+.ponto-entrada { opacity: 0; transform: scale(.4); transition: opacity .25s ease, transform .25s ease, background .3s ease; }
+#entrada.entrando .ponto-entrada,
+#entrada.caiu .ponto-entrada,
+#entrada.sem-rede .ponto-entrada { opacity: 1; transform: none; }
+#entrada.sem-rede .ponto-entrada { background: var(--alerta); }
+#entrada.sem-rede .estado-entrada { color: var(--alerta); }
+/* Sem saudacao (so a da primeira vez), o lugar dela nao ocupa espaco. */
+.saudacao:empty { display: none; }
+.saudacao:empty + .nome-entrada { margin-top: 16px; }
+
+/* ---------- amigos (amigos.js) ----------
+
+   Na entrada, um trilho de fotos na borda (escolha B do dono), do lado que o
+   tema mandar (data-amigos no <html>, aplicarLadoDosAmigos em tema.js). O
+   clique abre a lista ao lado dele. O verde de online e fixo, como o
+   vermelho de "no ar": e sinal, nao enfeite. Quem esta numa sala ganha o
+   ponto na cor de destaque, e NAO o vermelho, que e de quem transmite. */
+:root { --online: #4cc38a; }
+
+.amigos-entrada {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  z-index: 2;
+  transform: translateY(-50%);
+}
+:root[data-amigos="esquerda"] .amigos-entrada { right: auto; left: 18px; }
+#entrada.primeira .amigos-entrada { display: none; }
+
+button.trilho-amigos {
+  height: auto;
+  width: 48px;
+  padding: 10px 0;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--painel) 88%, transparent);
+  border-color: var(--borda);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+}
+button.trilho-amigos:hover:not(:disabled),
+button.trilho-amigos[aria-expanded="true"] { background: var(--painel); border-color: var(--borda-hover); }
+.icone-trilho { color: var(--apagado); display: grid; place-items: center; }
+.mais-trilho { color: var(--realce); }
+.fotos-amigos { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.fotos-amigos:empty { display: none; }
+.fotos-amigos .avatar,
+.pilha-amigos .avatar,
+.aviso-amigo > .avatar,
+.pessoa.amigo .avatar,
+.pessoa.pedido .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--avatar);
+  font-size: 12px;
+}
+.avatar .foto { border-radius: inherit; }
+.avatar.offline { opacity: .45; }
+.resto-amigos { font-size: 11px; color: var(--apagado); }
+.estado-amigo {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--painel);
+}
+.estado-amigo.online { background: var(--online); }
+.estado-amigo.em-sala { background: var(--realce); }
+.selo-pedidos {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--realce);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.painel-amigos {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 10px);
+  transform: translateY(-50%);
+  width: 320px;
+  max-height: min(560px, 80vh);
+  z-index: 3;
+  background: var(--painel);
+  border: 1px solid var(--borda);
+  border-radius: 10px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+:root[data-amigos="esquerda"] .painel-amigos { right: auto; left: calc(100% + 10px); }
+.painel-amigos .topo-popover button.botao-icone { width: 30px; height: 30px; padding: 0; color: var(--realce); }
+.adicionar-amigo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--borda);
+}
+.adicionar-amigo input {
+  flex: 1 1 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--borda);
+  border-radius: 7px;
+  background: var(--campo);
+  outline: none;
+}
+.adicionar-amigo input:focus { border-color: var(--realce); }
+.adicionar-amigo button { flex: 1 1 100%; }
+.adicionar-amigo .nota-dialogo { flex: 1 1 100%; margin: 0; }
+.adicionar-amigo .nota-dialogo:empty { display: none; }
+.corpo-amigos { padding: 6px; overflow: auto; display: flex; flex-direction: column; gap: 2px; min-height: 0; }
+.secao-amigos {
+  padding: 8px 8px 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fraco);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.vazio-amigos { margin: 0; padding: 14px 10px; font-size: 12px; color: var(--apagado); line-height: 1.45; }
+.pessoa.amigo.offline .nome { color: var(--apagado); }
+button.botao-amigo { height: 28px; padding: 0 10px; font-size: 12px; border-radius: 7px; }
+button.botao-amigo.esperando { color: var(--apagado); font-variant-numeric: tabular-nums; }
+.pilha-amigos { display: flex; }
+.pilha-amigos .avatar { box-shadow: 0 0 0 2px var(--painel); }
+.pilha-amigos .avatar + .avatar { margin-left: -12px; }
+.remover-amigo {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fraco);
+  opacity: 0;
+}
+.pessoa:hover .remover-amigo,
+.remover-amigo:focus-visible,
+.remover-amigo.confirmar { opacity: 1; }
+button.remover-amigo.confirmar { width: auto; padding: 0 8px; font-size: 12px; color: var(--no-ar); }
+.rodape-amigos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 8px 14px;
+  border-top: 1px solid var(--borda);
+}
+.rotulo-meu-codigo { font-size: 11px; color: var(--fraco); }
+.meu-codigo { flex: 1; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: text; }
+.rodape-amigos button.botao-icone { width: 30px; height: 30px; padding: 0; }
+.codigo-amigo-perfil { display: flex; align-items: center; gap: 10px; }
+.codigo-amigo-perfil .meu-codigo { flex: 0 1 auto; font-size: 15px; }
+
+/* Na sala, embaixo da lista de quem esta nela. */
+.chamar-amigos { border-top: 1px solid var(--borda); padding: 4px 6px 6px; max-height: 220px; overflow: auto; }
+
+/* Avisos: pedido para entrar, convite e pedido de amizade. Embaixo no meio,
+   por cima de tudo, um embaixo do outro. */
+.avisos-amigos {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 45;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  pointer-events: none;
+}
+.aviso-amigo {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(380px, 92vw);
+  padding: 10px 12px;
+  background: var(--painel-alto);
+  border: 1px solid var(--borda-hover);
+  border-radius: 10px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+}
+.aviso-amigo .textos { flex: 1; min-width: 0; line-height: 1.3; }
+.titulo-aviso { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aviso-amigo .sub { font-size: 11px; color: var(--apagado); font-variant-numeric: tabular-nums; }
+.aviso-amigo .sub:empty { display: none; }
+html:not(.sem-animacoes) .aviso-amigo { animation: sobe-amigo .24s cubic-bezier(.2, .8, .2, 1); }
+@keyframes sobe-amigo { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+html:not(.sem-animacoes) .painel-amigos:not(.oculto) { animation: abre-amigos .18s cubic-bezier(.2, .8, .2, 1); }
+@keyframes abre-amigos { from { opacity: 0; } to { opacity: 1; } }
+
+/* No editor do tema: o trilho na previa da entrada, do lado escolhido. */
+.marcador-amigos {
+  position: absolute;
+  top: 50%;
+  right: 4%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 3px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--painel) 88%, transparent);
+  border: 1px solid var(--borda);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.marcador-amigos span { width: 8px; height: 8px; border-radius: 3px; background: var(--avatar); }
+.previa-entrada[data-amigos="esquerda"] .marcador-amigos { right: auto; left: 4%; }

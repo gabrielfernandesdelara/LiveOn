@@ -10,43 +10,98 @@
 <body>
 
 <!-- ---------------- tela de entrada ---------------- -->
+<!-- A entrada (2.0.0, "voce em destaque", escolhida pelo dono): sem cartao,
+     a foto grande no meio, a saudacao, o nome e uma linha so com o campo e o
+     botao. Entrar e Criar trocam pelo link de baixo. A coluna fica no centro,
+     a esquerda, a direita ou onde a pessoa quiser, pelo tema (entrada.js). -->
 <section id="entrada">
-  <div class="cartao-entrada">
-    <button id="btn-config" class="botao-icone" title="Configurações"><span data-icone="engrenagem" data-tamanho="16"></span></button>
-    <div class="marca marca-grande">
-      <span class="marca-icone"><span data-icone="marca" data-tamanho="25"></span></span>
-      <span class="marca-nome">LiveOn</span>
+  <!-- Sem papel de parede, a propria foto, desfocada, faz o fundo. -->
+  <img id="fundo-foto" class="fundo-foto oculto" alt="">
+  <div class="degrade-entrada" aria-hidden="true"></div>
+
+  <div class="marca marca-barra topo-entrada">
+    <span class="marca-icone"><span data-icone="marca" data-tamanho="16"></span></span>
+    <span class="marca-nome">LiveOn</span>
+  </div>
+  <button id="btn-config" class="botao-icone" title="Configurações"><span data-icone="engrenagem" data-tamanho="17"></span></button>
+
+  <div id="coluna-entrada" class="coluna-entrada">
+    <!-- A foto abre o Perfil: e la que se troca a foto e o nome. -->
+    <button id="btn-foto-entrada" class="foto-entrada" title="Trocar a foto ou o nome">
+      <span id="avatar-entrada" class="avatar-entrada"></span>
+      <span class="lapis-entrada"><span data-icone="lapis" data-tamanho="22"></span></span>
+      <span class="camera-entrada"><span data-icone="camera" data-tamanho="28"></span></span>
+      <span class="ponto-entrada"></span>
+      <span class="arco-entrada" aria-hidden="true"></span>
+    </button>
+    <div id="saudacao" class="saudacao"></div>
+    <div id="nome-entrada" class="nome-entrada"></div>
+    <div id="estado-entrada" class="estado-entrada oculto"></div>
+
+    <!-- Primeira vez que o app abre: so o nome. -->
+    <div id="primeira-vez" class="oculto">
+      <input id="campo-primeiro-nome" type="text" maxlength="32" placeholder="Seu nome" aria-label="Seu nome">
+      <div class="erro-entrada oculto"></div>
+      <button id="btn-continuar" class="principal">Continuar</button>
     </div>
-    <div class="subtitulo">Compartilhe sua tela com os amigos.</div>
 
-    <div class="segmentos">
-      <button id="modo-entrar" class="ativo">Entrar</button>
-      <button id="modo-criar">Criar</button>
+    <div id="formulario-entrada">
+      <!-- Uma pilha, e nao uma linha: com o botao ao lado, o campo ficava
+           deslocado para a esquerda do eixo da foto e do nome (dono). -->
+      <div class="linha-entrada">
+        <div id="bloco-sala" class="campo-entrada oculto">
+          <input id="campo-sala" type="text" maxlength="40" placeholder="Nome da sala (opcional)" aria-label="Nome da sala">
+        </div>
+        <div id="bloco-codigo" class="campo-entrada">
+          <input id="campo-codigo" type="text" maxlength="60" placeholder="Código da sala" aria-label="Código da sala" spellcheck="false">
+          <button id="btn-colar-codigo" class="icone-campo" title="Colar"><span data-icone="colar" data-tamanho="16"></span></button>
+        </div>
+        <!-- Um codigo copiado, achado sozinho ao abrir ou ao voltar para o app. -->
+        <button id="sugestao-codigo" class="sugestao-codigo oculto"></button>
+        <!-- O erro aparece logo embaixo do campo (mostrarErroEntrada). -->
+        <div id="erro-entrada" class="erro-entrada oculto"></div>
+        <button id="btn-entrar" class="principal">Entrar</button>
+      </div>
+
+      <button id="btn-trocar-modo" class="trocar-modo">ou <b>criar uma sala</b></button>
     </div>
+  </div>
+  <span id="versao-entrada" class="versao-entrada"></span>
 
-    <label for="campo-nome">Seu nome</label>
-    <input id="campo-nome" type="text" maxlength="32" placeholder="Como os outros vão te chamar?">
-
-    <div id="bloco-sala">
-      <label for="campo-sala">Nome da sala</label>
-      <input id="campo-sala" type="text" maxlength="40" placeholder="ex.: Sexta de jogos">
-    </div>
-
-    <div id="bloco-codigo">
-      <label for="campo-codigo">Código da sala</label>
-      <div class="linha-codigo">
-        <input id="campo-codigo" type="text" maxlength="60" placeholder="Código da sala do seu amigo">
-        <button id="btn-gerar-codigo" class="botao-icone oculto" title="Gerar outro código"><span data-icone="atualizar" data-tamanho="16"></span></button>
-        <button id="btn-copiar-codigo" class="oculto" title="Copiar o código">Copiar</button>
+  <!-- Amigos (amigos.js): o trilho de fotos na borda, do lado que o tema
+       mandar (data-amigos no <html>). O clique abre a lista por cima. -->
+  <div id="amigos-entrada" class="amigos-entrada oculto">
+    <button id="btn-amigos" class="trilho-amigos" title="Amigos" aria-expanded="false" aria-controls="lista-amigos">
+      <span class="icone-trilho"><span data-icone="amigos" data-tamanho="16"></span></span>
+      <span id="fotos-amigos" class="fotos-amigos"></span>
+      <span id="selo-pedidos" class="selo-pedidos oculto"></span>
+      <span class="icone-trilho mais-trilho"><span data-icone="mais" data-tamanho="15"></span></span>
+    </button>
+    <div id="lista-amigos" class="painel-amigos oculto">
+      <div class="topo-popover">
+        <span class="titulo-popover">Amigos</span>
+        <span id="total-online" class="total"></span>
+        <span class="cresce"></span>
+        <button id="btn-adicionar-amigo" class="botao-icone" title="Adicionar amigo"><span data-icone="adicionarAmigo" data-tamanho="16"></span></button>
+      </div>
+      <div id="adicionar-amigo" class="adicionar-amigo oculto">
+        <input id="campo-amigo" type="text" maxlength="44" placeholder="Código do amigo, como Ana#1234" aria-label="Código de amigo" spellcheck="false">
+        <button id="btn-mandar-pedido" class="principal">Mandar pedido</button>
+        <p id="nota-amigo" class="nota-dialogo"></p>
+      </div>
+      <div id="corpo-amigos" class="corpo-amigos"></div>
+      <div class="rodape-amigos">
+        <span class="rotulo-meu-codigo">Seu código</span>
+        <span id="meu-codigo-amigo" class="meu-codigo"></span>
+        <button id="btn-copiar-amigo" class="botao-icone" title="Copiar seu código de amigo"><span data-icone="copiar" data-tamanho="14"></span></button>
       </div>
     </div>
-
-    <button id="btn-entrar" class="principal">Criar sala</button>
-
-    <!-- O texto muda com o modo, em definirModo(). -->
-    <div id="dica-entrada" class="dica"></div>
   </div>
 </section>
+
+<!-- Avisos dos amigos (amigos.js): pedido para entrar, convite e pedido de
+     amizade. Fora das telas, para aparecer na entrada e na sala. -->
+<div id="avisos-amigos" class="avisos-amigos"></div>
 
 <!-- ---------------- sala ---------------- -->
 <section id="sala" class="oculto">
@@ -79,6 +134,11 @@
           <span id="pop-no-ar" class="resumo-no-ar oculto"><span class="ponto"></span><span id="pop-no-ar-texto"></span></span>
         </div>
         <div id="lista-pessoas"></div>
+        <!-- Amigos online fora desta sala, para chamar (amigos.js). -->
+        <div id="chamar-amigos" class="chamar-amigos oculto">
+          <div class="secao-amigos">Chamar amigos</div>
+          <div id="lista-chamar"></div>
+        </div>
         <div class="rodape-popover" id="rotulo-versao"></div>
       </div>
     </div>
@@ -246,13 +306,48 @@
            a roda do mouse e a barra dao zoom. -->
       <section class="secao-config" data-secao="perfil">
         <h3>Perfil</h3>
-        <p class="descricao-config">Sua foto aparece para quem estiver na sala com você.</p>
+        <p class="descricao-config">Como os amigos veem você na sala.</p>
+
+        <!-- O nome saiu da entrada na 2.0.0: la ele aparece grande, e o clique
+             na foto traz para ca. Vale na proxima vez que entrar numa sala. -->
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Nome</div>
+            <p class="descricao-opcao">Como você aparece para os amigos. Vale a partir da próxima sala em que você entrar.</p>
+            <p id="aviso-nome" class="nota-dialogo alerta"></p>
+          </div>
+          <input id="campo-nome" class="campo-nome-perfil" type="text" maxlength="32" placeholder="Seu nome" aria-label="Seu nome">
+        </div>
+
+        <!-- Codigo de amigo (amigos.js): Nome#1234. Trocar o nome sorteia
+             outro; a amizade fica presa a identidade, nao ao codigo. -->
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Código de amigo</div>
+            <p class="descricao-opcao">Quem tiver esse código pode te mandar um pedido de amizade. Trocar o nome troca o código, e quem já é seu amigo continua.</p>
+          </div>
+          <div class="codigo-amigo-perfil">
+            <span id="codigo-amigo-perfil" class="meu-codigo"></span>
+            <button id="btn-copiar-amigo-perfil"><span data-icone="copiar" data-tamanho="13"></span><span class="rotulo-copiar">Copiar</span></button>
+          </div>
+        </div>
+
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Ficar invisível</div>
+            <p class="descricao-opcao">Os amigos veem você offline e não sabem em que sala você está. Você continua vendo eles.</p>
+          </div>
+          <div id="opcao-invisivel" class="segmentos segmentos-abas">
+            <button data-valor="nao">Visível</button>
+            <button data-valor="sim">Invisível</button>
+          </div>
+        </div>
 
         <div class="grupo-config perfil-topo">
           <div id="foto-atual" class="foto-atual"></div>
           <div>
             <div class="titulo-grupo">Foto</div>
-            <p class="descricao-opcao">Fica no seu computador. Qualquer imagem serve: ela é diminuída sozinha.</p>
+            <p class="descricao-opcao">Aparece junto do seu nome para todos da sala. Fica guardada só no seu computador.</p>
             <div class="botoes-foto">
               <button id="btn-escolher-foto" class="principal">Escolher imagem</button>
               <button id="btn-ajustar-foto" class="oculto">Ajustar posição</button>
@@ -287,7 +382,7 @@
 
       <section class="secao-config oculto" data-secao="aparencia">
         <h3>Aparência</h3>
-        <p class="descricao-config">Muda só o que você vê. Cada amigo escolhe o dele.</p>
+        <p class="descricao-config">As cores do LiveOn. O tema que você escolher só muda para você.</p>
 
         <div class="grupo-config">
           <div class="titulo-grupo">Temas prontos</div>
@@ -303,10 +398,24 @@
 
         <div class="grupo-config">
           <div class="titulo-grupo">Seus temas</div>
+          <p class="descricao-opcao">Até 4 temas com as suas cores, papel de parede e cor do ícone.</p>
           <!-- Quatro lugares, montados por desenharTemasPessoais(), em
                preferencias.js: vazio vira "Criar tema", ocupado vira a
                miniatura com editar e apagar. -->
           <div id="temas-pessoais" class="temas"></div>
+        </div>
+
+        <!-- Animacoes (2.0.0, animacoes.js). Com o Mostrar animacoes do
+             Windows desligado, ficam desligadas de qualquer jeito. -->
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Animações</div>
+            <p class="descricao-opcao">Movimento ao entrar na sala, ao abrir janelas e quando alguém entra no ar. Se o Windows estiver com as animações desligadas, aqui também ficam.</p>
+          </div>
+          <div id="opcao-animacoes" class="segmentos segmentos-abas">
+            <button data-valor="ligadas">Ligadas</button>
+            <button data-valor="desligadas">Desligadas</button>
+          </div>
         </div>
       </section>
 
@@ -315,7 +424,7 @@
            escolhe; Cancelar volta ao tema de antes. -->
       <section class="secao-config oculto" data-secao="editor">
         <h3 id="titulo-editor">Novo tema</h3>
-        <p class="descricao-config">O LiveOn muda enquanto você escolhe.</p>
+        <p class="descricao-config">O LiveOn muda enquanto você escolhe. Cancelar desfaz tudo.</p>
 
         <div class="grupo-config editor-topo">
           <div class="campo">
@@ -339,29 +448,136 @@
           <p id="aviso-contraste" class="nota-dialogo alerta"></p>
         </div>
 
-        <div class="grupo-config">
+        <!-- Papel de parede: o fundo da entrada, e o da sala tambem, a nao
+             ser que o tema escolha outro fundo para ela (abaixo). A previa
+             com os botoes embaixo e, do lado, todos os ajustes numa lista so
+             (pedido do dono). Os efeitos sao filtros na camada do papel: a
+             imagem guardada nao muda. Os dois blocos de fundo saem do mesmo
+             molde, e o JS acha cada peca pelo data-parte (preferencias.js). -->
+        <div class="grupo-config editor-fundo" data-alvo="entrada">
           <div class="titulo-grupo">Papel de parede</div>
-          <p class="descricao-opcao">Aparece no fundo, atrás das telas e na entrada. Arraste a imagem para escolher a parte que aparece.</p>
+          <p class="descricao-opcao">Uma imagem no fundo da entrada, e da sala também, a não ser que você escolha outro fundo para ela. Arraste a prévia para escolher a parte que aparece.</p>
           <div class="linha-papel">
-            <div id="previa-papel" class="previa-papel vazio" title="Arraste para posicionar"><div class="camada-papel"></div></div>
-            <div class="controles-papel">
+            <div class="coluna-previa-papel">
+              <div id="previa-papel" data-parte="previa" class="previa-papel vazio" title="Arraste para posicionar"><div class="camada-papel"></div></div>
               <div class="botoes-foto">
-                <button id="btn-escolher-papel">Escolher imagem</button>
-                <button id="btn-remover-papel" class="oculto">Remover</button>
-                <input id="arquivo-papel" type="file" accept="image/*" class="oculto">
+                <button id="btn-escolher-papel" data-parte="escolher">Escolher imagem</button>
+                <button id="btn-remover-papel" data-parte="remover" class="oculto">Remover</button>
+                <input id="arquivo-papel" data-parte="arquivo" type="file" accept="image/*" class="oculto">
               </div>
-              <label for="zoom-papel">Zoom</label>
-              <input id="zoom-papel" type="range" min="1" max="3" step="0.01" value="1">
-              <label for="escurecer-papel">Escurecer</label>
-              <input id="escurecer-papel" type="range" min="0" max="0.85" step="0.01" value="0.35">
+              <button id="btn-cores-do-papel" data-parte="cores-da-imagem" title="Escolhe a cor de destaque a partir da imagem"><span data-icone="pincel"></span>Tirar as cores da imagem</button>
+            </div>
+            <div class="controles-papel">
+              <div class="cabeca-efeitos">
+                <span class="titulo-papeis">Efeitos</span>
+                <button id="btn-sem-efeitos" data-parte="sem-efeitos" class="botao-texto">Tirar os efeitos</button>
+              </div>
+              <div class="efeitos-papel">
+                <label class="efeito"><span class="nome-efeito">Zoom</span><input id="zoom-papel" data-parte="zoom" class="barra-papel" type="range" min="1" max="3" step="0.01" value="1"><span id="valor-zoom" data-parte="valor-zoom" class="valor-efeito"></span></label>
+                <label class="efeito"><span class="nome-efeito">Escurecer</span><input id="escurecer-papel" data-parte="escurecer" class="barra-papel" type="range" min="0" max="0.85" step="0.01" value="0.35"><span id="valor-escurecer" data-parte="valor-escurecer" class="valor-efeito"></span></label>
+                <label class="efeito"><span class="nome-efeito">Desfoque</span><input type="range" class="barra-efeito" data-efeito="desfoque" min="0" max="40" step="1"><span class="valor-efeito"></span></label>
+                <label class="efeito"><span class="nome-efeito">Brilho</span><input type="range" class="barra-efeito" data-efeito="brilho" min="40" max="160" step="1"><span class="valor-efeito"></span></label>
+                <label class="efeito"><span class="nome-efeito">Cores</span><input type="range" class="barra-efeito" data-efeito="cores" min="0" max="200" step="1"><span class="valor-efeito"></span></label>
+                <label class="efeito"><span class="nome-efeito">Contraste</span><input type="range" class="barra-efeito" data-efeito="contraste" min="50" max="150" step="1"><span class="valor-efeito"></span></label>
+                <label class="efeito"><span class="nome-efeito">Vinheta</span><input type="range" class="barra-efeito" data-efeito="vinheta" min="0" max="100" step="1"><span class="valor-efeito"></span></label>
+              </div>
             </div>
           </div>
-          <p id="aviso-papel" class="nota-dialogo alerta"></p>
+          <p id="aviso-papel" data-parte="aviso" class="nota-dialogo alerta"></p>
+          <div class="titulo-papeis">Ou use um do LiveOn</div>
+          <div id="papeis-prontos" data-parte="prontos" class="papeis-prontos"></div>
+        </div>
+
+        <!-- Posicao da entrada (2.0.0): para o papel de parede nao ficar
+             atras da foto e do codigo. Livre: arrasta na previa. -->
+        <div class="grupo-config">
+          <div class="linha-opcao">
+            <div>
+              <div class="titulo-grupo">Posição da entrada</div>
+              <p class="descricao-opcao">Onde ficam a sua foto e o código na tela inicial. Com papel de parede, aquele lado escurece para dar leitura.</p>
+            </div>
+            <div id="opcao-entrada" class="segmentos segmentos-abas">
+              <button data-valor="centro">Centro</button>
+              <button data-valor="esquerda">Esquerda</button>
+              <button data-valor="direita">Direita</button>
+              <button data-valor="livre">Livre</button>
+            </div>
+          </div>
+          <div id="previa-entrada" class="previa-entrada" title="Arraste para posicionar">
+            <div class="camada-papel"></div>
+            <div class="degrade-previa"></div>
+            <span class="marcador-entrada"><span class="marcador-foto"></span><span class="marcador-linha"></span><span class="marcador-linha curta"></span></span>
+            <span class="marcador-amigos"><span></span><span></span><span></span></span>
+          </div>
+          <p id="nota-entrada" class="nota-dialogo"></p>
+        </div>
+
+        <!-- Lado do trilho dos amigos na tela inicial (amigos.js). -->
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Lista de amigos</div>
+            <p class="descricao-opcao">De que lado da tela inicial ficam as fotos dos amigos. No automático, fica do lado oposto ao da entrada.</p>
+          </div>
+          <div id="opcao-amigos" class="segmentos segmentos-abas">
+            <button data-valor="auto">Automático</button>
+            <button data-valor="esquerda">Esquerda</button>
+            <button data-valor="direita">Direita</button>
+          </div>
+        </div>
+
+        <!-- Fundo da sala (2.0.0, pedido do dono): igual ao papel de parede,
+             uma cor so, ou uma imagem propria (ou um papel do LiveOn) com os
+             mesmos efeitos. Vale so dentro da sala (aplicarFundoDaVez). -->
+        <div class="grupo-config editor-fundo" data-alvo="sala">
+          <div class="linha-opcao">
+            <div>
+              <div class="titulo-grupo">Fundo da sala</div>
+              <p class="descricao-opcao">O que fica atrás das telas quando você está numa sala.</p>
+            </div>
+            <div id="opcao-fundo-sala" class="segmentos segmentos-abas">
+              <button data-valor="igual">Igual ao papel de parede</button>
+              <button data-valor="cor">Cor</button>
+              <button data-valor="imagem">Imagem</button>
+            </div>
+          </div>
+          <div data-parte="bloco-cor" class="bloco-cor-sala oculto">
+            <label class="cor"><input id="cor-sala" data-parte="cor" type="color"><span class="nome-cor">Cor do fundo</span><span class="hex-cor"></span></label>
+          </div>
+          <div data-parte="bloco-imagem" class="oculto">
+            <div class="linha-papel">
+              <div class="coluna-previa-papel">
+                <div id="previa-papel-sala" data-parte="previa" class="previa-papel vazio" title="Arraste para posicionar"><div class="camada-papel"></div></div>
+                <div class="botoes-foto">
+                  <button id="btn-escolher-papel-sala" data-parte="escolher">Escolher imagem</button>
+                  <button id="btn-remover-papel-sala" data-parte="remover" class="oculto">Remover</button>
+                  <input id="arquivo-papel-sala" data-parte="arquivo" type="file" accept="image/*" class="oculto">
+                </div>
+              </div>
+              <div class="controles-papel">
+                <div class="cabeca-efeitos">
+                  <span class="titulo-papeis">Efeitos</span>
+                  <button id="btn-sem-efeitos-sala" data-parte="sem-efeitos" class="botao-texto">Tirar os efeitos</button>
+                </div>
+                <div class="efeitos-papel">
+                  <label class="efeito"><span class="nome-efeito">Zoom</span><input id="zoom-papel-sala" data-parte="zoom" class="barra-papel" type="range" min="1" max="3" step="0.01" value="1"><span id="valor-zoom-sala" data-parte="valor-zoom" class="valor-efeito"></span></label>
+                  <label class="efeito"><span class="nome-efeito">Escurecer</span><input id="escurecer-papel-sala" data-parte="escurecer" class="barra-papel" type="range" min="0" max="0.85" step="0.01" value="0.35"><span id="valor-escurecer-sala" data-parte="valor-escurecer" class="valor-efeito"></span></label>
+                  <label class="efeito"><span class="nome-efeito">Desfoque</span><input type="range" class="barra-efeito" data-efeito="desfoque" min="0" max="40" step="1"><span class="valor-efeito"></span></label>
+                  <label class="efeito"><span class="nome-efeito">Brilho</span><input type="range" class="barra-efeito" data-efeito="brilho" min="40" max="160" step="1"><span class="valor-efeito"></span></label>
+                  <label class="efeito"><span class="nome-efeito">Cores</span><input type="range" class="barra-efeito" data-efeito="cores" min="0" max="200" step="1"><span class="valor-efeito"></span></label>
+                  <label class="efeito"><span class="nome-efeito">Contraste</span><input type="range" class="barra-efeito" data-efeito="contraste" min="50" max="150" step="1"><span class="valor-efeito"></span></label>
+                  <label class="efeito"><span class="nome-efeito">Vinheta</span><input type="range" class="barra-efeito" data-efeito="vinheta" min="0" max="100" step="1"><span class="valor-efeito"></span></label>
+                </div>
+              </div>
+            </div>
+            <p id="aviso-papel-sala" data-parte="aviso" class="nota-dialogo alerta"></p>
+            <div class="titulo-papeis">Ou use um do LiveOn</div>
+            <div id="papeis-prontos-sala" data-parte="prontos" class="papeis-prontos"></div>
+          </div>
         </div>
 
         <div class="grupo-config">
           <div class="titulo-grupo">Ícone do LiveOn</div>
-          <p class="descricao-opcao">Segue o destaque até você escolher outra cor.</p>
+          <p class="descricao-opcao">As cores do ícone dentro do LiveOn. Sem escolher, ele usa a cor de destaque.</p>
           <div class="linha-icone">
             <span class="marca previa-marca"><span class="marca-icone"><span data-icone="marca" data-tamanho="30"></span></span></span>
             <div class="cores-icone">
@@ -382,13 +598,13 @@
            ficam so os temas. -->
       <section class="secao-config oculto" data-secao="telas">
         <h3>Telas</h3>
-        <p class="descricao-config">Como as telas aparecem para você. Cada amigo escolhe o dele.</p>
+        <p class="descricao-config">Como as telas aparecem para você. Nada aqui muda o que os amigos veem.</p>
 
         <h4 class="bloco-config">Ao abrir uma tela</h4>
         <div class="grupo-config linha-opcao">
           <div>
             <div class="titulo-grupo">Abrir a tela de um amigo</div>
-            <p class="descricao-opcao">Com um clique, ele não manda nada até você clicar em Assistir.</p>
+            <p class="descricao-opcao">Com um clique, aparece um convite e a imagem só começa a chegar quando você clica em Assistir. Economiza internet.</p>
           </div>
           <div id="opcao-assistir" class="segmentos segmentos-abas">
             <button data-valor="auto" data-exemplo="assistir-auto">Na hora</button>
@@ -400,7 +616,7 @@
         <div class="grupo-config linha-opcao">
           <div>
             <div class="titulo-grupo">Sua própria tela</div>
-            <p class="descricao-opcao">Quando você transmite. Os outros continuam vendo.</p>
+            <p class="descricao-opcao">Mostra ou esconde a sua transmissão na sua grade. Os amigos continuam vendo normalmente.</p>
           </div>
           <div id="opcao-minha-tela" class="segmentos segmentos-abas">
             <button data-valor="mostrar" data-exemplo="minha-tela-mostrar">Mostrar</button>
@@ -410,7 +626,7 @@
         <div class="grupo-config linha-opcao">
           <div>
             <div class="titulo-grupo">Foto e nome no card</div>
-            <p class="descricao-opcao">Com o mouse, somem quando ele para.</p>
+            <p class="descricao-opcao">Com o mouse, só aparecem quando você mexe o mouse em cima da tela, para não cobrir nada.</p>
           </div>
           <div id="opcao-selo" class="segmentos segmentos-abas">
             <button data-valor="mouse" data-exemplo="selo-mouse">Com o mouse</button>
@@ -422,7 +638,7 @@
         <div class="grupo-config linha-opcao">
           <div>
             <div class="titulo-grupo">Formato</div>
-            <p class="descricao-opcao">Por cima da tela de quem também transmite.</p>
+            <p class="descricao-opcao">Como a webcam aparece por cima da tela de quem transmite as duas.</p>
           </div>
           <div id="opcao-camera" class="segmentos segmentos-abas">
             <button data-valor="canto" data-exemplo="camera-canto">No canto</button>
@@ -432,7 +648,7 @@
         <div class="grupo-config linha-opcao">
           <div>
             <div class="titulo-grupo">Tamanho</div>
-            <p class="descricao-opcao">Vale para os dois formatos.</p>
+            <p class="descricao-opcao">O tamanho da webcam por cima da tela. Vale para os dois formatos.</p>
           </div>
           <div id="opcao-tamanho-cam" class="segmentos segmentos-abas">
             <button data-valor="pequena" data-exemplo="cam-pequena">Pequena</button>
@@ -446,21 +662,20 @@
            engrenagem abre as configuracoes direto nesta aba. -->
       <section class="secao-config oculto" data-secao="audio">
         <h3>Áudio</h3>
-        <p class="descricao-config">Como você ouve os amigos.</p>
+        <p class="descricao-config">Onde e como você ouve as telas dos amigos.</p>
 
-        <div class="grupo-config">
-          <div class="titulo-grupo">Saída de som</div>
-          <div class="campo campo-saida">
-            <label for="campo-saida">Tocar o som em</label>
-            <span class="caixa-select"><select id="campo-saida"></select></span>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Saída de som</div>
+            <p class="descricao-opcao">Fone, caixa de som ou outro aparelho. Vale só para o LiveOn: o resto do PC continua na saída do Windows.</p>
           </div>
-          <p class="nota-dialogo">Vale só para o LiveOn. O resto do computador continua usando a saída do Windows.</p>
+          <span class="caixa-select"><select id="campo-saida" aria-label="Saída de som"></select></span>
         </div>
 
         <div class="grupo-config linha-opcao">
           <div>
-            <div class="titulo-grupo">Som de quem abre a tela</div>
-            <p class="descricao-opcao">Como cada tela começa. O alto-falante do card troca depois.</p>
+            <div class="titulo-grupo">Som das telas novas</div>
+            <p class="descricao-opcao">Se a tela de quem começa a transmitir chega com som ou muda. Depois, o alto-falante do card liga e desliga.</p>
           </div>
           <div id="opcao-som-novo" class="segmentos segmentos-abas">
             <button data-valor="ligado" data-exemplo="som-ligado">Ligado</button>
@@ -473,128 +688,160 @@
            posicao fisica, para valer em qualquer teclado. -->
       <section class="secao-config oculto" data-secao="mini">
         <h3>Mini tela</h3>
-        <p class="descricao-config">A tela de um amigo numa janelinha sempre por cima, até de um jogo. Abra pelo botão de mini tela no card.</p>
+        <p class="descricao-config">A tela de um amigo numa janela pequena, sempre por cima dos outros programas. Abra pelo botão de mini tela no card.</p>
 
         <div class="grupo-config">
           <div class="titulo-grupo">Travar</div>
-          <p class="descricao-opcao">Travada, o mouse passa direto por ela e não atrapalha o jogo. Para travar, passe o mouse na mini tela e clique no cadeado do meio.</p>
+          <p class="descricao-opcao">Travada, os cliques não vão afetar a mini tela. Para travar, clique no cadeado no meio da mini tela.</p>
         </div>
 
         <div class="grupo-config linha-opcao">
           <div>
             <div class="titulo-grupo">Tecla para destravar</div>
-            <p class="descricao-opcao">Pode ser uma combinação, como Ctrl + '. Alt+Tab até a mini tela também destrava.</p>
+            <p class="descricao-opcao">Funciona de dentro de qualquer programa. Pode ser uma combinação, como Ctrl + '. Alt+Tab até a mini tela também destrava.</p>
           </div>
           <div class="campo-atalho">
             <button id="btn-atalho-mini" class="atalho" title="Clique e aperte a tecla"></button>
             <button id="btn-atalho-padrao" class="botao-icone" title="Voltar para a tecla padrão ( ' )"><span data-icone="atualizar"></span></button>
           </div>
         </div>
-        <p class="nota-dialogo">Enquanto a mini tela estiver travada, essa tecla fica reservada para destravar: em outros programas ela não funciona até você destravar.</p>
+        <p class="nota-dialogo">Enquanto a mini tela está travada, essa tecla não funciona nos outros programas.</p>
       </section>
 
-      <!-- Debug (1.6.4): o registro, que sempre existiu e nao tinha botao, e a
-           monitoria, a medicao detalhada que so liga quando a pessoa quer. -->
+      <!-- Debug (2.0.0): o registro, que sempre existiu e nao tinha botao, e a
+           monitoria, a medicao detalhada que so liga quando a pessoa quer. O
+           que cada um guarda fica recolhido em <details>: e consulta, nao
+           leitura obrigatoria. -->
       <section class="secao-config oculto" data-secao="debug">
         <h3>Debug</h3>
-        <p class="descricao-config">Para quando algo dá errado e alguém precisa entender o que aconteceu.</p>
+        <p class="descricao-config">Arquivos para entender um problema. Quando algo der errado, mande para quem for ajudar.</p>
 
-        <h4 class="bloco-config">Registro</h4>
         <div class="grupo-config linha-opcao">
           <div>
-            <div class="titulo-grupo">O que é</div>
-            <p class="descricao-opcao">Um arquivo de texto por sala, gravado sempre, em Documentos\LiveOn\Logs. Cada arquivo some sozinho duas semanas depois da última escrita. É ele que você manda quando alguma coisa dá errado.</p>
+            <div class="titulo-grupo">Registro</div>
+            <p class="descricao-opcao">Anota o que acontece em cada sala, num arquivo de texto por sala, apagado sozinho depois de duas semanas. Sem ele, fica difícil descobrir por que algo deu errado.</p>
           </div>
-          <button id="btn-abrir-log">Abrir a pasta</button>
+          <div class="controles-debug">
+            <div id="opcao-registro" class="segmentos segmentos-abas">
+              <button data-valor="desligado">Desligado</button>
+              <button data-valor="ligado">Ligado</button>
+            </div>
+            <button id="btn-abrir-log" class="botao-icone" title="Abrir a pasta do registro"><span data-icone="pasta"></span></button>
+          </div>
         </div>
-        <div class="grupo-config">
-          <div class="titulo-grupo">O que ele guarda</div>
+        <details class="detalhes-debug">
+          <summary>O que o registro guarda</summary>
           <ul class="lista-debug">
-            <li>A máquina: processador, memória, cada placa de vídeo (fabricante, driver e qual está ativa), placa ou processador, e a prioridade.</li>
-            <li>A sala: quando você entra e sai, quem já estava, quem chega e sai, e quem entra e sai do ar. O código da sala aparece cortado, só os 4 primeiros caracteres.</li>
-            <li>As conexões com cada amigo: o estado (conectando, conectada, instável, falhou), por onde a imagem passa (direto ou por um servidor) e quantos caminhos foram tentados.</li>
-            <li>A cada 30 segundos, o vídeo de cada amigo: codec, resolução, fps, taxa, quem codifica e decodifica, quadros perdidos, congelamentos, o que está limitando a qualidade, e a sua internet (ida e volta e upload estimado).</li>
-            <li>A cada 30 segundos, o uso de processador e de memória do LiveOn.</li>
-            <li>Travamentos: se o app ficou parado mais de 2 segundos, e se o PC dormiu.</li>
-            <li>Falhas: captura de tela que não abriu, erro da página, quedas da conexão com a sala e reconexões.</li>
-            <li>O que você escolhe: tela ou janela, qualidade, modo de áudio, volume, sinal fraco, mini tela, foto e tema.</li>
+            <li><strong>Seu PC:</strong> processador, memória, placa de vídeo e driver.</li>
+            <li><strong>A sala:</strong> quem entra, sai e transmite.</li>
+            <li><strong>As conexões:</strong> se cada amigo conectou, e se foi direto ou por um servidor.</li>
+            <li><strong>O vídeo:</strong> a cada 30 s, resolução, fps, perdas e o que está limitando a qualidade.</li>
+            <li><strong>Travamentos e falhas:</strong> app parado, PC dormindo, captura que não abriu, quedas.</li>
+            <li><strong>Suas escolhas:</strong> tela, qualidade, áudio, mini tela e tema.</li>
           </ul>
-          <p class="nota-dialogo">Nunca vai para o registro: o código inteiro da sala, o título das janelas que você transmite, nem a imagem ou o som.</p>
-        </div>
+          <p class="privacidade-debug"><span data-icone="cadeado" data-tamanho="13"></span>Nunca guarda o código inteiro da sala, o nome das janelas, a imagem nem o som.</p>
+        </details>
 
-        <h4 class="bloco-config">Monitoria</h4>
         <div class="grupo-config linha-opcao">
           <div>
-            <div class="titulo-grupo">Medição detalhada</div>
-            <p class="descricao-opcao">Ligada, o LiveOn mede tudo a cada 5 segundos e grava numa planilha em Documentos\LiveOn\Monitorias, uma por vez que o app abre. Abre no Excel.</p>
+            <div class="titulo-grupo">Monitoria</div>
+            <p class="descricao-opcao">Mede o desempenho do LiveOn a cada 5 s, numa planilha que abre no Excel. Ligue só enquanto investiga um problema.</p>
           </div>
-          <div id="opcao-monitoria" class="segmentos segmentos-abas">
-            <button data-valor="desligada">Desligada</button>
-            <button data-valor="ligada">Ligada</button>
+          <div class="controles-debug">
+            <div id="opcao-monitoria" class="segmentos segmentos-abas">
+              <button data-valor="desligada">Desligada</button>
+              <button data-valor="ligada">Ligada</button>
+            </div>
+            <button id="btn-abrir-monitoria" class="botao-icone" title="Abrir a pasta das monitorias"><span data-icone="pasta"></span></button>
           </div>
         </div>
-        <div class="grupo-config linha-opcao">
-          <div>
-            <div class="titulo-grupo">O que ela mede</div>
-            <p class="descricao-opcao">Processador e memória de cada parte do LiveOn e a memória livre do PC; e, para cada amigo, o vídeo que você recebe e o que você manda (resolução, fps, taxa, codec, quem codifica, perdas, atraso irregular, congelamentos) e a conexão. Ela pesa pouco, mas só deixe ligada quando estiver procurando um problema.</p>
-          </div>
-          <button id="btn-abrir-monitoria">Abrir a pasta</button>
-        </div>
+        <details class="detalhes-debug">
+          <summary>O que a monitoria mede</summary>
+          <ul class="lista-debug">
+            <li><strong>O LiveOn:</strong> processador e memória de cada parte do app, e a memória livre do PC.</li>
+            <li><strong>Cada amigo:</strong> o vídeo que você recebe e o que manda (resolução, fps, taxa, codec, perdas, congelamentos) e a conexão.</li>
+          </ul>
+          <p class="privacidade-debug"><span data-icone="cadeado" data-tamanho="13"></span>Uma planilha por vez que o LiveOn abre, apagada depois de duas semanas.</p>
+        </details>
       </section>
 
       <section class="secao-config oculto" data-secao="desempenho">
         <h3>Desempenho</h3>
-        <p id="config-placa" class="quem-dialogo"></p>
+        <p class="descricao-config">Para o LiveOn pesar menos no seu PC. <span id="config-placa"></span></p>
 
-        <div class="grupo-config">
-          <div class="campo">
-            <label for="campo-video">Processar as telas com</label>
-            <span class="caixa-select">
-              <select id="campo-video">
-                <option value="gpu">Placa de vídeo (GPU)</option>
-                <option value="cpu">Processador (CPU)</option>
-              </select>
-            </span>
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Aceleração</div>
+            <p class="descricao-opcao">Quem desenha o LiveOn e as telas. Se o PC travar com o LiveOn aberto, teste o processador.</p>
+            <p id="config-nota" class="nota-dialogo"></p>
+            <button id="btn-reiniciar" class="principal oculto">Reiniciar agora</button>
           </div>
-          <p id="config-nota" class="nota-dialogo"></p>
-          <button id="btn-reiniciar" class="principal oculto">Reiniciar agora</button>
+          <span class="caixa-select">
+            <select id="campo-video" aria-label="Aceleração">
+              <option value="gpu">Placa de vídeo</option>
+              <option value="cpu">Processador</option>
+            </select>
+          </span>
         </div>
 
         <!-- Codificador (codificador.js): VP8 no processador ou H.264 na placa.
-             O automatico decide por um teste de verdade nesta placa. -->
-        <div class="grupo-config">
-          <div class="campo">
-            <label for="campo-codificador">Codificar o vídeo que você transmite com</label>
-            <span class="caixa-select">
-              <select id="campo-codificador">
-                <option value="auto">Automático (recomendado)</option>
-                <option value="h264">H.264 na placa de vídeo</option>
-                <option value="vp8">VP8 no processador</option>
-              </select>
-            </span>
+             O automatico aposta pela placa e confere na primeira transmissao. -->
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Codificador</div>
+            <p class="descricao-opcao">Comprime o vídeo que você transmite. Na placa de vídeo, o processador fica livre para o jogo.</p>
+            <p id="nota-codificador" class="nota-dialogo"></p>
           </div>
-          <p id="nota-codificador" class="nota-dialogo"></p>
+          <span class="caixa-select">
+            <select id="campo-codificador" aria-label="Codificador">
+              <option value="auto">Automático</option>
+              <option value="h264">H.264 (placa de vídeo)</option>
+              <option value="vp8">VP8 (processador)</option>
+            </select>
+          </span>
         </div>
 
-        <div class="grupo-config">
-          <div class="campo">
-            <label for="campo-prioridade">Prioridade do LiveOn</label>
-            <span class="caixa-select">
-              <select id="campo-prioridade">
-                <option value="normal">Normal</option>
-                <option value="alta">Alta</option>
-              </select>
-            </span>
+        <!-- Banda de envio (2.0.0): automatica (bitrateDe, configuracao.js) ou
+             um limite total, dividido entre quem assiste. E so teto: vale o
+             necessario, ate o limite. -->
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Banda de envio</div>
+            <p class="descricao-opcao">O máximo da sua internet que a sua tela pode usar, somando todos os amigos. O LiveOn usa só o necessário para a qualidade escolhida, sem passar do limite.</p>
+            <p id="nota-banda" class="nota-dialogo"></p>
           </div>
-          <p id="config-nota-prioridade" class="nota-dialogo"></p>
+          <span class="caixa-select">
+            <select id="campo-banda" aria-label="Banda de envio">
+              <option value="auto">Automática</option>
+              <option value="10">Até 10 Mbps</option>
+              <option value="20">Até 20 Mbps</option>
+              <option value="30">Até 30 Mbps</option>
+              <option value="40">Até 40 Mbps</option>
+              <option value="50">Até 50 Mbps</option>
+            </select>
+          </span>
+        </div>
+
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Prioridade</div>
+            <p class="descricao-opcao">Alta faz o Windows dar preferência ao LiveOn sobre os outros programas, como o jogo.</p>
+            <p id="config-nota-prioridade" class="nota-dialogo"></p>
+          </div>
+          <span class="caixa-select">
+            <select id="campo-prioridade" aria-label="Prioridade">
+              <option value="normal">Normal</option>
+              <option value="alta">Alta</option>
+            </select>
+          </span>
         </div>
 
         <!-- Pausa (pausa.js): so a imagem para, o som continua; a mini tela
              nunca pausa. -->
         <div class="grupo-config linha-opcao">
           <div>
-            <div class="titulo-grupo">Pausar as telas fora de vista</div>
-            <p class="descricao-opcao">Para de receber a imagem quando você não está vendo. O som continua, e a mini tela não pausa. Um programa só em parte por cima, ou o LiveOn em outro monitor, não pausa.</p>
+            <div class="titulo-grupo">Pausar telas fora de vista</div>
+            <p class="descricao-opcao">Para de receber a imagem enquanto você não está vendo o LiveOn. O som continua, e a mini tela nunca pausa.</p>
           </div>
           <div id="opcao-pausa" class="segmentos segmentos-abas">
             <button data-valor="nunca" data-exemplo="pausa-nunca">Nunca</button>
@@ -679,6 +926,9 @@
 <script src="js/pausa.js"></script>
 <script src="js/codificador.js"></script>
 <script src="js/preferencias.js"></script>
+<script src="js/animacoes.js"></script>
+<script src="js/entrada.js"></script>
+<script src="js/amigos.js"></script>
 <script src="js/ligacoes.js"></script>
 <script src="js/partida.js"></script>
 </body>

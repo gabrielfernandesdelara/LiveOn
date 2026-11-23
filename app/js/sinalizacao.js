@@ -106,9 +106,11 @@ function abrirSocket () {
     if (saindoDeProposito) return voltarParaEntrada()
 
     // Nunca cheguei a entrar: e problema de endereco ou servidor fora do ar.
+    // O erro vai embaixo do codigo, na entrada, e os campos continuam como
+    // a pessoa deixou: e so tentar de novo.
     if (!meuId) {
-      avisar('Não consegui falar com o servidor. Confira sua internet.')
-      return voltarParaEntrada()
+      voltarParaEntrada()
+      return mostrarErroEntrada('Sem conexão com o servidor. Confira sua internet.')
     }
 
     tentarReconectar()
@@ -116,9 +118,13 @@ function abrirSocket () {
 }
 
 function tentarReconectar () {
+  // Desistiu: a entrada volta com o codigo desta sala preenchido, e um Enter
+  // tenta de novo. O codigo so fica na memoria, nunca gravado.
   if (tentativasDeReconexao >= MAX_TENTATIVAS) {
-    avisar('Não consegui reconectar. Entre na sala de novo.')
-    return voltarParaEntrada()
+    const codigo = sessao && sessao.codigo
+    voltarParaEntrada()
+    if (codigo) prepararVolta(codigo, 'A conexão caiu. Clique em Entrar para voltar.')
+    return
   }
 
   tentativasDeReconexao++
@@ -311,6 +317,8 @@ function tratar (msg) {
       if (ajustesAbertos === msg.id) fecharAjustes()
       participantes.delete(msg.id)
       sincronizarGrade()
+      // Um amigo a menos recebendo: o teto dos outros pode subir.
+      conferirPlateia()
       break
     }
 
@@ -325,6 +333,7 @@ function tratar (msg) {
       par.assistindo = msg.assistindo !== false
       par.semImagem = msg.pausado === true
       for (const remetente of par.remetentes) aplicarQualidade(par, remetente)
+      conferirPlateia()
       anotar(`${msg.de.slice(0, 8)} pediu ${altura ? altura + 'p' : 'automatica'}${fps ? ' a ' + fps + ' fps' : ''}`)
       break
     }
@@ -385,14 +394,28 @@ function tratar (msg) {
       // No log tambem: quando a sala cai para todo mundo, a recusa do
       // servidor na volta e a unica linha que explica por que a sala sumiu.
       anotar(`servidor recusou: ${msg.motivo}`)
-      avisar(msg.motivo)
       // Codigo errado, sala inexistente, nome ja usado: nao adianta insistir.
       // Vale tambem no meio de uma reconexao: sem isso o socket ficava aberto
       // sem nunca receber o 'bemvindo', e a tela congelava ate a vigia agir.
+      // Nesse caso o erro vai para a entrada, embaixo do campo que causou.
       if (!meuId || aguardandoEntrada) {
+        const estavaNaSala = Boolean(meuId)
+        const codigo = sessao && sessao.codigo
         saindoDeProposito = true
         if (ws) { try { ws.close() } catch { /* ja fechando */ } }
         voltarParaEntrada()
+        // Voltando de uma queda e a sala nao existe mais: o codigo dela nao
+        // serve para nada, entao nao fica preenchido.
+        if (estavaNaSala && /não corresponde/.test(msg.motivo)) {
+          if (modo === 'entrar') $('#campo-codigo').value = ''
+          atualizarBotaoEntrar()
+          mostrarErroEntrada('Essa sala fechou.', 'geral', true)
+        } else {
+          if (estavaNaSala && codigo) prepararVolta(codigo, '')
+          mostrarRecusa(msg.motivo)
+        }
+      } else {
+        avisar(msg.motivo)
       }
       break
   }

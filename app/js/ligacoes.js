@@ -2,62 +2,7 @@
 
 'use strict'
 
-function definirModo (novo) {
-  modo = novo
-
-  for (const nome of ['criar', 'entrar']) {
-    $('#modo-' + nome).classList.toggle('ativo', novo === nome)
-  }
-
-  // So "criar" pede nome da sala; entrar trabalha so com o codigo.
-  $('#bloco-sala').classList.toggle('oculto', novo !== 'criar')
-  $('#dica-entrada').textContent = novo === 'criar'
-    ? 'O código é a chave da sala. Copie e mande para os seus amigos.'
-    : 'Peça o código para quem criou a sala.'
-
-  const criando = novo === 'criar'
-  const campo = $('#campo-codigo')
-
-  // Criando, o codigo e sorteado e nao se digita: e o que impede alguem de
-  // escolher "132" de novo. Entrando, ele e digitado normalmente.
-  campo.readOnly = criando
-  $('#btn-gerar-codigo').classList.toggle('oculto', !criando)
-  $('#btn-copiar-codigo').classList.toggle('oculto', !criando)
-
-  if (criando) {
-    if (!campo.value || !campo.dataset.sorteado) novoCodigo()
-  } else if (campo.dataset.sorteado) {
-    // O codigo sorteado era para a sala que EU criaria; nao serve para entrar.
-    campo.value = ''
-    delete campo.dataset.sorteado
-  }
-
-  $('#btn-entrar').textContent = criando ? 'Criar sala' : 'Entrar na sala'
-  atualizarBotaoEntrar()
-}
-
-// O botão principal fica apagado enquanto falta algo, mas continua clicável:
-// o clique diz o que falta, e o Enter dos campos continua respondendo.
-// Os 10 caracteres são o piso que o servidor confere no código.
-function atualizarBotaoEntrar () {
-  const nome = $('#campo-nome').value.trim()
-  const pronto = modo === 'criar'
-    ? Boolean(nome && $('#campo-sala').value.trim())
-    : Boolean(nome && $('#campo-codigo').value.trim().length >= 10)
-  $('#btn-entrar').classList.toggle('incompleto', !pronto)
-}
-
-function novoCodigo () {
-  const campo = $('#campo-codigo')
-  campo.value = gerarCodigo()
-  campo.dataset.sorteado = '1'
-}
-
-$('#modo-criar').onclick = () => definirModo('criar')
-
-$('#modo-entrar').onclick = () => definirModo('entrar')
-
-$('#btn-gerar-codigo').onclick = novoCodigo
+// A tela de entrada (Entrar, Criar, o codigo) mora em entrada.js.
 
 // "Copiado" no próprio botão por 1,6s. Continua pelo processo principal
 // (window.ponte.copiar) e não pelo navigator.clipboard: o do renderer falha
@@ -71,33 +16,21 @@ async function copiarCodigo (codigo, botao) {
 
   const rotulo = botao.querySelector('.rotulo-copiar') || botao
   rotulo.textContent = 'Copiado'
+  // Com icone, ele vira um certo verde com um pulinho (animacoes.js).
+  const comIcone = Boolean(botao.querySelector('svg'))
+  if (comIcone) {
+    trocarIcone(botao, 'certo', 13, 2)
+    botao.classList.add('copiado')
+    pularIcone(botao)
+  }
   clearTimeout(temposDeCopia.get(botao))
-  temposDeCopia.set(botao, setTimeout(() => { rotulo.textContent = 'Copiar' }, 1600))
-}
-
-$('#btn-copiar-codigo').onclick = () => copiarCodigo($('#campo-codigo').value, $('#btn-copiar-codigo'))
-
-$('#btn-entrar').onclick = () => {
-  const nome = $('#campo-nome').value.trim()
-  const rotulo = $('#campo-sala').value.trim()
-  const codigo = $('#campo-codigo').value.trim()
-
-  if (!nome) return avisar('Preencha seu nome.')
-  if (!codigo) return avisar('Preencha o código da sala.')
-  if (modo === 'criar' && !rotulo) return avisar('Preencha o nome da sala.')
-
-  meuNome = nome
-  guardar('liveon:nome', nome)
-
-  anotar(modo === 'criar' ? `criando sala "${rotulo}"` : 'entrando com um codigo')
-  conectar({ nome, codigo, rotulo, criando: modo === 'criar' })
-}
-
-for (const campo of ['#campo-nome', '#campo-sala', '#campo-codigo']) {
-  $(campo).addEventListener('keydown', (evento) => {
-    if (evento.key === 'Enter') $('#btn-entrar').click()
-  })
-  $(campo).addEventListener('input', atualizarBotaoEntrar)
+  temposDeCopia.set(botao, setTimeout(() => {
+    rotulo.textContent = 'Copiar'
+    if (comIcone) {
+      trocarIcone(botao, 'copiar', 13, 2)
+      botao.classList.remove('copiado')
+    }
+  }, 1600))
 }
 
 $('#btn-copiar-sala').onclick = () => copiarCodigo(sessao && sessao.codigo, $('#btn-copiar-sala'))
@@ -177,23 +110,40 @@ for (const botao of document.querySelectorAll('#opcao-tamanho-cam button')) bota
 for (const botao of document.querySelectorAll('#opcao-minha-tela button')) botao.onclick = () => definirMinhaTela(botao.dataset.valor)
 $('#btn-atalho-mini').onclick = capturarAtalhoDaMini
 $('#campo-codificador').onchange = () => definirCodificador($('#campo-codificador').value)
+$('#campo-banda').onchange = () => definirBanda($('#campo-banda').value)
 for (const botao of document.querySelectorAll('#opcao-pausa button')) botao.onclick = () => definirModoPausa(botao.dataset.valor)
 $('#btn-abrir-log').onclick = () => window.ponte.abrirPastaDoLog('registro')
 $('#btn-abrir-monitoria').onclick = () => window.ponte.abrirPastaDoLog('monitoria')
 for (const botao of document.querySelectorAll('#opcao-monitoria button')) botao.onclick = () => definirMonitoria(botao.dataset.valor === 'ligada')
+for (const botao of document.querySelectorAll('#opcao-registro button')) botao.onclick = () => definirRegistro(botao.dataset.valor === 'ligado')
 $('#btn-atalho-padrao').onclick = voltarAtalhoPadrao
 for (const botao of document.querySelectorAll('#opcao-som-novo button')) botao.onclick = () => definirSomDasNovas(botao.dataset.valor)
 for (const campo of document.querySelectorAll('.editor-tema-cor')) campo.oninput = () => mudarCorDoEditor(campo)
-$('#btn-escolher-papel').onclick = () => $('#arquivo-papel').click()
-$('#arquivo-papel').onchange = () => {
-  const arquivo = $('#arquivo-papel').files[0]
-  $('#arquivo-papel').value = ''
-  escolherPapel(arquivo)
+// Os dois fundos do editor de tema (papel de parede e fundo da sala) saem do
+// mesmo molde: as mesmas ligacoes, cada uma com o alvo do seu bloco.
+for (const bloco of document.querySelectorAll('.editor-fundo')) {
+  const alvo = bloco.dataset.alvo
+  const parte = (nome) => bloco.querySelector(`[data-parte="${nome}"]`)
+  parte('escolher').onclick = () => parte('arquivo').click()
+  parte('arquivo').onchange = () => {
+    const arquivo = parte('arquivo').files[0]
+    parte('arquivo').value = ''
+    escolherPapel(arquivo, alvo)
+  }
+  parte('remover').onclick = () => removerPapel(alvo)
+  parte('escurecer').oninput = () => mudarEscurecer(alvo)
+  parte('zoom').oninput = () => mudarZoomDoPapel(Number(parte('zoom').value), alvo)
+  parte('sem-efeitos').onclick = () => tirarEfeitos(alvo)
+  for (const barra of bloco.querySelectorAll('.barra-efeito')) barra.oninput = () => mudarEfeito(barra.dataset.efeito, Number(barra.value), alvo)
+  ligarPreviaDoPapel(alvo)
 }
-$('#btn-remover-papel').onclick = removerPapel
-$('#escurecer-papel').oninput = mudarEscurecer
-$('#zoom-papel').oninput = () => mudarZoomDoPapel(Number($('#zoom-papel').value))
-ligarPreviaDoPapel()
+ligarPreviaDaEntrada()
+$('#btn-cores-do-papel').onclick = tirarCoresDoPapel
+for (const botao of document.querySelectorAll('#opcao-animacoes button')) botao.onclick = () => definirAnimacoes(botao.dataset.valor)
+for (const botao of document.querySelectorAll('#opcao-fundo-sala button')) botao.onclick = () => definirModoDoFundoDaSala(botao.dataset.valor)
+$('#cor-sala').oninput = () => mudarCorDoFundoDaSala($('#cor-sala').value)
+for (const botao of document.querySelectorAll('#opcao-entrada button')) botao.onclick = () => definirPosicaoDaEntrada(botao.dataset.valor)
+for (const botao of document.querySelectorAll('#opcao-amigos button')) botao.onclick = () => definirLadoDosAmigos(botao.dataset.valor)
 $('#campo-base-tema').onchange = mudarBaseDoTema
 $('#btn-salvar-tema').onclick = salvarTema
 $('#btn-cancelar-tema').onclick = () => mostrarAbaConfig('aparencia')

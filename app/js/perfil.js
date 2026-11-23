@@ -103,6 +103,8 @@ function redesenharAvatares (id) {
 
 // A foto grande do topo da aba, com o nome de quem esta usando.
 function desenharPerfil () {
+  // A foto tambem vai dentro do campo do nome, na entrada.
+  atualizarAvatarEntrada()
   const lugar = $('#foto-atual')
   if (!lugar) return
   const nome = meuNome || $('#campo-nome').value || '?'
@@ -245,6 +247,7 @@ async function salvarFoto () {
   anotar(`foto de perfil trocada: ${Math.round(blob.size / 1024)} KB`)
   fecharRecorte()
   enviarFotoParaTodos()
+  mandarFotoAosAmigos()
   redesenharAvatares(meuId)
 }
 
@@ -255,6 +258,7 @@ function removerFoto () {
   fecharRecorte()
   avisarFoto('')
   enviarFotoParaTodos()
+  mandarFotoAosAmigos()
   redesenharAvatares(meuId)
 }
 

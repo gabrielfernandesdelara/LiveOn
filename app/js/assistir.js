@@ -99,7 +99,10 @@ function atualizarConvite (id) {
   if (!card || card.classList.contains('eu')) return
   const pessoa = participantes.get(id)
   const aguardando = Boolean(pessoa && pessoa.transmitindo) && telasDecididas.has(id) && !assistindo.has(id)
+  const estavaAguardando = card.classList.contains('aguardando')
   card.classList.toggle('aguardando', aguardando)
+  // Deixou o convite: a tela aparece saindo de um desfoque (animacoes.js).
+  if (estavaAguardando && !aguardando) revelarTela(card)
   const video = card.querySelector('video')
   if (video && aguardando) video.muted = true
 }

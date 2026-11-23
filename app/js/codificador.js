@@ -1,4 +1,4 @@
-// Codificador de vídeo de quem transmite (1.6.4, a pedido do dono, aba
+// Codificador de vídeo de quem transmite (2.0.0, a pedido do dono, aba
 // Desempenho): VP8 no processador, como sempre foi, ou H.264 na placa de
 // vídeo. Codificar é o que mais pesa para quem transmite jogando: com o
 // H.264 na placa, o processador fica livre para o jogo.
@@ -148,16 +148,16 @@ function mostrarCodificador () {
   const cpu = infoDaPlaca.videoAtivo === 'cpu'
   campo.disabled = cpu
   if (cpu) {
-    nota.textContent = 'No modo processador, o vídeo é sempre codificado pelo processador (VP8).'
+    nota.textContent = 'Com a aceleração no processador, é sempre VP8.'
     return
   }
+  // O que o automatico escolheu aqui, e por que, numa frase.
   const conferido = resultadoGuardado()
-  const placa = infoDaPlaca.placa || 'sua placa'
   let texto
-  if (infoDaPlaca.amd) texto = `Com placa AMD, o automático usa o VP8: já houve travamentos com o driver da AMD. Se quiser testar, escolha H.264.`
-  else if (conferido && conferido.placa) texto = `Conferido: a ${placa} codifica H.264 na placa. O automático usa ele, e o processador fica livre para o jogo.`
-  else if (conferido) texto = `Conferido: aqui o H.264 saiu pelo processador. O automático usa o VP8.`
-  else if (placaProvavelmenteCodifica()) texto = `A ${placa} deve codificar H.264 na placa: o automático usa ele e confere na primeira transmissão.`
-  else texto = 'Sem uma placa conhecida por codificar H.264, o automático usa o VP8.'
-  nota.textContent = texto + ' Vale na próxima vez que você transmitir.'
+  if (infoDaPlaca.amd) texto = 'Automático: VP8. Com placa AMD já houve travamentos no H.264.'
+  else if (conferido && conferido.placa) texto = 'Automático: H.264 na placa de vídeo (conferido).'
+  else if (conferido) texto = 'Automático: VP8. Aqui o H.264 saiu pelo processador.'
+  else if (placaProvavelmenteCodifica()) texto = 'Automático: H.264 na placa de vídeo. Confere na primeira transmissão.'
+  else texto = 'Automático: VP8.'
+  nota.textContent = texto + ' Muda na próxima transmissão.'
 }

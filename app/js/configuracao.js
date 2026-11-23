@@ -23,26 +23,62 @@ const ICE = {
   bundlePolicy: 'max-bundle'
 }
 
-// Teto por par. Em malha, quem transmite manda uma copia para CADA amigo:
-// 4 amigos a 6 Mbps = 24 Mbps de upload. Este teto evita afogar a conexao.
-// Acompanha a qualidade escolhida, nao faz sentido reservar 6 Mbps para 360p.
+// Teto por par, a 30 fps. Em malha, quem transmite manda uma copia para CADA
+// amigo, entao o teto de cada um e dividido pelo tamanho da plateia
+// (FATOR_POR_PLATEIA).
+//
+// Subiu na 2.0.0: com 1080p em 5 Mbps, jogo com muito movimento a 55-60 fps
+// nao cabia, o codificador descia para 720p e o WebRTC chamava isso de
+// "falta de banda", com o upload medido do dono em 15,7 Mbps (registro de
+// 23/11/2026). Quem segurava era este teto, nao a internet.
 const BITRATE_POR_ALTURA = {
-  360: 700000,
-  480: 1200000,
-  720: 2500000,
-  1080: 5000000,
-  1440: 9000000
+  360: 800000,
+  480: 1400000,
+  720: 3500000,
+  1080: 8000000,
+  1440: 14000000
 }
+
+// Quanto do teto cada amigo leva, pelo numero de amigos recebendo a tela
+// (indice = plateia). Em 1080p60 o total fica em 12, 21,6, 25,2 e 26,4 Mbps
+// para 1, 2, 3 e 4 amigos: abaixo dos ~30 que saturaram o upload de um amigo
+// em 05/11/2026. O WebRTC ainda baixa sozinho cada par se a conexao nao
+// aguentar; isto e so o maximo que ele pode pedir.
+const FATOR_POR_PLATEIA = [1, 1, 0.9, 0.7, 0.55]
 
 // O que ESTA maquina esta capturando. E o teto de verdade: ninguem recebe
 // mais do que isso, por mais que peca.
 let qualidadeLocal = { altura: 720, fps: 30 }
 
-function bitrateDe (altura, fps) {
+// Banda de envio escolhida na aba Desempenho (2.0.0, pedido do dono):
+// automatica (a tabela acima) ou um LIMITE, em Mbps, que e o maximo TOTAL que
+// a minha tela pode usar do upload, dividido entre quem assiste. E so teto:
+// o que vale continua sendo o necessario pela tabela, e o limite so corta
+// quando o necessario passaria dele ("mesmo escolhendo 50, so usa o que for
+// necessario", dono). 0 = automatica, sem limite a mais.
+const BANDAS_FIXAS = [10, 20, 30, 40, 50]
+
+function bandaFixa () {
+  const valor = typeof lembrar === 'function' ? Number(lembrar('liveon:banda')) : 0
+  return BANDAS_FIXAS.includes(valor) ? valor : 0
+}
+
+// plateia: quantos amigos estao recebendo a minha tela agora.
+function bitrateDe (altura, fps, plateia = 1) {
+
   const degraus = [360, 480, 720, 1080, 1440]
   const degrau = degraus.find((a) => a >= altura) || 1440
-  // 60 fps custa mais banda para a mesma nitidez.
-  return Math.round(BITRATE_POR_ALTURA[degrau] * (fps === 60 ? 1.5 : 1))
+  // Mais quadros custam mais banda para a mesma nitidez: de 30 a 60 fps o
+  // teto sobe ate 50%, de forma continua (antes era so com 60 EXATOS, e 55
+  // ficava no teto de 30).
+  const porFps = 1 + Math.max(0, Math.min(Number(fps) || 30, 60) - 30) / 60
+  const porPlateia = FATOR_POR_PLATEIA[Math.min(Math.max(plateia, 1), FATOR_POR_PLATEIA.length - 1)]
+  const necessario = Math.round(BITRATE_POR_ALTURA[degrau] * porFps * porPlateia)
+  // Com limite escolhido, cada amigo leva o necessario, mas nunca mais que a
+  // parte dele do limite.
+  const limite = bandaFixa()
+  if (!limite) return necessario
+  return Math.min(necessario, Math.round((limite * 1000000) / Math.max(plateia, 1)))
 }
 
 // Sinalizacao hospedada. O app so fala com ela: nao existe mais servidor
