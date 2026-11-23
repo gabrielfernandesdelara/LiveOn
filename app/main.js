@@ -1334,6 +1334,52 @@ async function descreverMaquina () {
 // rodando da pasta do projeto). O instalador usa o mesmo appId.
 if (process.platform === 'win32') app.setAppUserModelId('com.gabrieldelara.liveon')
 
+// --- link da sala: liveon://sala/<codigo> (2.1.0) ---------------------------
+//
+// O link do Discord abre a pagina do Worker (nuvem/src/pagina.js), que chama
+// liveon://sala/<codigo>. O Windows entrega isso ao LiveOn: na abertura, pelo
+// argv; com o app ja aberto, ao segundo processo, que passa para este pelo
+// 'second-instance' e fecha. Por isso, no app instalado, uma instancia so.
+// Rodando da pasta do projeto (testes, npx electron .), nada disso: o
+// registro do liveon:// apontaria para o electron.exe solto, e a trava de
+// instancia unica fecharia o teste se o LiveOn instalado estivesse aberto
+// (os dois usam a mesma pasta de dados).
+const LINK_DA_SALA = /^liveon:\/\/sala\/([a-z0-9]{10,60})\/?$/i
+let codigoDoLink = ''
+
+function codigoNoLink (argv) {
+  for (const arg of argv || []) {
+    const achado = LINK_DA_SALA.exec(String(arg).trim())
+    if (achado) return achado[1].toLowerCase()
+  }
+  return ''
+}
+
+// O codigo nunca vai inteiro para o registro (ver mascararCodigo).
+function abrirLinkDaSala (codigo) {
+  if (!janela || janela.isDestroyed()) return
+  // LIVEON_SEM_AVISOS: teste nao traz janela para a frente.
+  if (!process.env.LIVEON_SEM_AVISOS) {
+    if (janela.isMinimized()) janela.restore()
+    janela.show()
+    janela.focus()
+  }
+  if (!codigo) return
+  registrar('app', `link de sala aberto (${codigo.slice(0, 4)}${'*'.repeat(Math.max(0, codigo.length - 4))})`)
+  if (janela.webContents.isLoading()) {
+    codigoDoLink = codigo
+    return
+  }
+  janela.webContents.send('sala:link', codigo)
+}
+
+if (app.isPackaged) {
+  if (!app.requestSingleInstanceLock()) app.exit(0)
+  app.setAsDefaultProtocolClient('liveon')
+}
+codigoDoLink = codigoNoLink(process.argv)
+app.on('second-instance', (_evento, argv) => abrirLinkDaSala(codigoNoLink(argv)))
+
 app.whenReady().then(() => {
   iniciarLog()
   placaPronta = lerPlaca().catch(() => ({ nome: 'desconhecida', amd: false, lista: [] }))
@@ -1355,6 +1401,13 @@ app.whenReady().then(() => {
   // Depois da janela existir: antes dela, o processo do renderer e o da GPU
   // ainda não nasceram e ficariam de fora.
   janela.webContents.once('did-finish-load', () => priorizar('abertura'))
+  // Abriu pelo link da sala: a pagina ja tem como receber.
+  janela.webContents.on('did-finish-load', () => {
+    if (!codigoDoLink) return
+    const codigo = codigoDoLink
+    codigoDoLink = ''
+    abrirLinkDaSala(codigo)
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) criarJanela()

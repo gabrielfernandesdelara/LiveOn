@@ -123,8 +123,8 @@ async function nivelRecebido (id, par) {
 
   // Outra trilha, ou eu pedi outra qualidade para essa pessoa: a resolucao de
   // antes nao serve mais de comparacao.
-  const pedido = qualidadePorId.get(id)
-  const chave = trilha.id + '|' + (pedido ? pedido.altura + 'x' + pedido.fps : '')
+  const pedido = qualidadeDe(id)
+  const chave = trilha.id + '|' + pedido.altura + 'x' + pedido.fps
   if (estado.chave !== chave) {
     estado.chave = chave
     estado.referencia = []

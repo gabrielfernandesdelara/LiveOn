@@ -20,6 +20,10 @@ let streamCamera = null
 let modo = 'entrar'
 
 let rotuloDaSala = ''
+// O id de quem e o dono da sala, se ele estiver dentro ('' sem dono), e se
+// sou eu (remocao.js).
+let donoDaSala = ''
+let souDonoDaSala = false
 
 // Reconexao. Guardo os dados da sessao para conseguir voltar sozinho.
 let sessao = null

@@ -82,18 +82,6 @@ function legendaDe (pessoa) {
   return pessoa.camera ? texto + ' · câmera' : texto
 }
 
-function criarEngrenagem (titulo, aoClicar) {
-  const botao = document.createElement('button')
-  botao.className = 'engrenagem'
-  botao.title = titulo
-  botao.appendChild(icone('ajustes'))
-  botao.onclick = () => {
-    // Abrir qualquer diálogo fecha o pop-over.
-    fecharPessoas()
-    aoClicar()
-  }
-  return botao
-}
 
 function desenharPessoas () {
   const todos = quemEstaNaSala()
@@ -131,6 +119,7 @@ function desenharPessoas () {
     nome.className = 'nome'
     nome.textContent = pessoa.souEu ? `${pessoa.nome} (você)` : pessoa.nome
     nome.title = nome.textContent
+    marcarDono(nome, pessoa.id)
 
     const sub = document.createElement('span')
     sub.className = 'sub'
@@ -156,16 +145,13 @@ function desenharPessoas () {
       }
     }
 
-    // Na minha linha a engrenagem é a saída de áudio: por onde EU ouço. Não
-    // depende de estar transmitindo, então ela fica sempre.
-    if (pessoa.souEu) linha.appendChild(criarEngrenagem('Saída de áudio', abrirSaida))
+    // As engrenagens da lista (a minha, saída de áudio; a dos outros,
+    // qualidade e volume) saíram na 2.1.0, a pedido do dono: a saída mora na
+    // aba Áudio e a qualidade de todas as telas na aba Telas. A qualidade e o
+    // volume de UMA pessoa continuam nos ajustes do card dela.
 
-    // Nos outros ela é a qualidade e o volume daquela pessoa, e só faz sentido
-    // para quem está no ar. Da minha própria transmissão quem manda é o
-    // seletor de fontes.
-    if (!pessoa.souEu && pessoa.transmitindo) {
-      linha.appendChild(criarEngrenagem(`Configurações de ${pessoa.nome}`, () => abrirAjustes(pessoa.id)))
-    }
+    // Tirar da sala: o dono direto, os outros por votacao (remocao.js).
+    if (!pessoa.souEu && podeTirar()) linha.appendChild(criarBotaoTirar(pessoa))
 
     alvo.appendChild(linha)
   }

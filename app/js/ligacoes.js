@@ -13,8 +13,12 @@ async function copiarCodigo (codigo, botao) {
   if (!codigo) return
   const certo = await window.ponte.copiar(codigo)
   if (!certo) return avisar('Não consegui copiar.')
+  tocarCopiado()
 
   const rotulo = botao.querySelector('.rotulo-copiar') || botao
+  // O texto e o icone de antes ("Copiar", ou "Link" no botao do link).
+  if (!rotulo.dataset.original) rotulo.dataset.original = rotulo.textContent
+  const iconeDeAntes = botao.dataset.iconeCopia || 'copiar'
   rotulo.textContent = 'Copiado'
   // Com icone, ele vira um certo verde com um pulinho (animacoes.js).
   const comIcone = Boolean(botao.querySelector('svg'))
@@ -25,9 +29,9 @@ async function copiarCodigo (codigo, botao) {
   }
   clearTimeout(temposDeCopia.get(botao))
   temposDeCopia.set(botao, setTimeout(() => {
-    rotulo.textContent = 'Copiar'
+    rotulo.textContent = rotulo.dataset.original
     if (comIcone) {
-      trocarIcone(botao, 'copiar', 13, 2)
+      trocarIcone(botao, iconeDeAntes, 13, 2)
       botao.classList.remove('copiado')
     }
   }, 1600))
@@ -110,6 +114,8 @@ for (const botao of document.querySelectorAll('#opcao-tamanho-cam button')) bota
 for (const botao of document.querySelectorAll('#opcao-minha-tela button')) botao.onclick = () => definirMinhaTela(botao.dataset.valor)
 $('#btn-atalho-mini').onclick = capturarAtalhoDaMini
 $('#campo-codificador').onchange = () => definirCodificador($('#campo-codificador').value)
+$('#campo-qualidade-altura').onchange = definirQualidadePadrao
+$('#campo-qualidade-fps').onchange = definirQualidadePadrao
 $('#campo-banda').onchange = () => definirBanda($('#campo-banda').value)
 for (const botao of document.querySelectorAll('#opcao-pausa button')) botao.onclick = () => definirModoPausa(botao.dataset.valor)
 $('#btn-abrir-log').onclick = () => window.ponte.abrirPastaDoLog('registro')

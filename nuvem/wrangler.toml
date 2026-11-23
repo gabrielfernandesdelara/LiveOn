@@ -24,6 +24,11 @@ class_name = "Pessoa"
 name = "ETIQUETA"
 class_name = "Etiqueta"
 
+# Conta codigo de sala errado por IP: 5 seguidos, 5 minutos de espera.
+[[durable_objects.bindings]]
+name = "PORTEIRO"
+class_name = "Porteiro"
+
 [[ratelimits]]
 name = "LIMITE_ENTRADA"
 namespace_id = "2001"
@@ -62,6 +67,10 @@ deleted_classes = ["Diretorio"]
 [[migrations]]
 tag = "v4"
 new_sqlite_classes = ["Pessoa", "Etiqueta"]
+
+[[migrations]]
+tag = "v5"
+new_sqlite_classes = ["Porteiro"]
 
 [observability]
 enabled = true

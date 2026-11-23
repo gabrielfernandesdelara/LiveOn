@@ -115,6 +115,8 @@
     <span class="bloco-codigo">
       <span class="codigo" id="rotulo-codigo" title="Código da sala"></span>
       <button id="btn-copiar-sala" title="Copiar o código da sala"><span data-icone="copiar" data-tamanho="13" data-traco="2"></span><span class="rotulo-copiar">Copiar</span></button>
+      <!-- O link abre a sala no LiveOn de quem clicar (link.js). -->
+      <button id="btn-copiar-link" title="Copiar o link da sala, para colar no Discord" data-icone-copia="link"><span data-icone="link" data-tamanho="13" data-traco="2"></span><span class="rotulo-copiar">Link</span></button>
     </span>
     <span class="pilula oculto" id="rotulo-conexao"></span>
     <span class="cresce"></span>
@@ -209,6 +211,22 @@
 
     <div class="acoes-dialogo">
       <button id="btn-fechar-ajustes" class="principal">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ---------------- tirar alguem da sala (remocao.js) ---------------- -->
+<div id="remocao" class="dialogo oculto">
+  <div class="painel-dialogo">
+    <h2 id="titulo-remocao">Tirar da sala</h2>
+    <div id="opcao-remocao" class="segmentos segmentos-abas opcao-remocao">
+      <button data-valor="expulsar">Expulsar</button>
+      <button data-valor="banir">Banir</button>
+    </div>
+    <p id="nota-remocao" class="nota-dialogo"></p>
+    <div class="acoes-dialogo">
+      <button id="btn-cancelar-remocao">Cancelar</button>
+      <button id="btn-confirmar-remocao" class="perigo">Expulsar</button>
     </div>
   </div>
 </div>
@@ -612,6 +630,35 @@
           </div>
         </div>
 
+        <!-- Qualidade padrao (ajustes.js, pedido do dono): o teto que eu peco a
+             toda tela que abrir. A engrenagem de cada pessoa continua mandando
+             nela, por cima disto. -->
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Qualidade das telas</div>
+            <p class="descricao-opcao">Resolução e fps de toda tela que você abrir. Na engrenagem de cada pessoa dá para escolher outra só para ela.</p>
+          </div>
+          <span class="duas-listas">
+            <span class="caixa-select">
+              <select id="campo-qualidade-altura" aria-label="Resolução das telas">
+                <option value="0">Automática</option>
+                <option value="1440">1440p</option>
+                <option value="1080">1080p</option>
+                <option value="720">720p</option>
+                <option value="480">480p</option>
+                <option value="360">360p</option>
+              </select>
+            </span>
+            <span class="caixa-select">
+              <select id="campo-qualidade-fps" aria-label="Fps das telas">
+                <option value="0">Automático</option>
+                <option value="60">60 fps</option>
+                <option value="30">30 fps</option>
+              </select>
+            </span>
+          </span>
+        </div>
+
         <h4 class="bloco-config">Na grade</h4>
         <div class="grupo-config linha-opcao">
           <div>
@@ -929,6 +976,8 @@
 <script src="js/animacoes.js"></script>
 <script src="js/entrada.js"></script>
 <script src="js/amigos.js"></script>
+<script src="js/remocao.js"></script>
+<script src="js/link.js"></script>
 <script src="js/ligacoes.js"></script>
 <script src="js/partida.js"></script>
 </body>

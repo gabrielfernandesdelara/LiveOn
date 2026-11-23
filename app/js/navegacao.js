@@ -31,6 +31,10 @@ function fecharDialogo () {
     fecharConfig()
     return true
   }
+  if (remocaoEstaAberta()) {
+    fecharRemocao()
+    return true
+  }
   for (const id of ['#seletor']) {
     if (!$(id).classList.contains('oculto')) {
       $(id).classList.add('oculto')
@@ -100,6 +104,7 @@ function voltarParaEntrada () {
   pares.clear()
   participantes.clear()
   meuId = null
+  esquecerDonoDaSala()
   // Os amigos deixam de me ver na sala (amigos.js).
   atualizarPresencaNaSala()
 

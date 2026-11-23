@@ -81,7 +81,7 @@ function garantirPar (id) {
     // Transmissao nova, remetentes novos do outro lado: o teto que eu pedi
     // precisa ser dito outra vez, senao volta calado para a qualidade cheia.
     // So para a tela: a webcam tem teto fixo, de quem manda.
-    if (!daCamera && (qualidadePorId.has(id) || !estouAssistindo(id) || imagemPausadaDe(id))) pedirQualidade(id)
+    if (!daCamera && (qualidadePorId.has(id) || temQualidadePadrao() || !estouAssistindo(id) || imagemPausadaDe(id))) pedirQualidade(id)
 
     // Rede de seguranca para o quadro congelado: se o aviso de "parei" nao
     // chegar, os proprios eventos da trilha limpam a tela.

@@ -18,10 +18,15 @@ function avisarSaida () {
 }
 window.addEventListener('pagehide', avisarSaida)
 
-function conectar ({ nome, codigo, rotulo, criando }) {
+async function conectar ({ nome, codigo, rotulo, criando }) {
   sessao = { nome, codigo, rotulo, criando }
   saindoDeProposito = false
   tentativasDeReconexao = 0
+  // Quem sou nesta sala, para o dono continuar dono e o banido continuar de
+  // fora (remocao.js). Uma por sala.
+  const atual = sessao
+  try { atual.identidade = await identidadeNaSala(codigo) } catch { atual.identidade = '' }
+  if (sessao !== atual) return
   abrirSocket()
 }
 
@@ -77,7 +82,8 @@ function abrirSocket () {
       nome: sessao.nome,
       // Prova de que sou a mesma pessoa de antes: com ela eu volto com o
       // mesmo id, e o nome antigo nao me barra como "ja em uso".
-      credencial: sessao.credencial
+      credencial: sessao.credencial,
+      identidade: sessao.identidade || ''
     })
     sessao.criando = false
   }
@@ -132,6 +138,8 @@ function tentarReconectar () {
   // Espera crescente: 1s, 2s, 4s... ate 10s.
   const espera = Math.min(1000 * 2 ** (tentativasDeReconexao - 1), 10000)
   if (tentativasDeReconexao > 1) {
+    // Uma vez por queda: so na primeira vez que ela aparece na tela.
+    if (!quedaNaTela) tocarConexaoCaiu()
     quedaNaTela = true
     marcarConexao('ruim', `reconectando (${tentativasDeReconexao}/${MAX_TENTATIVAS})...`)
   }
@@ -273,8 +281,13 @@ function tratar (msg) {
         (msg.participantes.length
           ? ': ' + msg.participantes.map((p) => `${p.nome}/${p.id.slice(0, 8)}${p.transmitindo ? ' (no ar)' : ''}${p.camera ? ' (camera)' : ''}`).join(', ')
           : ''))
+      donoDaSala = msg.dono || ''
+      souDonoDaSala = Boolean(msg.souDono)
       marcarConexao('ok', '')
-      if (reconectou && quedaNaTela) avisar('Reconectado.')
+      if (reconectou && quedaNaTela) {
+        avisar('Reconectado.')
+        tocarReconectado()
+      }
       quedaNaTela = false
       mostrarSala(rotuloDaSala)
       break
@@ -284,6 +297,7 @@ function tratar (msg) {
       anotar(`${msg.nome}/${msg.id.slice(0, 8)} entrou na sala`)
       tocarEntrouNaSala()
       participantes.set(msg.id, { id: msg.id, nome: msg.nome, transmitindo: false, camera: '' })
+      if (msg.dono) donoDaSala = msg.id
       // Se eu ja estou no ar, o recem-chegado precisa receber minhas trilhas.
       // Ele ja sabe da minha webcam: veio na lista do 'bemvindo' dele.
       if (streamLocal || streamCamera) adicionarMidia(garantirPar(msg.id))
@@ -294,12 +308,21 @@ function tratar (msg) {
 
     case 'foto': receberFoto(msg); break
 
+    case 'removido': fuiRemovido(Boolean(msg.banido)); break
+    case 'votacao': mostrarVotacao(msg); break
+    case 'votacao-fim': fimDaVotacao(msg); break
+
     case 'saiu': {
       const quem = participantes.get(msg.id)
-      anotar(`${quem ? quem.nome : '?'}/${msg.id.slice(0, 8)} saiu da sala`)
+      anotar(`${quem ? quem.nome : '?'}/${msg.id.slice(0, 8)} saiu da sala${msg.removido ? (msg.banido ? ' (banido)' : ' (expulso)') : ''}`)
+      if (msg.id === donoDaSala) donoDaSala = ''
+      if (msg.removido && quem) avisarRemocao(msg.id, quem.nome, msg.banido)
+      // Tirado da sala: o som da madeira no lugar da bolha (remocao.js).
       // Saiu da sala com a tela no ar: para quem fica, e tambem sair do ar.
       // Os dois sons, um depois do outro.
-      if (quem && quem.transmitindo) {
+      if (msg.removido) {
+        tocarAlguemTirado()
+      } else if (quem && quem.transmitindo) {
         tocarSaida()
         setTimeout(tocarSaiuDaSala, 380)
       } else {
@@ -364,6 +387,13 @@ function tratar (msg) {
       // dispara nada, senao seria uma saraivada ao abrir a sala.
       if (comecouAgora) tocarAviso()
       if (telaMudou && !transmitindo) tocarSaida()
+      // A webcam usa o MESMO som da tela (pedido do dono, 2.1.0): e ir ao ar
+      // do mesmo jeito. So quando muda sozinha, sem a tela mudar junto, para
+      // nao tocar duas vezes.
+      if (cameraMudou && !telaMudou) {
+        if (camera) tocarAviso()
+        else tocarSaida()
+      }
 
       // Tela nova: assistir na hora ou esperar o clique, e com que som.
       if (transmitindo) aoAbrirTela(msg.de)

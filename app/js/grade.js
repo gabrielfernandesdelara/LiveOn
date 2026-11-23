@@ -475,6 +475,8 @@ function criarCard (id, nome, souEu) {
   })
 
   card.appendChild(palco)
+  // Card refeito com a pessoa ja na mini tela: nasce embacado (mini.js).
+  if (typeof miniId !== 'undefined' && id === miniId && miniAberta()) marcarCardNaMini(card, true)
   return card
 }
 

@@ -23,7 +23,9 @@ const CODIGO_MINIMO = 10
 
 // Amigos (código de amigo, presença, pedido para entrar): arquivo próprio.
 import { Pessoa, Etiqueta, idDoSegredo } from './amigos.js'
-export { Pessoa, Etiqueta }
+import { Porteiro } from './porteiro.js'
+import { paginaDeEntrar } from './pagina.js'
+export { Pessoa, Etiqueta, Porteiro }
 
 // O segredo de cada pessoa, sorteado no app: 32 caracteres do alfabeto do
 // código da sala (~158 bits). Quem tem o segredo É a pessoa.
@@ -86,6 +88,26 @@ const TAMANHO_MAXIMO = 64 * 1024   // caracteres por mensagem
 const RITMO_MAXIMO = 300           // mensagens por janela, por conexão
 const JANELA_RITMO = 10000
 
+// Expulsar e banir (2.1.0, pedido do dono): o DONO (quem criou) tira na
+// hora; sem o dono na sala, os outros votam (maioria de quem esta dentro,
+// menos o alvo, em 60 s). A identidade e um resumo que o app manda, um por
+// sala, e e ela que o banimento lembra. Quem apaga os dados do app vira
+// outra identidade: o dono aceitou isso (nao quis trocar o codigo junto).
+const VALIDADE_VOTACAO = 60000
+
+function identidadeValida (valor) {
+  return typeof valor === 'string' && /^[0-9a-f]{64}$/.test(valor) ? valor : ''
+}
+
+function votosPrecisos (eleitores) {
+  return Math.floor(eleitores / 2) + 1
+}
+
+function textoDaEspera (ms) {
+  const minutos = Math.max(1, Math.ceil(ms / 60000))
+  return `muitos códigos errados. Tente de novo em ${minutos === 1 ? '1 minuto' : minutos + ' minutos'}`
+}
+
 function limpar (texto, tamanho) {
   return String(texto || '').trim().slice(0, tamanho)
 }
@@ -120,6 +142,12 @@ export default {
     }
 
     const partes = url.pathname.split('/').filter(Boolean)
+
+    // O link da sala para o Discord (pagina.js): o codigo vem depois do "#",
+    // e por isso nem chega aqui.
+    if (partes.length === 1 && partes[0] === 'entrar' && requisicao.method === 'GET') {
+      return paginaDeEntrar()
+    }
 
     // Amigos: /amigos/<segredo>. O objeto é nomeado pelo HASH do segredo,
     // que é o id que os amigos guardam; o segredo em si nunca sai do PC
@@ -177,6 +205,10 @@ export class Sala {
     // objeto hibernar a conta zera, e tudo bem: quem está mandando em
     // enxurrada não deixa o objeto dormir.
     this.ritmo = new WeakMap()
+    // De onde veio cada socket, para o porteiro (codigo errado, porteiro.js).
+    // Na memoria: entre abrir o socket e mandar o 'entrar' o objeto nao
+    // chega a hibernar; se hibernar, a conta cai na origem 'desconhecida'.
+    this.origem = new WeakMap()
 
     // Responde ao ping sem acordar o objeto. É o que deixa a batida de coração
     // praticamente de graça: o runtime responde sozinho durante a hibernação.
@@ -194,6 +226,7 @@ export class Sala {
 
     // acceptWebSocket, e não server.accept(): é o que permite hibernar.
     this.estado.acceptWebSocket(doServidor)
+    this.origem.set(doServidor, requisicao.headers.get('CF-Connecting-IP') || 'desconhecida')
 
     // Guarda o próprio código para o `abrir` conferir o tamanho mínimo.
     //
@@ -272,6 +305,9 @@ export class Sala {
       case 'pong': return
       // Saída de propósito: anuncia na hora, sem a carência de quem cai.
       case 'sair': return this.sair(ws)
+      case 'expulsar': return this.expulsar(ws, msg)
+      case 'votar-expulsao': return this.comecarVotacao(ws, msg)
+      case 'voto': return this.votar(ws, msg)
       default:
         return this.enviar(ws, { tipo: 'erro', motivo: `tipo desconhecido: ${msg.tipo}` })
     }
@@ -315,8 +351,11 @@ export class Sala {
     if (existente) await this.estado.storage.deleteAll()
 
     await this.estado.storage.put('rotulo', rotulo)
+    // Quem cria e o dono. Sem identidade (app antigo), a sala fica sem dono,
+    // e tirar alguem e sempre por votacao.
+    await this.estado.storage.put('dono', identidadeValida(msg.identidade))
 
-    await this.acomodar(ws, nome, rotulo)
+    await this.acomodar(ws, nome, rotulo, null, identidadeValida(msg.identidade))
   }
 
   async entrar (ws, msg) {
@@ -327,16 +366,25 @@ export class Sala {
       return this.enviar(ws, { tipo: 'erro', motivo: 'seu nome é obrigatório' })
     }
 
+    // Cinco codigos errados seguidos do mesmo IP: cinco minutos de espera
+    // (porteiro.js, pedido do dono). Vale ate para o codigo certo.
+    const porteiro = this.porteiroDe(ws)
+    const espera = await porteiro.espera()
+    if (espera > 0) return this.enviar(ws, { tipo: 'erro', motivo: textoDaEspera(espera), espera })
+
     const rotulo = await this.estado.storage.get('rotulo')
-    if (!rotulo) {
-      return this.enviar(ws, { tipo: 'erro', motivo: 'código não corresponde a nenhuma sala aberta' })
-    }
+    if (!rotulo) return this.codigoErrado(ws, porteiro)
 
     // Sala vazia pode ser uma sala em carência, esperando todo mundo voltar
     // de uma queda. Só é entulho depois que a carência vence.
     if (this.quantos() === 0 && Date.now() - (await this.vaziaDesde()) > CARENCIA_VAZIA) {
       await this.estado.storage.deleteAll()
-      return this.enviar(ws, { tipo: 'erro', motivo: 'código não corresponde a nenhuma sala aberta' })
+      return this.codigoErrado(ws, porteiro)
+    }
+
+    const identidade = identidadeValida(msg.identidade)
+    if (identidade && (await this.banidos()).includes(identidade)) {
+      return this.enviar(ws, { tipo: 'erro', motivo: 'você não pode mais entrar nessa sala' })
     }
 
     // Volta de quem caiu. A credencial prova que é a mesma pessoa, então ela
@@ -389,7 +437,7 @@ export class Sala {
 
       await this.acomodar(ws, conhecido.nome, rotulo, {
         id: conhecido.id, credencial, retomada, transmitindo, camera, novatos
-      })
+      }, identidade)
       if (ausente) await this.entregarFila(ws, conhecido.id)
       return
     }
@@ -400,7 +448,22 @@ export class Sala {
       return this.enviar(ws, { tipo: 'erro', motivo: `já tem alguém chamado "${nome}" nessa sala` })
     }
 
-    await this.acomodar(ws, nome, rotulo)
+    await this.acomodar(ws, nome, rotulo, null, identidade)
+  }
+
+  porteiroDe (ws) {
+    const origem = this.origem.get(ws) || 'desconhecida'
+    return this.ambiente.PORTEIRO.get(this.ambiente.PORTEIRO.idFromName(origem))
+  }
+
+  async codigoErrado (ws, porteiro) {
+    const { espera, restam } = await porteiro.errou()
+    if (espera > 0) return this.enviar(ws, { tipo: 'erro', motivo: textoDaEspera(espera), espera })
+    return this.enviar(ws, {
+      tipo: 'erro',
+      motivo: `código não corresponde a nenhuma sala aberta (${restam === 1 ? 'resta 1 tentativa' : `restam ${restam} tentativas`})`,
+      restam
+    })
   }
 
   nomeOcupado (ws, nome) {
@@ -419,7 +482,7 @@ export class Sala {
   }
 
   // Parte comum de criar e entrar: registra o participante e avisa os outros.
-  async acomodar (ws, nome, rotulo, retorno = null) {
+  async acomodar (ws, nome, rotulo, retorno = null, identidade = '') {
     const id = retorno ? retorno.id : crypto.randomUUID()
     const credencial = retorno ? retorno.credencial : crypto.randomUUID()
     const retomada = Boolean(retorno && retorno.retomada)
@@ -433,7 +496,15 @@ export class Sala {
 
     // entrouEm existe para o alarme: quem acabou de chegar ainda não pingou
     // nenhuma vez, e não pode ser recolhido por causa disso.
-    ws.serializeAttachment({ id, nome, credencial, transmitindo, camera, entrouEm: Date.now() })
+    ws.serializeAttachment({ id, nome, credencial, transmitindo, camera, identidade, entrouEm: Date.now() })
+    // Entrou: a conta de codigos errados daquele IP zera.
+    try { await this.porteiroDe(ws).acertou() } catch { /* so manutencao */ }
+    const dono = await this.estado.storage.get('dono')
+    const souDono = Boolean(dono && identidade === dono)
+    const outroDono = souDono ? null : this.outros(ws).find((outro) => {
+      const d = this.dados(outro)
+      return dono && d && d.identidade === dono
+    })
 
     // Reinsere para ficar no fim da fila: quem some primeiro é quem entrou
     // há mais tempo, não quem acabou de voltar.
@@ -452,15 +523,20 @@ export class Sala {
     // próxima vez que a sala esvaziar.
     await this.estado.storage.delete('vaziaDesde')
 
-    this.enviar(ws, { tipo: 'bemvindo', id, credencial, rotulo, participantes, retomada })
+    this.enviar(ws, {
+      tipo: 'bemvindo', id, credencial, rotulo, participantes, retomada,
+      souDono, dono: souDono ? id : (outroDono ? this.dados(outroDono).id : '')
+    })
 
     // Numa retomada ninguém viu essa pessoa sair, anunciar entrada criaria
     // uma cópia dela na lista dos outros.
     // Para quem chegou durante a ausencia dele, porem, e entrada de verdade.
     const avisar = retomada ? ((retorno && retorno.novatos) || []) : this.outros(ws)
     for (const outro of avisar) {
-      this.enviar(outro, { tipo: 'entrou', id, nome })
+      this.enviar(outro, { tipo: 'entrou', id, nome, dono: souDono })
     }
+    // Voltou o dono: a votacao que estivesse correndo perde o sentido.
+    if (souDono && await this.estado.storage.get('votacao')) await this.encerrarVotacao('dono')
 
     await this.agendarVigia()  }
 
@@ -503,7 +579,8 @@ export class Sala {
 
     const ausentes = await this.ausentes()
     ausentes[meu.id] = {
-      nome: meu.nome, transmitindo: meu.transmitindo, camera: meu.camera || '', desde: Date.now()
+      nome: meu.nome, transmitindo: meu.transmitindo, camera: meu.camera || '',
+      identidade: meu.identidade || '', desde: Date.now()
     }
     await this.estado.storage.put('ausentes', ausentes)
 
@@ -564,6 +641,12 @@ export class Sala {
       }
     }
     if (mudou) await this.estado.storage.put('ausentes', ausentes)
+
+    const votacao = await this.estado.storage.get('votacao')
+    if (votacao) {
+      if (agora >= votacao.ate) await this.encerrarVotacao('expirou')
+      else proximo = Math.min(proximo, votacao.ate)
+    }
 
     if (this.quantos() > 0 || proximo !== Infinity) {
       return this.estado.storage.setAlarm(Math.min(Date.now() + INTERVALO_VIGIA, proximo))
@@ -641,12 +724,147 @@ export class Sala {
     for (const outro of this.outros(ws)) {
       this.enviar(outro, { tipo: 'saiu', id: meu.id })
     }
+    if (await this.estado.storage.get('votacao')) await this.contarVotos()
 
     const vazia = this.outros(ws).length === 0
 
     // Saiu o último: começa a carência em vez de apagar. Quem apaga de fato é
     // o alarme, depois de CARENCIA_VAZIA sem ninguém voltar.
     if (vazia) {
+      await this.estado.storage.put('vaziaDesde', Date.now())
+      await this.agendarVigia()
+    }
+  }
+
+  // --- expulsar e banir --------------------------------------------------------
+
+  async banidos () {
+    return (await this.estado.storage.get('banidos')) || []
+  }
+
+  // O dono conta como presente tambem na carencia de queda: cair por dois
+  // segundos nao abre votacao para tirar alguem.
+  async donoPresente () {
+    const dono = await this.estado.storage.get('dono')
+    if (!dono) return false
+    const conectado = this.todos().some((ws) => {
+      const d = this.dados(ws)
+      return d && d.identidade === dono
+    })
+    return conectado || Object.values(await this.ausentes()).some((a) => a.identidade === dono)
+  }
+
+  socketDe (id) {
+    return this.todos().find((ws) => {
+      const d = this.dados(ws)
+      return d && d.id === id
+    })
+  }
+
+  async expulsar (ws, msg) {
+    const meu = this.dados(ws)
+    if (!meu) return
+    const dono = await this.estado.storage.get('dono')
+    if (!dono || meu.identidade !== dono) return this.enviar(ws, { tipo: 'erro', motivo: 'só o dono da sala pode tirar alguém' })
+    const alvo = this.socketDe(msg.alvo)
+    if (!alvo || alvo === ws) return
+    await this.remover(alvo, Boolean(msg.banir))
+  }
+
+  async comecarVotacao (ws, msg) {
+    const meu = this.dados(ws)
+    if (!meu) return
+    if (await this.donoPresente()) return this.enviar(ws, { tipo: 'erro', motivo: 'o dono da sala está aqui, só ele pode tirar alguém' })
+    if (await this.estado.storage.get('votacao')) return this.enviar(ws, { tipo: 'erro', motivo: 'já tem uma votação acontecendo' })
+    const alvo = this.socketDe(msg.alvo)
+    if (!alvo || alvo === ws) return
+    const ate = Date.now() + VALIDADE_VOTACAO
+    await this.estado.storage.put('votacao', {
+      alvo: msg.alvo, banir: Boolean(msg.banir), por: meu.id, sim: [meu.id], nao: [], ate
+    })
+    await this.agendarAte(ate)
+    await this.contarVotos()
+  }
+
+  async votar (ws, msg) {
+    const meu = this.dados(ws)
+    const v = await this.estado.storage.get('votacao')
+    if (!meu || !v || v.alvo !== msg.alvo || meu.id === v.alvo) return
+    v.sim = v.sim.filter((id) => id !== meu.id)
+    v.nao = v.nao.filter((id) => id !== meu.id)
+    if (msg.sim) v.sim.push(meu.id)
+    else v.nao.push(meu.id)
+    await this.estado.storage.put('votacao', v)
+    await this.contarVotos()
+  }
+
+  // Quem pode votar e quem esta conectado agora, menos o alvo. Passa com a
+  // maioria; cai quando nao da mais para chegar nela.
+  async contarVotos () {
+    const v = await this.estado.storage.get('votacao')
+    if (!v) return
+    const alvo = this.socketDe(v.alvo)
+    if (!alvo) return this.encerrarVotacao('saiu')
+    const eleitores = this.todos().filter((ws) => {
+      const d = this.dados(ws)
+      return d && d.id !== v.alvo
+    })
+    const presentes = new Set(eleitores.map((ws) => this.dados(ws).id))
+    v.sim = v.sim.filter((id) => presentes.has(id))
+    v.nao = v.nao.filter((id) => presentes.has(id))
+    await this.estado.storage.put('votacao', v)
+    const precisa = votosPrecisos(eleitores.length)
+    if (v.sim.length >= precisa) {
+      await this.encerrarVotacao('aprovada')
+      return this.remover(alvo, v.banir)
+    }
+    if (v.nao.length > eleitores.length - precisa) return this.encerrarVotacao('recusada')
+    const aviso = {
+      tipo: 'votacao', alvo: v.alvo, banir: v.banir, por: v.por,
+      sim: v.sim.length, nao: v.nao.length, precisa, restam: Math.max(0, v.ate - Date.now())
+    }
+    for (const ws of eleitores) {
+      const id = this.dados(ws).id
+      this.enviar(ws, { ...aviso, meuVoto: v.sim.includes(id) ? 'sim' : v.nao.includes(id) ? 'nao' : '' })
+    }
+  }
+
+  async encerrarVotacao (resultado) {
+    const v = await this.estado.storage.get('votacao')
+    if (!v) return
+    await this.estado.storage.delete('votacao')
+    for (const ws of this.todos()) {
+      const d = this.dados(ws)
+      if (d && d.id !== v.alvo) this.enviar(ws, { tipo: 'votacao-fim', alvo: v.alvo, banir: v.banir, resultado })
+    }
+  }
+
+  // Tira da sala na hora, sem carencia: o anexo e zerado antes de fechar,
+  // para o webSocketClose nao o tratar como queda; a credencial e
+  // esquecida, para a reconexao automatica nao trazer de volta.
+  async remover (alvo, banir) {
+    const dele = this.dados(alvo)
+    if (!dele) return
+    if (banir && dele.identidade) {
+      const banidos = await this.banidos()
+      if (!banidos.includes(dele.identidade)) banidos.push(dele.identidade)
+      await this.estado.storage.put('banidos', banidos.slice(-200))
+    }
+    const v = await this.estado.storage.get('votacao')
+    if (v && v.alvo === dele.id) await this.encerrarVotacao('saiu')
+
+    this.enviar(alvo, { tipo: 'removido', banido: banir })
+    alvo.serializeAttachment(null)
+    try { alvo.close(4003, banir ? 'banido' : 'removido') } catch { /* ja morreu */ }
+
+    const conhecidos = await this.conhecidos()
+    for (const [credencial, c] of Object.entries(conhecidos)) if (c.id === dele.id) delete conhecidos[credencial]
+    await this.estado.storage.put('conhecidos', conhecidos)
+
+    for (const outro of this.todos()) {
+      if (this.dados(outro)) this.enviar(outro, { tipo: 'saiu', id: dele.id, removido: true, banido: banir })
+    }
+    if (this.quantos() === 0) {
       await this.estado.storage.put('vaziaDesde', Date.now())
       await this.agendarVigia()
     }

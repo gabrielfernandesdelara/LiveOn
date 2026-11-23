@@ -66,6 +66,12 @@ contextBridge.exposeInMainWorld('ponte', {
   codigoCopiado: () => ipcRenderer.invoke('codigo:copiado'),
   // Aviso do Windows dos amigos, so com a janela sem foco (main.js decide).
   notificar: (titulo, texto) => ipcRenderer.invoke('notificar', { titulo, texto }),
+  // Link da sala (liveon://sala/<codigo>), aberto pelo Discord.
+  aoAbrirSala: (aoAbrir) => {
+    const ouvinte = (_evento, codigo) => aoAbrir(codigo)
+    ipcRenderer.on('sala:link', ouvinte)
+    return () => ipcRenderer.removeListener('sala:link', ouvinte)
+  },
 
   // Mini tela (a janela sempre por cima): travar deixa o mouse passar direto
   // por ela; o atalho destrava. A janela em si e aberta pela pagina.

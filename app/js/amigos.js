@@ -168,6 +168,7 @@ function tratarAmigos (msg) {
       return desenharAmigos()
     case 'pedido-amizade':
       notificar(`${msg.de.nome} quer te adicionar como amigo`, msg.de.tag)
+      tocarPedidoDeAmizade()
       return avisoDeAmizade(msg.de)
     case 'adicionado':
       return respostaDoAdicionar(msg)
@@ -186,6 +187,7 @@ function tratarAmigos (msg) {
       return tirarAviso('entrada:' + msg.pedido)
     case 'convite':
       notificar(`${msg.de.nome} te chamou`, msg.rotulo || 'para uma sala')
+      tocarConvite()
       return avisoDeConvite(msg)
     case 'convite-enviado':
       if (!msg.entregue) chamados.delete(msg.para)
@@ -575,6 +577,7 @@ async function copiarMeuCodigo (botao) {
   if (!euAmigo.tag) return
   let ok = false
   try { ok = await window.ponte.copiar(euAmigo.tag) } catch { /* sem ponte */ }
+  if (ok) tocarCopiado()
   if (!ok || !botao) return
   botao.classList.add('copiado')
   setTimeout(() => botao.classList.remove('copiado'), 1600)
@@ -628,6 +631,7 @@ function entrarComCodigoDeAmigo (codigo) {
 }
 
 function entradaAceita (msg) {
+  tocarPedidoAceito()
   anotar(`amigos: ${msg.por && msg.por.nome ? 'pedido aceito' : 'pedido aceito'}, entrando`)
   entrarComCodigoDeAmigo(msg.codigo)
 }
@@ -640,6 +644,7 @@ function pedidoDeEntrada (msg) {
   }
   const amigo = amigos.get(msg.de.id) || msg.de
   notificar(`${msg.de.nome} quer entrar na sala`, rotuloDaSala)
+  tocarPedidoDeEntrada()
   mostrarAviso({
     chave: 'entrada:' + msg.pedido,
     amigo,

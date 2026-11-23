@@ -1323,6 +1323,9 @@ button.trocar-modo:hover:not(:disabled) {
 #opcao-pausa button { padding: 0 12px; }
 /* Lista do lado de uma opcao (o select do Desempenho, o Audio). */
 .linha-opcao > .caixa-select { flex: 0 0 240px; }
+.linha-opcao > .duas-listas { flex: 0 0 240px; display: flex; gap: 8px; }
+.duas-listas .caixa-select { flex: 1 1 0; }
+.duas-listas select { width: 100%; }
 .linha-opcao .nota-dialogo:empty { display: none; }
 .linha-opcao #btn-reiniciar { margin-top: 10px; }
 
@@ -2475,3 +2478,34 @@ html:not(.sem-animacoes) .painel-amigos:not(.oculto) { animation: abre-amigos .1
 }
 .marcador-amigos span { width: 8px; height: 8px; border-radius: 3px; background: var(--avatar); }
 .previa-entrada[data-amigos="esquerda"] .marcador-amigos { right: auto; left: 4%; }
+
+/* ---------- tirar da sala (remocao.js) ---------- */
+.coroa-dono { margin-left: 5px; vertical-align: -1px; color: var(--alerta); }
+.pessoa .engrenagem.tirar { margin-left: -4px; }
+.opcao-remocao { display: flex; margin-top: 14px; }
+.opcao-remocao button { flex: 1; }
+#nota-remocao { margin-top: 10px; }
+
+/* ---------- tela que esta na mini tela (mini.js) ----------
+   Embacada no card, como se nao estivesse sendo vista aqui (pedido do
+   dono). O aviso no meio traz de volta. Na miniatura so o embacado: nao
+   cabe o botao. */
+.card.na-mini .palco > video,
+.card.na-mini .cam { filter: blur(18px) brightness(.5) saturate(.7); transform: scale(1.06); }
+.aviso-na-mini {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--texto);
+  font-size: 13px;
+  font-weight: 600;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, .6);
+}
+#miniaturas .aviso-na-mini button,
+.card.minusculo .aviso-na-mini button { display: none; }
+html:not(.sem-animacoes) .card .palco > video { transition: filter .35s ease, transform .35s ease; }

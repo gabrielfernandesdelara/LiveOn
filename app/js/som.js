@@ -96,6 +96,165 @@ function bolha (de, para) {
   }
 }
 
+// Pedido para entrar (2.1.0): a "campainha elastica de metal", escolhida
+// pelo dono (C1) entre umas vinte. Ding-dong descendo (880 e 698 Hz), cada
+// nota passando do tom e voltando como o pop do LiveOn, mas com timbre de
+// sino de verdade (FM, modulador a 3,5x): o pop e a bolha sao triangulo e
+// senoide, e o pedido precisava soar diferente deles. ~1,2 s, pico ~0,04.
+function sinoElastico (c, f, t, dur, vol = 0.04) {
+  const curva = (p, alvo) => {
+    p.setValueAtTime(alvo * 0.7, t)
+    p.exponentialRampToValueAtTime(alvo * 1.12, t + 0.045)
+    p.exponentialRampToValueAtTime(alvo, t + 0.11)
+  }
+  const portadora = c.createOscillator()
+  const modulador = c.createOscillator()
+  const profundidade = c.createGain()
+  const g = c.createGain()
+  curva(portadora.frequency, f)
+  curva(modulador.frequency, f * 3.5)
+  profundidade.gain.setValueAtTime(f * 1.6, t)
+  profundidade.gain.exponentialRampToValueAtTime(f * 0.05, t + dur)
+  modulador.connect(profundidade).connect(portadora.frequency)
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.005)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+  portadora.connect(g).connect(c.destination)
+  portadora.start(t)
+  modulador.start(t)
+  portadora.stop(t + dur + 0.05)
+  modulador.stop(t + dur + 0.05)
+}
+
+function tocarPedidoDeEntrada () {
+  tocar((c, t) => {
+    sinoElastico(c, 880, t, 0.7)
+    sinoElastico(c, 698, t + 0.26, 0.9)
+  })
+}
+
+// --- a linguagem dos sons (2.1.0, escolhida pelo dono) ------------------------
+//
+// Para o grupo saber o que aconteceu sem olhar, cada som segue tres regras:
+// - o TIMBRE diz o assunto: pop e ir ao ar, bolha e gente na sala, sino e
+//   amigos e pedidos, madeira e decisao da sala, vidro e a conexao;
+// - a DIRECAO diz o que houve: subindo chegou ou ligou, descendo saiu ou
+//   caiu;
+// - o NUMERO de notas diz a importancia: uma informa, duas pedem atencao,
+//   tres pedem uma acao sua.
+// Todos com o "estica e volta" do pop, que e a marca do LiveOn. A webcam usa
+// o mesmo som da tela (tocarAviso e tocarSaida), e amigo ficando online nao
+// tem som: as duas coisas a pedido do dono.
+
+function tocar (desenhar) {
+  try {
+    const c = contextoDeAviso()
+    desenhar(c, c.currentTime + 0.01)
+  } catch {
+    // Som e enfeite: nunca pode atrapalhar o que aconteceu.
+  }
+}
+
+// A curva da marca: comeca fora da nota, passa dela e se acomoda. Descendo,
+// comeca acima.
+function curvaElastica (p, f, t, sobe = true) {
+  p.setValueAtTime(sobe ? f * 0.7 : f * 1.4, t)
+  p.exponentialRampToValueAtTime(sobe ? f * 1.12 : f * 0.9, t + 0.045)
+  p.exponentialRampToValueAtTime(f, t + 0.11)
+}
+
+function envelope (c, t, pico, ataque, fim) {
+  const g = c.createGain()
+  g.gain.setValueAtTime(0.0001, t)
+  g.gain.exponentialRampToValueAtTime(pico, t + ataque)
+  g.gain.exponentialRampToValueAtTime(0.0001, t + fim)
+  g.connect(c.destination)
+  return g
+}
+
+// MADEIRA: nota seca, com um brilho curto em cima (marimba).
+function madeira (c, f, t, vol = 0.06, sobe = true) {
+  const o = c.createOscillator()
+  curvaElastica(o.frequency, f, t, sobe)
+  o.connect(envelope(c, t, vol, 0.003, 0.2))
+  o.start(t)
+  o.stop(t + 0.25)
+  const brilho = c.createOscillator()
+  curvaElastica(brilho.frequency, f * 3.9, t, sobe)
+  brilho.connect(envelope(c, t, vol * 0.25, 0.002, 0.05))
+  brilho.start(t)
+  brilho.stop(t + 0.08)
+}
+
+// VIDRO: senoide com o parcial de 2,76 (copo batido).
+function vidro (c, f, t, dur = 0.45, vol = 0.045, sobe = true) {
+  const o = c.createOscillator()
+  curvaElastica(o.frequency, f, t, sobe)
+  o.connect(envelope(c, t, vol, 0.004, dur))
+  o.start(t)
+  o.stop(t + dur + 0.05)
+  const parcial = c.createOscillator()
+  curvaElastica(parcial.frequency, f * 2.76, t, sobe)
+  parcial.connect(envelope(c, t, vol * 0.35, 0.003, dur * 0.4))
+  parcial.start(t)
+  parcial.stop(t + dur)
+}
+
+// Sino: te chamaram (3 notas subindo, pede acao), pedido aceito (1 nota alta),
+// pedido de amizade (2 iguais, como bater a porta).
+function tocarConvite () {
+  tocar((c, t) => {
+    sinoElastico(c, 698, t, 0.5)
+    sinoElastico(c, 880, t + 0.17, 0.55)
+    sinoElastico(c, 1046, t + 0.34, 0.9)
+  })
+}
+function tocarPedidoAceito () { tocar((c, t) => sinoElastico(c, 1318, t, 0.8, 0.035)) }
+function tocarPedidoDeAmizade () {
+  tocar((c, t) => {
+    sinoElastico(c, 988, t, 0.3, 0.03)
+    sinoElastico(c, 988, t + 0.13, 0.55, 0.03)
+  })
+}
+
+// Madeira: votacao (2 batidas iguais), alguem tirado (3 descendo) e tiraram
+// voce (as mesmas, mais graves e lentas).
+function tocarVotacao () {
+  tocar((c, t) => {
+    madeira(c, 700, t)
+    madeira(c, 700, t + 0.15)
+  })
+}
+function tocarAlguemTirado () {
+  tocar((c, t) => {
+    madeira(c, 784, t, 0.055, false)
+    madeira(c, 587, t + 0.11, 0.055, false)
+    madeira(c, 392, t + 0.22, 0.065, false)
+  })
+}
+function tocarTiraramVoce () {
+  tocar((c, t) => {
+    madeira(c, 523, t, 0.06, false)
+    madeira(c, 392, t + 0.17, 0.06, false)
+    madeira(c, 262, t + 0.34, 0.07, false)
+  })
+}
+
+// Vidro: a conexao caiu (2 descendo), voltou (2 subindo), copiado (1 toque).
+function tocarConexaoCaiu () {
+  tocar((c, t) => {
+    vidro(c, 1318, t, 0.35, 0.04, false)
+    vidro(c, 988, t + 0.18, 0.55, 0.04, false)
+  })
+}
+function tocarReconectado () {
+  tocar((c, t) => {
+    vidro(c, 988, t, 0.35)
+    vidro(c, 1318, t + 0.18, 0.55)
+  })
+}
+function tocarCopiado () { tocar((c, t) => vidro(c, 1760, t, 0.12, 0.02)) }
+
 function tocarEntrouNaSala () { bolha(420, 1000) }
 function tocarSaiuDaSala () { bolha(1000, 420) }
 

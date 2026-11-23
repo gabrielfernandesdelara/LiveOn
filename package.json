@@ -1,6 +1,6 @@
 {
   "name": "liveon",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Compartilhamento de tela com audio do sistema entre amigos (P2P mesh)",
   "author": "Gabriel de Lara",
   "license": "MIT",
@@ -73,6 +73,14 @@
         "owner": "gabrielfernandesdelara",
         "repo": "LiveOn",
         "releaseType": "release"
+      }
+    ],
+    "protocols": [
+      {
+        "name": "LiveOn",
+        "schemes": [
+          "liveon"
+        ]
       }
     ]
   }

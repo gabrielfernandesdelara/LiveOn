@@ -123,6 +123,41 @@ function voltarAtalhoPadrao () {
 
 // --- a janela -----------------------------------------------------------------
 
+// A tela que esta na mini fica embacada no card (2.1.0, pedido do dono):
+// quem esta olhando para a mini nao precisa dela de novo na grade, e o
+// card embacado diz onde ela foi parar. O som continua saindo pelo card. O
+// botao no meio traz de volta (fecha a mini).
+function marcarCardNaMini (card, naMini) {
+  card.classList.toggle('na-mini', naMini)
+  const palco = card.querySelector('.palco')
+  let aviso = palco && palco.querySelector('.aviso-na-mini')
+  if (!naMini) {
+    if (aviso) aviso.remove()
+    return
+  }
+  if (!palco || aviso) return
+  aviso = document.createElement('div')
+  aviso.className = 'aviso-na-mini'
+  const texto = document.createElement('span')
+  texto.textContent = 'Na mini tela'
+  const voltar = document.createElement('button')
+  voltar.textContent = 'Trazer de volta'
+  voltar.onclick = (evento) => {
+    evento.stopPropagation()
+    fecharMiniTela()
+  }
+  // Duplo clique no aviso nao pode focar o card por baixo.
+  aviso.addEventListener('dblclick', (evento) => evento.stopPropagation())
+  aviso.append(texto, voltar)
+  palco.appendChild(aviso)
+}
+
+function marcarCardsDaMini () {
+  for (const card of document.querySelectorAll('.card[data-id]')) {
+    marcarCardNaMini(card, miniAberta() && card.dataset.id === miniId)
+  }
+}
+
 function miniAberta () {
   return Boolean(miniJanela && !miniJanela.closed)
 }
@@ -142,6 +177,7 @@ function abrirMiniTela (id) {
     montarMiniTela()
   }
   mostrarNaMini()
+  marcarCardsDaMini()
   anotar(`mini tela: ${id.slice(0, 8)}`)
   avisarPausaDaMini()
 }
@@ -254,6 +290,7 @@ function fecharMiniTela () {
   miniJanela = null
   miniId = null
   miniTravada = false
+  marcarCardsDaMini()
   if (tinha) avisarPausaDaMini()
 }
 
@@ -268,6 +305,7 @@ try {
       miniJanela = null
       miniId = null
       miniTravada = false
+      marcarCardsDaMini()
       return
     }
     miniTravada = Boolean(mudanca.travada)

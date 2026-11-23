@@ -696,6 +696,7 @@ async function abrirConfig (aba) {
   avisarFoto('')
   mostrarAbaConfig(typeof aba === 'string' ? aba : 'perfil')
   marcarAparencia()
+  mostrarQualidadePadrao()
   $('#config').classList.remove('oculto')
   try {
     const config = await window.ponte.lerConfig()
