@@ -123,6 +123,7 @@ $('#btn-abrir-log').onclick = () => window.ponte.abrirPastaDoLog('registro')
 $('#btn-abrir-monitoria').onclick = () => window.ponte.abrirPastaDoLog('monitoria')
 for (const botao of document.querySelectorAll('#opcao-monitoria button')) botao.onclick = () => definirMonitoria(botao.dataset.valor === 'ligada')
 for (const botao of document.querySelectorAll('#opcao-registro button')) botao.onclick = () => definirRegistro(botao.dataset.valor === 'ligado')
+for (const botao of document.querySelectorAll('#opcao-prioridade-placa button')) botao.onclick = () => definirPrioridadePlaca(botao.dataset.valor === 'ligada')
 $('#btn-atalho-padrao').onclick = voltarAtalhoPadrao
 for (const botao of document.querySelectorAll('#opcao-som-novo button')) botao.onclick = () => definirSomDasNovas(botao.dataset.valor)
 for (const campo of document.querySelectorAll('.editor-tema-cor')) campo.oninput = () => mudarCorDoEditor(campo)

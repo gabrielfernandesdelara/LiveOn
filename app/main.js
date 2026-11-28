@@ -249,6 +249,7 @@ function medirProcessos () {
     texto += linhaDaMonitoria(hora, 'app', `memoria ${tipo} (MB)`, Math.round(uso.memoria / 1024))
   }
   texto += linhaDaMonitoria(hora, 'app', 'memoria total (MB)', Math.round(memoria / 1024))
+  texto += linhaDaMonitoria(hora, 'app', 'prioridade na placa', prioridadePlacaLigada() ? 'ligada' : 'desligada')
   texto += linhaDaMonitoria(hora, 'pc', 'memoria livre (MB)', Math.round(os.freemem() / 1048576))
   escreverNaMonitoria(texto)
 }
@@ -422,6 +423,8 @@ ipcMain.handle('config:ler', apenasDoApp(async () => {
     video: lerConfig().video === 'cpu' ? 'cpu' : 'gpu',
     videoAtivo,
     prioridade: prioridadeEscolhida(),
+    prioridadePlaca: prioridadePlacaLigada(),
+    prioridadePlacaDisponivel: capturaProcesso.prioridadeGpu(process.pid) !== null,
     registro: registroLigado,
     placa: placa.nome,
     amd: placa.amd
@@ -430,14 +433,19 @@ ipcMain.handle('config:ler', apenasDoApp(async () => {
 
 // Grava UMA escolha por vez. O vídeo só vale ao reiniciar; a prioridade e o
 // registro valem na hora.
-ipcMain.handle('config:gravar', apenasDoApp((_evento, { video, prioridade, registro } = {}) => {
-  const quantas = [video, prioridade, registro].filter((v) => v !== undefined).length
+ipcMain.handle('config:gravar', apenasDoApp((_evento, { video, prioridade, registro, prioridadePlaca } = {}) => {
+  const quantas = [video, prioridade, registro, prioridadePlaca].filter((v) => v !== undefined).length
   const soVideo = (video === 'gpu' || video === 'cpu') && quantas === 1
   const soPrioridade = (prioridade === 'normal' || prioridade === 'alta') && quantas === 1
   const soRegistro = typeof registro === 'boolean' && quantas === 1
-  if (!soVideo && !soPrioridade && !soRegistro) return false
+  const soPlaca = typeof prioridadePlaca === 'boolean' && quantas === 1
+  if (!soVideo && !soPrioridade && !soRegistro && !soPlaca) return false
   try {
-    if (soRegistro) {
+    if (soPlaca) {
+      gravarConfig({ ...lerConfig(), prioridadePlaca })
+      registrar('config', `prioridade na placa de video: ${prioridadePlaca ? 'ligada' : 'desligada'}`)
+      priorizarNaPlaca('configuracao')
+    } else if (soRegistro) {
       gravarConfig({ ...lerConfig(), registro })
       ligarRegistro(registro)
     } else if (soVideo) {
@@ -809,8 +817,52 @@ async function priorizar (motivo) {
 const INTERVALO_PRIORIDADE = 5000
 const NOMES_PRIORIDADE = { [-14]: 'alta', [-7]: 'acima do normal', 0: 'normal', 7: 'abaixo do normal', 19: 'baixa' }
 
+// Prioridade na PLACA DE VIDEO (2.1.3, opcao da aba Desempenho, desligada
+// por padrao). Separada da de processador: com um jogo ocupando a placa
+// inteira, a captura e o codificador do LiveOn ficam sem vez, e a tela
+// chegava aos amigos a 6 fps com o jogo em foco e a 30 fora dele (monitoria
+// de 28/11/2026, Age of Mythology sem limite de fps). O OBS faz o mesmo.
+// Ligada pede TEMPO REAL, que o Windows aceitou sem administrador (medido);
+// desligada volta ao normal. Vale para todo processo do app, porque a
+// captura e o codificador nao moram no mesmo. NAO foi possivel provar o
+// ganho aqui: uma carga artificial na placa nao reproduziu a queda, e a
+// diferenca ficou no ruido. O teste e de quem tem o problema, com a
+// monitoria ligada.
+const CLASSE_GPU_NORMAL = 2
+const CLASSE_GPU_TEMPO_REAL = 5
+
+function prioridadePlacaLigada () {
+  return lerConfig().prioridadePlaca === true
+}
+
+function priorizarNaPlaca (motivo) {
+  const classe = prioridadePlacaLigada() ? CLASSE_GPU_TEMPO_REAL : CLASSE_GPU_NORMAL
+  // A pagina (Tab) fica no sandbox e nao fala com a placa: o Windows recusa
+  // com parametro invalido e a classe nem pode ser lida. Quem desenha e
+  // codifica e o processo de GPU; ela fica de fora da conta.
+  let certos = 0
+  let comPlaca = 0
+  for (const { pid } of app.getAppMetrics()) {
+    const antes = capturaProcesso.prioridadeGpu(pid)
+    if (!antes || antes.classe < 0) continue
+    comPlaca++
+    const r = capturaProcesso.prioridadeGpu(pid, classe)
+    if (r && r.ok && r.classe === classe) certos++
+  }
+  registrar('app', `prioridade na placa ${classe === CLASSE_GPU_TEMPO_REAL ? 'TEMPO REAL' : 'normal'} em ${certos}/${comPlaca} processos que usam a placa (${motivo})`)
+}
+
 function vigiarPrioridade () {
   setInterval(() => {
+    // O processo de GPU renasce se o driver cair, e nasce na classe normal.
+    if (prioridadePlacaLigada()) {
+      for (const { pid, type } of app.getAppMetrics()) {
+        const r = capturaProcesso.prioridadeGpu(pid)
+        if (!r || r.classe < 0 || r.classe === CLASSE_GPU_TEMPO_REAL) continue
+        const certo = capturaProcesso.prioridadeGpu(pid, CLASSE_GPU_TEMPO_REAL)
+        registrar('app', `prioridade na placa de ${type}/${pid}: ${r.classe} -> ${certo && certo.classe}`)
+      }
+    }
     const classe = prioridadeEscolhida() === 'alta'
       ? os.constants.priority.PRIORITY_HIGH
       : os.constants.priority.PRIORITY_NORMAL
@@ -971,6 +1023,8 @@ function configurarCaptura () {
       // quarto apareceu depois, ficando de fora do primeiro ajuste.
       priorizar('captura concedida')
       setTimeout(() => priorizar('captura em andamento'), 3000)
+      // A captura pode abrir processo novo; o vigia pegaria em 5 s, aqui e na hora.
+      if (prioridadePlacaLigada()) setTimeout(() => priorizarNaPlaca('captura em andamento'), 3000)
     } catch (erro) {
       registrar('captura', `falha ao listar fontes: ${erro.message}`)
       responder({})
@@ -1170,7 +1224,7 @@ let sdr = null   // { quadro (WebFrameMain), largura, altura, entregues, falhas 
 function pararSdr (motivo) {
   if (!sdr) return
   const contagem = hdr.pararCaptura()
-  registrar('sdr', `captura HDR parada (${motivo}): ${sdr.entregues} quadros entregues, ` +
+  registrar('sdr', `${sdr.comum ? 'captura propria' : 'captura HDR'} parada (${motivo}): ${sdr.entregues} quadros entregues, ` +
     `${contagem.pulados || 0} pulados, ${contagem.recuperacoes || 0} recuperacoes, ${sdr.falhas} falhas de entrega`)
   sdr = null
 }
@@ -1190,12 +1244,22 @@ async function retanguloDaFonte (fonteId) {
 ipcMain.handle('sdr:disponivel', apenasDoApp(() =>
   videoAtivo === 'gpu' && hdr.capturaDisponivel() && hdr.listar().some((m) => m.ligado)))
 
-ipcMain.handle('sdr:iniciar', apenasDoApp(async (evento, { fonteId, largura, altura, fps } = {}) => {
+// comum: a captura PROPRIA de janela (2.1.3). Quando o Chromium nao consegue
+// abrir uma janela (NotReadableError em 8 ms, Windows 10 de um amigo), a
+// pagina pede a mesma janela por aqui, pelo Windows Graphics Capture direto
+// no HWND: so a janela, mesmo coberta, nada do que estiver na frente. Em
+// monitor sem HDR o quadro passa sem conversao. So janela: a tela inteira o
+// Chromium nunca recusou.
+ipcMain.handle('sdr:iniciar', apenasDoApp(async (evento, { fonteId, largura, altura, fps, comum } = {}) => {
   pararSdr('nova captura')
-  if (videoAtivo !== 'gpu') return { ok: false, motivo: 'o Forçar SDR precisa da placa de vídeo nas configurações' }
+  comum = comum === true
+  if (videoAtivo !== 'gpu') {
+    return { ok: false, motivo: comum ? 'a captura própria precisa da placa de vídeo nas configurações' : 'o Forçar SDR precisa da placa de vídeo nas configurações' }
+  }
 
   // O id da fonte diz o que é: "screen:<n>:<n>" ou "window:<hwnd>:<n>".
   const [tipo, numero] = String(fonteId || '').split(':')
+  if (comum && tipo !== 'window') return { ok: false, motivo: 'a captura própria é só de janela' }
   let alvo
   let ret = null
   if (tipo === 'screen') {
@@ -1214,13 +1278,16 @@ ipcMain.handle('sdr:iniciar', apenasDoApp(async (evento, { fonteId, largura, alt
   try {
     info = hdr.iniciarCaptura({
       ...alvo,
+      comum,
+      // Para os testes exercitarem o caminho sem conversao num monitor em HDR.
+      direto: comum && process.env.LIVEON_CAPTURA_DIRETA === '1',
       saidaLargura: Number(largura) || 1920,
       saidaAltura: Number(altura) || 1080,
       fps: Number(fps) || 60
     }, (k, motivo) => {
       if (!sdr) return
       if (k < 0) {
-        const fim = motivo || 'a captura HDR parou'
+        const fim = motivo || (comum ? 'a captura própria parou' : 'a captura HDR parou')
         pararSdr(fim)
         if (!evento.sender.isDestroyed()) evento.sender.send('sdr:fim', fim)
         return
@@ -1228,17 +1295,22 @@ ipcMain.handle('sdr:iniciar', apenasDoApp(async (evento, { fonteId, largura, alt
       entregarQuadroSdr(k)
     })
   } catch (erro) {
-    registrar('sdr', `nao consegui iniciar a captura HDR (${nome}): ${erro.message}`)
+    registrar('sdr', `nao consegui iniciar a ${comum ? 'captura propria' : 'captura HDR'} (${nome}): ${erro.message}`)
     return { ok: false, motivo: erro.message }
   }
 
   // Monitor sem HDR: não há o que converter, a captura de sempre já sai certa.
   if (!info.hdr) return { ok: false, semHdr: true }
 
-  sdr = { quadro, info, fonteId, entregues: 0, falhas: 0 }
+  sdr = { quadro, info, fonteId, comum, entregues: 0, falhas: 0 }
   // De uma janela, o nome do monitor é o do Windows (DISPLAY1): o título
   // dela não vai para o log, pode ter coisa que ninguém quis mostrar.
   const onde = info.modo === 'janela' ? `janela no ${info.monitor}` : nome
+  if (comum) {
+    registrar('sdr', `captura propria da janela no ${info.monitor} (${info.direto ? 'sem conversao' : 'convertendo o HDR'}): ` +
+      `${info.entradaLargura}x${info.entradaAltura} -> ${info.largura}x${info.altura} @ ${Number(fps) || 60}fps`)
+    return { ok: true, largura: info.largura, altura: info.altura, monitor: onde, direto: info.direto }
+  }
   registrar('sdr', `captura HDR em ${onde}: ${info.entradaLargura}x${info.entradaAltura} -> ` +
     `${info.largura}x${info.altura} @ ${Number(fps) || 60}fps, branco do SDR ${Math.round(info.branco)} nits, ` +
     `pico ${Math.round(info.pico)} nits`)
@@ -1313,6 +1385,7 @@ async function descreverMaquina () {
   registrarCabecalho('maquina', prioridadeEscolhida() === 'alta'
     ? 'prioridade: ALTA (escolhida nas configuracoes)'
     : 'prioridade: normal')
+  registrarCabecalho('maquina', `prioridade na placa de video: ${prioridadePlacaLigada() ? 'TEMPO REAL (escolhida nas configuracoes)' : 'normal'}`)
 
   // HDR ligado com Windows anterior ao 24H2 e o que deixa a tela estourada
   // para quem assiste. Com o [inicio], que traz a versao do Windows, o log
@@ -1405,7 +1478,10 @@ app.whenReady().then(() => {
 
   // Depois da janela existir: antes dela, o processo do renderer e o da GPU
   // ainda não nasceram e ficariam de fora.
-  janela.webContents.once('did-finish-load', () => priorizar('abertura'))
+  janela.webContents.once('did-finish-load', () => {
+    priorizar('abertura')
+    if (prioridadePlacaLigada()) setTimeout(() => priorizarNaPlaca('abertura'), 1000)
+  })
   // Abriu pelo link da sala: a pagina ja tem como receber.
   janela.webContents.on('did-finish-load', () => {
     if (!codigoDoLink) return

@@ -36,12 +36,17 @@ async function ajustarDimensoes (video) {
 
 // Se a imagem no ar agora é a convertida.
 let sdrAtual = false
+// E se essa imagem convertida e a captura propria de janela (2.1.3).
+let capturaPropria = false
 
 // Sem nenhum quadro nesse tempo, a conversão não está funcionando nesta
 // máquina (por exemplo, o monitor ligado numa placa e o Chromium em outra).
 const ESPERA_PRIMEIRO_QUADRO_SDR = 3000
 
-async function capturarSdr (fonteId, qualidade) {
+// comum (2.1.3): a captura PROPRIA de janela, a reserva de quando o Chromium
+// nao consegue abrir a janela. Mesmo caminho de quadros do Forcar SDR; quem
+// chama trata a falha (estoura com o motivo, em vez de avisar).
+async function capturarSdr (fonteId, qualidade, comum = false) {
   const gerador = new MediaStreamTrackGenerator({ kind: 'video' })
   const escritor = gerador.writable.getWriter()
   let escrevendo = false
@@ -82,6 +87,7 @@ async function capturarSdr (fonteId, qualidade) {
   const desistir = (motivo) => {
     window.ponte.aoQuadroSdr(null)
     gerador.stop()
+    if (comum) throw new Error(motivo || 'erro desconhecido')
     if (motivo) {
       anotar(`Forcar SDR nao funcionou: ${motivo}`)
       avisar(`Forçar SDR não funcionou (${motivo}). Transmitindo do jeito normal.`)
@@ -95,7 +101,8 @@ async function capturarSdr (fonteId, qualidade) {
       fonteId,
       largura: qualidade.largura,
       altura: qualidade.altura,
-      fps: qualidade.fps
+      fps: qualidade.fps,
+      comum
     })
   } catch (erro) {
     resposta = { ok: false, motivo: erro.message }
@@ -120,7 +127,8 @@ async function capturarSdr (fonteId, qualidade) {
   }
 
   gerador.contentHint = 'motion'
-  anotar(`Forcar SDR: ${resposta.monitor} em HDR, convertendo para ${resposta.largura}x${resposta.altura}`)
+  if (comum) anotar(`captura propria da janela funcionou: ${resposta.largura}x${resposta.altura}${resposta.direto ? '' : ', convertendo o HDR'}`)
+  else anotar(`Forcar SDR: ${resposta.monitor} em HDR, convertendo para ${resposta.largura}x${resposta.altura}`)
   return gerador
 }
 
@@ -142,7 +150,7 @@ try {
     // Janela fechada: é o mesmo que o 'ended' da captura de sempre, a
     // transmissão acaba. Não há para onde voltar.
     if (/janela foi fechada/.test(motivo)) return pararTransmissao()
-    avisar('A conversão do HDR parou. Voltando para a captura normal.')
+    avisar(capturaPropria ? 'A captura da janela parou. Tentando de novo.' : 'A conversão do HDR parou. Voltando para a captura normal.')
     ajustarTransmissao(fonteAtual, audioAtual, { semSdr: true })
   })
 } catch { /* sem ponte */ }
@@ -184,6 +192,7 @@ async function capturarFonte (fonteId, configAudio, qualidade, sdr) {
 
   if (querConvertida) video = await capturarSdr(fonteId, qualidade)
   const convertida = Boolean(video)
+  let propria = null
 
   // Nao deu (monitor sem HDR, ou falhou) e o som ja veio: a captura de sempre
   // pede o som de novo, entao o primeiro sai.
@@ -224,11 +233,29 @@ async function capturarFonte (fonteId, configAudio, qualidade, sdr) {
       anotarFalhaDeCaptura('primeira tentativa', fonteId, configAudio, erro)
       if (!String(fonteId).startsWith('window:')) throw erro
       await new Promise((resolver) => setTimeout(resolver, 500))
-      stream = await pedir(false)
-      semLimites = true
-      anotar('captura de janela: a segunda tentativa, sem limites, funcionou')
+      try {
+        stream = await pedir(false)
+        semLimites = true
+        anotar('captura de janela: a segunda tentativa, sem limites, funcionou')
+      } catch (erro2) {
+        if (!erro2 || erro2.name !== 'NotReadableError') throw erro2
+        anotarFalhaDeCaptura('segunda tentativa', fonteId, configAudio, erro2)
+        // O Chromium nao abre a janela: a captura propria, pelo Windows
+        // Graphics Capture direto (2.1.3). So a janela, mesmo coberta.
+        // Falhando tambem, vale o erro do Chromium, que e o que o aviso
+        // entende; o motivo da propria fica no registro.
+        try {
+          propria = await capturarSdr(fonteId, qualidade, true)
+        } catch (erro3) {
+          anotar(`captura propria da janela tambem falhou: ${erro3.message}`)
+          throw erro2
+        }
+      }
     }
 
+    if (propria) {
+      video = propria
+    } else {
     if (semLimites) {
       try {
         await stream.getVideoTracks()[0].applyConstraints({
@@ -248,6 +275,7 @@ async function capturarFonte (fonteId, configAudio, qualidade, sdr) {
 
     await ajustarDimensoes(video)
     audioDoLoopback = stream.getAudioTracks()
+    }
   }
 
   // Fecha a captura nativa anterior ANTES de abrir outra. No comeco isto e
@@ -272,7 +300,9 @@ async function capturarFonte (fonteId, configAudio, qualidade, sdr) {
     }
   }
 
-  return { stream: new MediaStream(trilhas), sdr: convertida }
+  // A captura propria usa o mesmo caminho do Forcar SDR: para o resto do app
+  // (parar, ajustar, o fim pelo Windows) ela e uma captura convertida.
+  return { stream: new MediaStream(trilhas), sdr: convertida || Boolean(propria), propria: Boolean(propria) }
 }
 
 // O aviso some da tela em 6 s, e sem isto o registro so mostrava "captura
@@ -330,6 +360,7 @@ async function iniciarTransmissao (fonteId, configAudio) {
 
   streamLocal = captura.stream
   sdrAtual = captura.sdr
+  capturaPropria = captura.propria
   fonteAtual = fonteId
   audioAtual = configAudio
   // O id da fonte (o numero da janela, nunca o titulo) e quantas capturas
@@ -421,6 +452,7 @@ async function ajustarTransmissao (fonteId, configAudio, opcoes = {}) {
 
   streamLocal = captura.stream
   sdrAtual = captura.sdr
+  capturaPropria = captura.propria
   fonteAtual = fonteId
   audioAtual = configAudio
   capturasNestaExecucao++

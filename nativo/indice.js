@@ -173,4 +173,16 @@ function fracaoCoberta (hwnd) {
   }
 }
 
-module.exports = { disponivel, listarSessoes, pidDaFonte, capturar, fracaoCoberta }
+// Prioridade de placa de video de um processo (0 ociosa ... 5 tempo real).
+// Sem classe, so le. Devolve { ok, classe } ou null sem o addon.
+function prioridadeGpu (pid, classe) {
+  carregar()
+  if (!modulo || typeof modulo.prioridadeGpu !== 'function') return null
+  try {
+    return classe === undefined ? modulo.prioridadeGpu(pid) : modulo.prioridadeGpu(pid, classe)
+  } catch {
+    return null
+  }
+}
+
+module.exports = { disponivel, listarSessoes, pidDaFonte, capturar, fracaoCoberta, prioridadeGpu }

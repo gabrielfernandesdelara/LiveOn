@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <mutex>
 #include <string>
@@ -76,7 +77,7 @@ cbuffer Parametros : register(b0) {
   float escala; float pico; float joelho; float alvo;
   uint conteudoW; uint conteudoH; uint texW; uint texH;
   uint saidaW; uint saidaH; uint regX; uint regY;
-  uint regW; uint regH; uint cursorVisivel; uint _a;
+  uint regW; uint regH; uint cursorVisivel; uint direto;
   int cursorX; int cursorY; uint cursorW; uint cursorH;
 };
 
@@ -100,21 +101,28 @@ void main(uint3 id : SV_DispatchThreadID) {
   float2 limite = (float2(conteudoW, conteudoH) - 0.5) / float2(texW, texH);
   float2 uvt = min(uvc * float2(conteudoW, conteudoH) / float2(texW, texH), limite);
 
-  // 1.0 = branco do SDR do monitor.
-  float3 rel = max(entrada.SampleLevel(amostrador, uvt, 0).rgb * escala, 0);
-  float Y = dot(rel, float3(0.2126, 0.7152, 0.0722));
-  float Ye = Y * alvo;
-  float pe = max(pico * alvo, joelho + 0.001);
-  float p = (pe - joelho) / (1 - joelho);
-  float x = max(Ye - joelho, 0) / (1 - joelho);
-  // Reinhard estendido acima do joelho: contínuo e com a mesma inclinação
-  // nele, e o pico do monitor cai em 1.0.
-  float Yn = Ye <= joelho ? Ye : min(joelho + (1 - joelho) * (x * (1 + x / (p * p))) / (1 + x), 1);
-  float3 c = Y > 1e-6 ? rel * (Yn / Y) : rel;
-  // Cor saturada e clara: puxa para o branco em vez de cortar um canal, que
-  // mudaria o matiz.
-  c /= max(max(c.r, max(c.g, c.b)), 1);
-  float3 s = float3(srgb(c.r), srgb(c.g), srgb(c.b));
+  float3 s;
+  if (direto != 0) {
+    // Monitor sem HDR (a captura própria de janela): o quadro já vem em 8
+    // bits, pronto. Só encaixa e redimensiona.
+    s = saturate(entrada.SampleLevel(amostrador, uvt, 0).rgb);
+  } else {
+    // 1.0 = branco do SDR do monitor.
+    float3 rel = max(entrada.SampleLevel(amostrador, uvt, 0).rgb * escala, 0);
+    float Y = dot(rel, float3(0.2126, 0.7152, 0.0722));
+    float Ye = Y * alvo;
+    float pe = max(pico * alvo, joelho + 0.001);
+    float p = (pe - joelho) / (1 - joelho);
+    float x = max(Ye - joelho, 0) / (1 - joelho);
+    // Reinhard estendido acima do joelho: contínuo e com a mesma inclinação
+    // nele, e o pico do monitor cai em 1.0.
+    float Yn = Ye <= joelho ? Ye : min(joelho + (1 - joelho) * (x * (1 + x / (p * p))) / (1 + x), 1);
+    float3 c = Y > 1e-6 ? rel * (Yn / Y) : rel;
+    // Cor saturada e clara: puxa para o branco em vez de cortar um canal, que
+    // mudaria o matiz.
+    c /= max(max(c.r, max(c.g, c.b)), 1);
+    s = float3(srgb(c.r), srgb(c.g), srgb(c.b));
+  }
 
   // O cursor (só no modo monitor) já é SDR: entra por cima, depois da
   // conversão.
@@ -133,7 +141,7 @@ struct Parametros {
   float escala, pico, joelho, alvo;
   UINT conteudoW, conteudoH, texW, texH;
   UINT saidaW, saidaH, regX, regY;
-  UINT regW, regH, cursorVisivel, a;
+  UINT regW, regH, cursorVisivel, direto;
   INT cursorX, cursorY;
   UINT cursorW, cursorH;
 };
@@ -161,7 +169,10 @@ struct Captura {
   winrt::Windows::Graphics::SizeInt32 tamanhoDoPool{ 0, 0 };
   std::atomic<bool> janelaFechou{false};
 
-  // Comum: o quadro em 16 bits, a conversão e o anel de saída.
+  // Comum: o quadro capturado, a conversão e o anel de saída. O quadro é em
+  // 16 bits (HDR) ou, na captura própria de janela em monitor comum, em 8.
+  DXGI_FORMAT formato = DXGI_FORMAT_R16G16B16A16_FLOAT;
+  wdx::DirectXPixelFormat formatoPool = wdx::DirectXPixelFormat::R16G16B16A16Float;
   ComPtr<ID3D11Texture2D> quadroHdr;
   ComPtr<ID3D11ShaderResourceView> srvQuadro;
   UINT texW = 0, texH = 0;
@@ -284,7 +295,7 @@ bool garantirQuadroHdr(Captura* c, UINT w, UINT h) {
   td.MipLevels = 1;
   td.ArraySize = 1;
   td.SampleDesc.Count = 1;
-  td.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+  td.Format = c->formato;
   td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
   ComPtr<ID3D11Texture2D> nova;
   if (FAILED(c->dispositivo->CreateTexture2D(&td, nullptr, &nova))) return false;
@@ -448,7 +459,7 @@ void lacoJanela(Captura* c) {
     try {
       quadro = c->pool.TryGetNextFrame();
     } catch (...) {
-      avisar(c, -1, "a captura HDR da janela falhou");
+      avisar(c, -1, "a captura da janela falhou");
       break;
     }
 
@@ -470,7 +481,7 @@ void lacoJanela(Captura* c) {
         // A janela mudou de tamanho: o pool precisa acompanhar, senão os
         // próximos quadros vêm cortados.
         if (tamanho.Width != c->tamanhoDoPool.Width || tamanho.Height != c->tamanhoDoPool.Height) {
-          c->pool.Recreate(c->dispositivoWinrt, wdx::DirectXPixelFormat::R16G16B16A16Float, 2, tamanho);
+          c->pool.Recreate(c->dispositivoWinrt, c->formatoPool, 2, tamanho);
           c->tamanhoDoPool = tamanho;
         }
       }
@@ -558,6 +569,16 @@ Napi::Value Iniciar(const Napi::CallbackInfo& info) {
   double fps = numero("fps", 60);
   HWND hwnd = reinterpret_cast<HWND>(static_cast<intptr_t>(numero("hwnd", 0)));
   Modo modo = hwnd ? Modo::Janela : Modo::Monitor;
+  // comum: a captura PRÓPRIA de janela (2.1.3), usada quando o Chromium não
+  // consegue abrir a janela. Aí ela roda em qualquer monitor: com HDR,
+  // converte como no Forçar SDR; sem, passa o quadro direto. direto força
+  // o caminho sem conversão (é o que os testes usam num monitor em HDR).
+  auto booleano = [&](const char* nome) {
+    Napi::Value v = o.Get(nome);
+    return v.IsBoolean() && v.As<Napi::Boolean>().Value();
+  };
+  const bool comum = booleano("comum") && modo == Modo::Janela;
+  bool direto = booleano("direto") && modo == Modo::Janela;
 
   // A thread de captura usa coordenadas físicas do monitor.
   SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -575,9 +596,13 @@ Napi::Value Iniciar(const Napi::CallbackInfo& info) {
   }
 
   Napi::Object resposta = Napi::Object::New(env);
-  if (desc.ColorSpace != DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020) {
-    resposta.Set("hdr", false);
-    return resposta;
+  const bool monitorHdr = desc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
+  if (!monitorHdr) {
+    if (!comum) {
+      resposta.Set("hdr", false);
+      return resposta;
+    }
+    direto = true;
   }
   // Monitor girado chega deitado da duplicação, e não vale a pena girar aqui.
   if (modo == Modo::Monitor && desc.Rotation != DXGI_MODE_ROTATION_IDENTITY &&
@@ -587,6 +612,10 @@ Napi::Value Iniciar(const Napi::CallbackInfo& info) {
 
   auto* c = new Captura();
   c->modo = modo;
+  if (direto) {
+    c->formato = DXGI_FORMAT_B8G8R8A8_UNORM;
+    c->formatoPool = wdx::DirectXPixelFormat::B8G8R8A8UIntNormalized;
+  }
   for (int i = 0; i < ANEL; i++) c->ocupada[i] = false;
   if (FAILED(D3D11CreateDevice(adaptador.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
                                nullptr, 0, D3D11_SDK_VERSION, &c->dispositivo, nullptr, &c->contexto))) {
@@ -619,7 +648,7 @@ Napi::Value Iniciar(const Napi::CallbackInfo& info) {
       winrt::check_hresult(fabrica->CreateForWindow(hwnd, winrt::guid_of<wgc::GraphicsCaptureItem>(), winrt::put_abi(c->item)));
       c->tamanhoDoPool = c->item.Size();
       c->pool = wgc::Direct3D11CaptureFramePool::CreateFreeThreaded(
-          c->dispositivoWinrt, wdx::DirectXPixelFormat::R16G16B16A16Float, 2, c->tamanhoDoPool);
+          c->dispositivoWinrt, c->formatoPool, 2, c->tamanhoDoPool);
       c->sessao = c->pool.CreateCaptureSession(c->item);
       c->sessao.IsCursorCaptureEnabled(true);
       // A borda amarela some no Windows 11; no 10 não tem como tirar.
@@ -627,7 +656,12 @@ Napi::Value Iniciar(const Napi::CallbackInfo& info) {
       c->tokenFechou = c->item.Closed([c](auto&&, auto&&) { c->janelaFechou = true; });
       c->sessao.StartCapture();
     } catch (const winrt::hresult_error& erro) {
-      std::string motivo = "o Windows recusou a captura HDR da janela (" + winrt::to_string(erro.message()) + ")";
+      // O código vai junto: é ele que diz, no registro de quem teve o
+      // problema, se foi o Windows sem suporte, acesso negado ou outra coisa.
+      char codigo[16] = {};
+      snprintf(codigo, sizeof(codigo), "0x%08X", static_cast<unsigned>(erro.code()));
+      std::string motivo = "o Windows recusou a captura da janela (" + std::string(codigo) + ": " +
+                           winrt::to_string(erro.message()) + ")";
       c->modo = Modo::Janela;
       encerrar(c);
       return falha(motivo);
@@ -691,6 +725,7 @@ Napi::Value Iniciar(const Napi::CallbackInfo& info) {
   c->p.pico = static_cast<float>((std::max)(desc.MaxLuminance, static_cast<float>(branco)) / branco);
   c->p.joelho = JOELHO;
   c->p.alvo = BRANCO_NA_SAIDA;
+  c->p.direto = direto ? 1 : 0;
   D3D11_BUFFER_DESC bd = { sizeof(Parametros), D3D11_USAGE_DEFAULT, D3D11_BIND_CONSTANT_BUFFER, 0, 0, 0 };
   c->dispositivo->CreateBuffer(&bd, nullptr, &c->constantes);
   D3D11_QUERY_DESC qd = { D3D11_QUERY_EVENT, 0 };
@@ -704,6 +739,8 @@ Napi::Value Iniciar(const Napi::CallbackInfo& info) {
   char nome[128] = {};
   WideCharToMultiByte(CP_UTF8, 0, desc.DeviceName, -1, nome, sizeof(nome), nullptr, nullptr);
   resposta.Set("hdr", true);
+  resposta.Set("direto", direto);
+  resposta.Set("monitorHdr", monitorHdr);
   resposta.Set("modo", modo == Modo::Monitor ? "monitor" : "janela");
   resposta.Set("monitor", nome);
   resposta.Set("largura", c->saidaW);

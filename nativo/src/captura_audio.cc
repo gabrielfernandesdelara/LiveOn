@@ -683,8 +683,61 @@ Napi::Value Suportado(const Napi::CallbackInfo& info) {
   return Napi::Boolean::New(info.Env(), temApi);
 }
 
+// Prioridade de PLACA DE VIDEO de um processo (2.1.3). E separada da de
+// processador: com um jogo ocupando a placa inteira, a captura e o
+// codificador do LiveOn (no processo de GPU do Chromium) ficam sem vez, e a
+// tela chega aos amigos a 6 fps (medido em 28/11/2026, Age of Mythology em
+// foco). O OBS resolve do mesmo jeito. A funcao fica no gdi32 sem cabecalho
+// publico no SDK comum, por isso e buscada na hora. Classes do Windows:
+// 0 ocioso, 1 abaixo, 2 normal, 3 acima, 4 alta, 5 tempo real.
+typedef LONG(WINAPI* DefinirPrioridadeGpu)(HANDLE, INT);
+typedef LONG(WINAPI* LerPrioridadeGpu)(HANDLE, INT*);
+
+FARPROC FuncaoDoGdi(const char* nome) {
+  HMODULE gdi = GetModuleHandleW(L"gdi32.dll");
+  if (!gdi) gdi = LoadLibraryW(L"gdi32.dll");
+  return gdi ? GetProcAddress(gdi, nome) : nullptr;
+}
+
+// { ok, status, classe } com a classe lida DEPOIS de pedir: o Windows pode
+// aceitar o pedido e devolver outra (ou recusar sem privilegio).
+Napi::Value PrioridadeGpu(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::Object saida = Napi::Object::New(env);
+  if (info.Length() < 1 || !info[0].IsNumber()) {
+    Napi::TypeError::New(env, "esperava um pid").ThrowAsJavaScriptException();
+    return saida;
+  }
+  const DWORD pid = static_cast<DWORD>(info[0].As<Napi::Number>().Uint32Value());
+  const bool definir = info.Length() > 1 && info[1].IsNumber();
+  auto definirFn = reinterpret_cast<DefinirPrioridadeGpu>(FuncaoDoGdi("D3DKMTSetProcessSchedulingPriorityClass"));
+  auto lerFn = reinterpret_cast<LerPrioridadeGpu>(FuncaoDoGdi("D3DKMTGetProcessSchedulingPriorityClass"));
+  if (!definirFn || !lerFn) {
+    saida.Set("ok", false);
+    saida.Set("motivo", "este Windows nao tem a funcao");
+    return saida;
+  }
+  HANDLE processo = OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+  if (!processo) {
+    saida.Set("ok", false);
+    saida.Set("motivo", "nao abriu o processo");
+    saida.Set("erro", static_cast<double>(GetLastError()));
+    return saida;
+  }
+  LONG status = 0;
+  if (definir) status = definirFn(processo, info[1].As<Napi::Number>().Int32Value());
+  INT classe = -1;
+  const LONG leitura = lerFn(processo, &classe);
+  CloseHandle(processo);
+  saida.Set("ok", status >= 0);
+  saida.Set("status", static_cast<double>(static_cast<ULONG>(status)));
+  saida.Set("classe", leitura >= 0 ? classe : -1);
+  return saida;
+}
+
 Napi::Object Inicializar(Napi::Env env, Napi::Object exports) {
   Captura::Iniciar(env, exports);
+  exports.Set("prioridadeGpu", Napi::Function::New(env, PrioridadeGpu));
   exports.Set("listarSessoes", Napi::Function::New(env, ListarSessoes));
   exports.Set("pidDaJanela", Napi::Function::New(env, PidDaJanela));
   exports.Set("fracaoCoberta", Napi::Function::New(env, FracaoCoberta));

@@ -751,6 +751,7 @@ async function abrirConfig (aba) {
     $('#campo-prioridade').value = config.prioridade
     $('#config-placa').textContent = config.placa ? `Sua placa de vídeo: ${config.placa}.` : ''
     mostrarRegistro(config.registro !== false)
+    mostrarPrioridadePlaca(config.prioridadePlaca === true, config.prioridadePlacaDisponivel !== false)
   } catch (erro) {
     $('#config-placa').textContent = ''
     anotar('nao consegui ler as configuracoes: ' + erro.message)
@@ -812,6 +813,31 @@ async function definirRegistro (ligado) {
     ligado = !ligado
   }
   mostrarRegistro(ligado)
+}
+
+// Prioridade na placa de video (aba Desempenho, 2.1.3). Mora no config.json,
+// como a de processador, e vale na hora. Sem o addon nativo nao ha como
+// pedir: a opcao fica apagada e diz por que.
+function mostrarPrioridadePlaca (ligada, disponivel = true) {
+  for (const botao of document.querySelectorAll('#opcao-prioridade-placa button')) {
+    botao.classList.toggle('ativo', (botao.dataset.valor === 'ligada') === ligada)
+    botao.disabled = !disponivel
+  }
+  const nota = $('#nota-prioridade-placa')
+  nota.classList.remove('alerta')
+  nota.textContent = !disponivel
+    ? 'Indisponível nesta instalação.'
+    : ligada ? 'Ligada. Se o jogo começar a travar, desligue.' : ''
+}
+
+async function definirPrioridadePlaca (ligada) {
+  let certo = false
+  try { certo = await window.ponte.gravarConfig({ prioridadePlaca: ligada }) } catch { certo = false }
+  if (!certo) {
+    avisar('Não consegui salvar a configuração.')
+    ligada = !ligada
+  }
+  mostrarPrioridadePlaca(ligada)
 }
 
 async function trocarPrioridade () {
