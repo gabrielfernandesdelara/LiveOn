@@ -13,7 +13,7 @@
 //   cada amigo está perdendo. Vale o MELHOR dos amigos, e não o pior: se só um
 //   recebe mal, a internet ruim é a dele, e o aviso aparece no lado dele.
 //
-// O ícone tem histerese: acende depois de duas medições ruins seguidas (4 s)
+// O ícone tem histerese: acende depois de três medições ruins seguidas (6 s)
 // e só apaga depois de três boas (6 s). Sem isso ele piscaria a cada oscilação.
 //
 // Ressalva conhecida: se o amigo baixar a qualidade de propósito (Ajustar), a
@@ -107,6 +107,16 @@ async function nivelRecebido (id, par) {
   const estadoPar = par.pc.connectionState
   if (estadoPar === 'disconnected' || estadoPar === 'failed') return { nivel: 2, motivo: 'conexao ' + estadoPar }
 
+  // Tela que eu nao estou recebendo agora (convite do "com um clique", ou
+  // imagem pausada fora de vista): nao ha o que medir. E a referencia de
+  // antes nao vale para a volta: a imagem recomeca baixa e sobe aos poucos, e
+  // compara-la com a de antes da pausa acendia sinal fraco sem a conexao ter
+  // nada.
+  if (streamsRecebidos.has(id) && (!estouAssistindo(id) || imagemPausadaDe(id))) {
+    sinalPorId.delete(id)
+    return { nivel: 0 }
+  }
+
   const stream = streamsRecebidos.get(id) || camerasRecebidas.get(id)
   const trilha = stream && stream.getVideoTracks()[0]
   const receptor = trilha && par.pc.getReceivers().find((r) => r.track === trilha)
@@ -164,6 +174,9 @@ async function nivelRecebido (id, par) {
 async function nivelEnviado (par) {
   const remetente = par.remetentePorTipo.get('video')
   if (!remetente || !remetente.track) return null
+  // Envio desligado para este amigo (nao esta assistindo, ou pausou): os
+  // numeros dele estao parados e nao dizem nada da conexao.
+  if (par.assistindo === false || par.semImagem) return null
 
   let r = null
   let remoto = null

@@ -177,6 +177,7 @@ function fuiRemovido (banido) {
 function esquecerDonoDaSala () {
   donoDaSala = ''
   souDonoDaSala = false
+  votacaoNaTela = ''
   fecharRemocao()
   tirarAviso('votacao')
 }

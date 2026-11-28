@@ -93,8 +93,15 @@ async function mostrarAtalhoDaMini () {
   $('#btn-atalho-mini').textContent = atalho.rotulo
 }
 
-// Clicou no campo: o proximo aperto vira a tecla. Esc desiste.
+// Clicou no campo: o proximo aperto vira a tecla. Esc desiste, e clicar em
+// qualquer outro lugar tambem: antes a captura ficava ligada depois de a
+// pessoa fechar as configuracoes, e a proxima tecla apertada em QUALQUER
+// lugar do app (a primeira letra do codigo, por exemplo) virava a tecla da
+// mini tela, e ainda sumia.
+let terminarCapturaDoAtalho = null
+
 function capturarAtalhoDaMini () {
+  if (terminarCapturaDoAtalho) return
   const botao = $('#btn-atalho-mini')
   botao.textContent = 'Aperte a tecla...'
   botao.classList.add('capturando')
@@ -108,12 +115,17 @@ function capturarAtalhoDaMini () {
     anotar(`tecla de destravar a mini tela: ${atalho.acelerador}`)
     terminar()
   }
+  const clicouFora = (evento) => { if (evento.target !== botao) terminar() }
   const terminar = () => {
     document.removeEventListener('keydown', aoApertar, true)
+    document.removeEventListener('mousedown', clicouFora, true)
+    terminarCapturaDoAtalho = null
     botao.classList.remove('capturando')
     mostrarAtalhoDaMini()
   }
+  terminarCapturaDoAtalho = terminar
   document.addEventListener('keydown', aoApertar, true)
+  document.addEventListener('mousedown', clicouFora, true)
 }
 
 function voltarAtalhoPadrao () {

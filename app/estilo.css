@@ -2317,7 +2317,6 @@ button.trilho-amigos[aria-expanded="true"] { background: var(--painel); border-c
   background: var(--avatar);
   font-size: 12px;
 }
-.avatar .foto { border-radius: inherit; }
 .avatar.offline { opacity: .45; }
 .resto-amigos { font-size: 11px; color: var(--apagado); }
 .estado-amigo {

@@ -390,8 +390,7 @@ function ligarRegistro (ligar) {
   try {
     fs.mkdirSync(pastaDosLogs(), { recursive: true })
     const destino = caminhoLivre(`${naSala && salaDoLog ? nomeSeguro(salaDoLog) : 'sem sala'} ${carimbo()}`)
-    fs.writeFileSync(destino, cabecalho.map((linha) => `(abertura) ${linha}
-`).join(''))
+    fs.writeFileSync(destino, cabecalho.map((linha) => `(abertura) ${linha}\n`).join(''))
     arquivoLog = destino
     registrar('log', 'registro ligado nas configuracoes')
   } catch (erro) {
@@ -1048,7 +1047,9 @@ function configurarAtualizacao () {
   autoUpdater.on('checking-for-update', () => avisarSobreAtualizacao('procurando'))
   autoUpdater.on('update-available', (info) => avisarSobreAtualizacao('baixando', { versao: info.version, porcento: 0 }))
   autoUpdater.on('update-not-available', () => avisarSobreAtualizacao('atual'))
-  autoUpdater.on('download-progress', (p) => avisarSobreAtualizacao('baixando', { porcento: Math.round(p.percent) }))
+  // Cada aviso substitui o estado inteiro: sem levar a versao junto, ela
+  // sumia da tela no primeiro avanco da barra.
+  autoUpdater.on('download-progress', (p) => avisarSobreAtualizacao('baixando', { versao: estadoAtualizacao.versao, porcento: Math.round(p.percent) }))
   autoUpdater.on('update-downloaded', (info) => avisarSobreAtualizacao('pronta', { versao: info.version }))
   autoUpdater.on('error', (erro) => avisarSobreAtualizacao('falhou', { motivo: erro.message }))
 
@@ -1357,7 +1358,11 @@ function codigoNoLink (argv) {
 
 // O codigo nunca vai inteiro para o registro (ver mascararCodigo).
 function abrirLinkDaSala (codigo) {
-  if (!janela || janela.isDestroyed()) return
+  // A janela ainda nao existe (o app esta abrindo): o link espera por ela.
+  if (!janela || janela.isDestroyed()) {
+    if (codigo) codigoDoLink = codigo
+    return
+  }
   // LIVEON_SEM_AVISOS: teste nao traz janela para a frente.
   if (!process.env.LIVEON_SEM_AVISOS) {
     if (janela.isMinimized()) janela.restore()

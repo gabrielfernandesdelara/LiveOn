@@ -68,6 +68,11 @@ const CARENCIA_QUEDA = 20000
 // dos dois ficaria travada esperando uma resposta que nunca vem. O teto e
 // folgado: o comeco de uma transmissao sao algumas dezenas de mensagens.
 const FILA_MAXIMA = 300
+// E um teto de TAMANHO: cada mensagem pode ter ate 64 KB (uma foto), e 300
+// delas passavam muito do maximo de um valor no armazenamento. A gravacao
+// estourava e a fila parava de vez. ~1 MB de folga sobra para o comeco de
+// uma transmissao (SDP e ICE sao poucos KB).
+const FILA_MAXIMA_CARACTERES = 1000000
 
 // Quantas credenciais a sala lembra. Havia uma por pessoa que entrou, para
 // sempre, tudo dentro de um valor só do armazenamento, que tem limite de
@@ -106,6 +111,12 @@ function votosPrecisos (eleitores) {
 function textoDaEspera (ms) {
   const minutos = Math.max(1, Math.ceil(ms / 60000))
   return `muitos códigos errados. Tente de novo em ${minutos === 1 ? '1 minuto' : minutos + ' minutos'}`
+}
+
+// O codigo vem no caminho, e um "%" quebrado ("/sala/%E0") estourava o
+// decodeURIComponent: a requisicao virava erro 500 em vez de recusa.
+function decodificar (texto) {
+  try { return decodeURIComponent(texto) } catch { return '' }
 }
 
 function limpar (texto, tamanho) {
@@ -174,7 +185,7 @@ export default {
     }
 
     // O código diferencia maiúscula de minúscula: é segredo, não apelido.
-    const codigo = limpar(decodeURIComponent(partes[1]), 60)
+    const codigo = limpar(decodificar(partes[1]), 60)
     if (!codigo) return new Response('código vazio', { status: 400 })
 
     // Limite por origem. Precisa ser por IP, e não por sala: cada código
@@ -235,7 +246,7 @@ export class Sala {
     // ("132"), que é exatamente o que o piso existe para barrar. O que era
     // sobra de verdade (a rota /quantos e o put('codigo')) já saiu.
     this.codigo = limpar(
-      decodeURIComponent(new URL(requisicao.url).pathname.split('/').filter(Boolean)[1] || ''), 60
+      decodificar(new URL(requisicao.url).pathname.split('/').filter(Boolean)[1] || ''), 60
     )
 
     return new Response(null, { status: 101, webSocket: doCliente })
@@ -259,6 +270,12 @@ export class Sala {
       msg = JSON.parse(dados)
     } catch {
       return this.enviar(ws, { tipo: 'erro', motivo: 'json inválido' })
+    }
+    // JSON valido nao e o mesmo que objeto: "null", "1" ou "[]" estouravam
+    // no msg.tipo, e o bloco de erro, lendo msg.tipo de novo, estourava
+    // outra vez, sem tratamento (achado atacando o Worker com lixo).
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.tipo !== 'string') {
+      return this.enviar(ws, { tipo: 'erro', motivo: 'mensagem inválida' })
     }
 
     // Erro tratando uma mensagem vira resposta para quem a mandou, em vez de
@@ -497,8 +514,6 @@ export class Sala {
     // entrouEm existe para o alarme: quem acabou de chegar ainda não pingou
     // nenhuma vez, e não pode ser recolhido por causa disso.
     ws.serializeAttachment({ id, nome, credencial, transmitindo, camera, identidade, entrouEm: Date.now() })
-    // Entrou: a conta de codigos errados daquele IP zera.
-    try { await this.porteiroDe(ws).acertou() } catch { /* so manutencao */ }
     const dono = await this.estado.storage.get('dono')
     const souDono = Boolean(dono && identidade === dono)
     const outroDono = souDono ? null : this.outros(ws).find((outro) => {
@@ -538,7 +553,13 @@ export class Sala {
     // Voltou o dono: a votacao que estivesse correndo perde o sentido.
     if (souDono && await this.estado.storage.get('votacao')) await this.encerrarVotacao('dono')
 
-    await this.agendarVigia()  }
+    await this.agendarVigia()
+
+    // Entrou: a conta de codigos errados daquele IP zera. POR ULTIMO, depois
+    // do 'bemvindo': chamar outro objeto deixa outras mensagens entrarem no
+    // meio, e um SDP de alguem chegaria a quem ainda nem sabe o proprio id.
+    try { await this.porteiroDe(ws).acertou() } catch { /* so manutencao */ }
+  }
 
   async conhecidos () {
     return (await this.estado.storage.get('conhecidos')) || {}
@@ -697,6 +718,7 @@ export class Sala {
     const fila = (await this.estado.storage.get(chave)) || []
     if (fila.length >= FILA_MAXIMA) return
     fila.push(msg)
+    if (JSON.stringify(fila).length > FILA_MAXIMA_CARACTERES) return
     await this.estado.storage.put(chave, fila)
   }
 

@@ -1,11 +1,7 @@
 // Configurações: a janela grande, aberta pela engrenagem da entrada e pela da
-// barra da sala. Duas abas:
-//
-// - Aparência: tema, formato da webcam dos amigos e se a inicial do nome fica
-//   sempre no card. Tudo vale na hora e fica no localStorage, porque é gosto
-//   de quem olha e só a página usa.
-// - Desempenho: se as telas são processadas pela placa de vídeo ou pelo
-//   processador, e a prioridade do LiveOn no Windows.
+// barra da sala, com uma aba por assunto (Perfil, Aparência, Telas, Áudio,
+// Mini tela, Desempenho e Debug; ver o CLAUDE.md). O que é gosto de quem olha
+// vale na hora e fica no localStorage, porque só a página usa.
 //
 // Sobre o Desempenho:
 //
@@ -653,8 +649,20 @@ function salvarTema () {
   // As imagens vao primeiro. A da sala so e guardada no modo Imagem: nos
   // outros ela nao aparece, e nao precisa ocupar espaco.
   const papelDaSalaGuardado = sala.modo === 'imagem' ? sala.papel : ''
-  if (!guardarImagemDoFundo('liveon:papel-' + lugar, papel, 'entrada')) return
-  if (!guardarImagemDoFundo('liveon:papel-sala-' + lugar, papelDaSalaGuardado, 'sala')) return
+  // O que havia antes, para devolver se algo nao couber: o papel novo
+  // gravado e o resto falhando deixava o tema antigo com a imagem nova.
+  const antes = {
+    papel: lembrar('liveon:papel-' + lugar),
+    sala: lembrar('liveon:papel-sala-' + lugar),
+    temas: lembrar('liveon:temas-pessoais')
+  }
+  const devolver = () => {
+    guardar('liveon:papel-' + lugar, antes.papel)
+    guardar('liveon:papel-sala-' + lugar, antes.sala)
+    guardar('liveon:temas-pessoais', antes.temas)
+  }
+  if (!guardarImagemDoFundo('liveon:papel-' + lugar, papel, 'entrada')) return devolver()
+  if (!guardarImagemDoFundo('liveon:papel-sala-' + lugar, papelDaSalaGuardado, 'sala')) return devolver()
 
   const lista = temasPessoais()
   lista[lugar] = {
@@ -676,6 +684,12 @@ function salvarTema () {
     }
   }
   guardarTemasPessoais(lista)
+  // guardar() engole erro: confere, senao o editor fecharia como se tivesse
+  // salvo.
+  if (lembrar('liveon:temas-pessoais') !== JSON.stringify(lista)) {
+    devolver()
+    return avisarNoFundo('entrada', 'Sem espaço para guardar o tema. Apague um tema ou use imagens menores.')
+  }
   edicaoTema = null
   temaEmEdicao = null
   aplicarTema('pessoal-' + lugar)
@@ -689,9 +703,8 @@ function cancelarEdicaoDeTema () {
   temaEmEdicao = null
   aplicarTema(temaAtual)
 }
-// Abre no Perfil, ou na aba pedida (a engrenagem da minha linha na lista de
-// pessoas abre no Audio). O clique do botao chega aqui como evento, por
-// isso o teste do texto.
+// Abre no Perfil, ou na aba pedida. O clique do botao chega aqui como
+// evento, por isso o teste do texto.
 async function abrirConfig (aba) {
   avisarFoto('')
   mostrarAbaConfig(typeof aba === 'string' ? aba : 'perfil')
@@ -717,6 +730,7 @@ async function abrirConfig (aba) {
 function fecharConfig () {
   cancelarEdicaoDeTema()
   fecharRecorte()
+  if (terminarCapturaDoAtalho) terminarCapturaDoAtalho()
   $('#config').classList.add('oculto')
 }
 

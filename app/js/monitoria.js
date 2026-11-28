@@ -65,6 +65,10 @@ async function medirParaMonitoria () {
   for (const [id, par] of pares) {
     const pessoa = participantes.get(id)
     const nome = pessoa ? pessoa.nome : id.slice(0, 8)
+    // A webcam e a tela chegam pela mesma conexao: a trilha diz qual e qual.
+    const camera = camerasRecebidas.get(id)
+    const trilhaDaCamera = camera && camera.getVideoTracks()[0]
+    const idDaCamera = trilhaDaCamera ? trilhaDaCamera.id : ''
     let stats
     try { stats = await par.pc.getStats() } catch { continue }
 
@@ -75,7 +79,7 @@ async function medirParaMonitoria () {
         if (r.availableOutgoingBitrate) add(nome, 'upload estimado (kbps)', Math.round(r.availableOutgoingBitrate / 1000))
       }
       if (r.type === 'inbound-rtp' && r.kind === 'video') {
-        const q = `${nome} recebo`
+        const q = `${nome} ${idDaCamera && r.trackIdentifier === idDaCamera ? 'webcam recebo' : 'recebo'}`
         add(q, 'resolucao', r.frameWidth ? `${r.frameWidth}x${r.frameHeight}` : '')
         add(q, 'fps', Math.round(r.framesPerSecond || 0))
         add(q, 'kbps', taxaDesde(`${id}:in:${r.id}`, r.bytesReceived || 0))
@@ -92,7 +96,9 @@ async function medirParaMonitoria () {
         add(q, 'fps', Math.round(r.framesPerSecond || 0))
         add(q, 'kbps', taxaDesde(`${id}:out:${r.id}`, r.bytesSent || 0))
         add(q, 'codec', nomeDoCodec(stats, r))
-        add(q, 'codificador', r.encoderImplementation ? r.encoderImplementation + (r.powerEfficientEncoder ? ' (placa)' : ' (processador)') : '')
+        // Sem o powerEfficient o Chromium nao disse quem codifica: nada de chute.
+        const onde = r.powerEfficientEncoder === true ? ' (placa)' : r.powerEfficientEncoder === false ? ' (processador)' : ''
+        add(q, 'codificador', r.encoderImplementation ? r.encoderImplementation + onde : '')
         add(q, 'limitado por', r.qualityLimitationReason || '')
         add(q, 'ativo', r.active === false ? 'nao' : 'sim')
       }

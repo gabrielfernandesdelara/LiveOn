@@ -127,7 +127,7 @@ function sinoElastico (c, f, t, dur, vol = 0.04) {
 }
 
 function tocarPedidoDeEntrada () {
-  tocar((c, t) => {
+  tocarSom((c, t) => {
     sinoElastico(c, 880, t, 0.7)
     sinoElastico(c, 698, t + 0.26, 0.9)
   })
@@ -146,7 +146,7 @@ function tocarPedidoDeEntrada () {
 // o mesmo som da tela (tocarAviso e tocarSaida), e amigo ficando online nao
 // tem som: as duas coisas a pedido do dono.
 
-function tocar (desenhar) {
+function tocarSom (desenhar) {
   try {
     const c = contextoDeAviso()
     desenhar(c, c.currentTime + 0.01)
@@ -203,15 +203,15 @@ function vidro (c, f, t, dur = 0.45, vol = 0.045, sobe = true) {
 // Sino: te chamaram (3 notas subindo, pede acao), pedido aceito (1 nota alta),
 // pedido de amizade (2 iguais, como bater a porta).
 function tocarConvite () {
-  tocar((c, t) => {
+  tocarSom((c, t) => {
     sinoElastico(c, 698, t, 0.5)
     sinoElastico(c, 880, t + 0.17, 0.55)
     sinoElastico(c, 1046, t + 0.34, 0.9)
   })
 }
-function tocarPedidoAceito () { tocar((c, t) => sinoElastico(c, 1318, t, 0.8, 0.035)) }
+function tocarPedidoAceito () { tocarSom((c, t) => sinoElastico(c, 1318, t, 0.8, 0.035)) }
 function tocarPedidoDeAmizade () {
-  tocar((c, t) => {
+  tocarSom((c, t) => {
     sinoElastico(c, 988, t, 0.3, 0.03)
     sinoElastico(c, 988, t + 0.13, 0.55, 0.03)
   })
@@ -220,20 +220,20 @@ function tocarPedidoDeAmizade () {
 // Madeira: votacao (2 batidas iguais), alguem tirado (3 descendo) e tiraram
 // voce (as mesmas, mais graves e lentas).
 function tocarVotacao () {
-  tocar((c, t) => {
+  tocarSom((c, t) => {
     madeira(c, 700, t)
     madeira(c, 700, t + 0.15)
   })
 }
 function tocarAlguemTirado () {
-  tocar((c, t) => {
+  tocarSom((c, t) => {
     madeira(c, 784, t, 0.055, false)
     madeira(c, 587, t + 0.11, 0.055, false)
     madeira(c, 392, t + 0.22, 0.065, false)
   })
 }
 function tocarTiraramVoce () {
-  tocar((c, t) => {
+  tocarSom((c, t) => {
     madeira(c, 523, t, 0.06, false)
     madeira(c, 392, t + 0.17, 0.06, false)
     madeira(c, 262, t + 0.34, 0.07, false)
@@ -242,18 +242,18 @@ function tocarTiraramVoce () {
 
 // Vidro: a conexao caiu (2 descendo), voltou (2 subindo), copiado (1 toque).
 function tocarConexaoCaiu () {
-  tocar((c, t) => {
+  tocarSom((c, t) => {
     vidro(c, 1318, t, 0.35, 0.04, false)
     vidro(c, 988, t + 0.18, 0.55, 0.04, false)
   })
 }
 function tocarReconectado () {
-  tocar((c, t) => {
+  tocarSom((c, t) => {
     vidro(c, 988, t, 0.35)
     vidro(c, 1318, t + 0.18, 0.55)
   })
 }
-function tocarCopiado () { tocar((c, t) => vidro(c, 1760, t, 0.12, 0.02)) }
+function tocarCopiado () { tocarSom((c, t) => vidro(c, 1760, t, 0.12, 0.02)) }
 
 function tocarEntrouNaSala () { bolha(420, 1000) }
 function tocarSaiuDaSala () { bolha(1000, 420) }
@@ -378,8 +378,8 @@ async function listarSaidas () {
   }
 }
 
-// A engrenagem da minha linha na lista de pessoas: abre as configuracoes ja
-// na aba Audio, onde a escolha mora desde a 1.6.0.
+// Abre as configuracoes ja na aba Audio, onde a escolha mora desde a 1.6.0.
+// (A engrenagem da lista de pessoas que chamava isto saiu na 2.1.0.)
 function abrirSaida () {
   abrirConfig('audio')
 }

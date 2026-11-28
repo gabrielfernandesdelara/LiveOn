@@ -93,6 +93,7 @@ function abrirSocket () {
     ultimaMensagem = Date.now()
     let msg
     try { msg = JSON.parse(evento.data) } catch { return }
+    if (!msg || typeof msg !== 'object' || typeof msg.tipo !== 'string') return
     tratar(msg)
   }
 
@@ -338,6 +339,8 @@ function tratar (msg) {
       // dela oscila e pior do que guardar uma entrada a toa. Some tudo junto
       // quando eu saio da sala.
       if (ajustesAbertos === msg.id) fecharAjustes()
+      // A confirmacao de tirar essa pessoa da sala nao tem mais a quem tirar.
+      if (remocaoAberta && remocaoAberta.id === msg.id) fecharRemocao()
       participantes.delete(msg.id)
       sincronizarGrade()
       // Um amigo a menos recebendo: o teto dos outros pode subir.
@@ -445,7 +448,10 @@ function tratar (msg) {
           mostrarRecusa(msg.motivo)
         }
       } else {
-        avisar(msg.motivo)
+        // O servidor manda em minusculo e sem ponto (worker.js): na tela vai
+        // como frase.
+        const texto = String(msg.motivo || 'O servidor recusou.')
+        avisar(texto.charAt(0).toUpperCase() + texto.slice(1) + (/[.!?]$/.test(texto) ? '' : '.'))
       }
       break
   }

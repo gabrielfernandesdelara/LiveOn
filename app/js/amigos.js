@@ -83,6 +83,7 @@ function conectarAmigos () {
     if (wsAmigos !== meu) return
     let msg
     try { msg = JSON.parse(evento.data) } catch { return }
+    if (!msg || typeof msg !== 'object' || typeof msg.tipo !== 'string') return
     tratarAmigos(msg)
   }
 
@@ -93,6 +94,11 @@ function conectarAmigos () {
     wsAmigos = null
     amigosApresentado = false
     clearInterval(batidaAmigos)
+    // O que estava esperando resposta nao vai receber: solta o botao e o
+    // pedido para entrar, senao ficavam presos em "Mandando...".
+    $('#btn-mandar-pedido').disabled = false
+    if ($('#nota-amigo').textContent === 'Mandando...') mostrarNotaDosAmigos('Sem conexão. Tente de novo em instantes.', true)
+    if (meuPedido && !meuPedido.pedido) meuPedido = null
     // Os amigos ficam na tela, mas sem saber quem esta online.
     for (const amigo of amigos.values()) { amigo.online = false; amigo.sala = null }
     desenharAmigos()
@@ -162,6 +168,12 @@ function tratarAmigos (msg) {
     case 'amigo-removido':
       amigos.delete(msg.id)
       return desenharAmigos()
+    // A lista inteira de novo (o servidor manda quando uma amizade antiga
+    // volta). Sem este caso, o amigo so aparecia depois de reconectar.
+    case 'amigos':
+      amigos.clear()
+      for (const amigo of msg.amigos || []) amigos.set(amigo.id, amigo)
+      return desenharAmigos()
     case 'pedidos':
       pedidosRecebidos = msg.recebidos || []
       pedidosEnviados = msg.enviados || []
@@ -194,6 +206,12 @@ function tratarAmigos (msg) {
       return desenharChamar()
     case 'erro':
       anotar('amigos: ' + msg.motivo)
+      // Recusa do pedido para entrar (muitos pedidos): a nota vai na sala, e
+      // nao fica "Mandando..." para sempre.
+      if (meuPedido && !meuPedido.pedido) {
+        meuPedido = { salaId: meuPedido.salaId, nota: msg.motivo }
+        return desenharLista()
+      }
       if (/espere/i.test(msg.motivo)) mostrarNotaDosAmigos(msg.motivo, true)
   }
 }
@@ -624,6 +642,9 @@ function entrarComCodigoDeAmigo (codigo) {
   clearInterval(relogioPedido)
   meuPedido = null
   fecharListaDeAmigos()
+  // Ja estou nessa sala (o convite cruzou com a minha entrada): sair e
+  // entrar de novo derrubaria a malha a toa.
+  if (meuId && sessao && sessao.codigo === codigo) return
   if (meuId) $('#btn-sair').click()
   definirModo('entrar')
   $('#campo-codigo').value = codigo
@@ -632,7 +653,7 @@ function entrarComCodigoDeAmigo (codigo) {
 
 function entradaAceita (msg) {
   tocarPedidoAceito()
-  anotar(`amigos: ${msg.por && msg.por.nome ? 'pedido aceito' : 'pedido aceito'}, entrando`)
+  anotar('amigos: pedido para entrar aceito, entrando')
   entrarComCodigoDeAmigo(msg.codigo)
 }
 

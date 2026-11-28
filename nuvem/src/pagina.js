@@ -66,7 +66,8 @@ const HTML = `<!doctype html>
 <script>
   // Mesmo alfabeto do codigo sorteado pelo app; qualquer outra coisa e link
   // quebrado, e nada vai para o liveon://.
-  var codigo = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase()
+  var codigo = ''
+  try { codigo = decodeURIComponent(location.hash.slice(1)).trim().toLowerCase() } catch (e) { codigo = '' }
   if (/^[a-z0-9]{10,60}$/.test(codigo)) {
     var destino = 'liveon://sala/' + codigo
     document.getElementById('abrir').href = destino

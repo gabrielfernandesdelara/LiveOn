@@ -35,6 +35,9 @@ const VALIDADE_PEDIDO = 60000
 
 const MAXIMO_AMIGOS = 100
 const MAXIMO_RECEBIDOS = 30
+// Pedidos de amizade esperando resposta, mandados por mim. Sem teto a lista
+// crescia para sempre (devagar, pelo limite de 10 por minuto).
+const MAXIMO_ENVIADOS = 100
 const TAMANHO_MAXIMO = 64 * 1024
 const RITMO_MAXIMO = 120
 const JANELA_RITMO = 10000
@@ -204,18 +207,18 @@ export class Pessoa extends DurableObject {
 
   async avisarAmigos (comFoto = false) {
     const dados = await this.presencaPublica(comFoto)
-    const amigos = await this.amigos()
-    const ids = Object.keys(amigos)
+    const ids = Object.keys(await this.amigos())
     const respostas = await Promise.allSettled(ids.map((id) => this.stub(id).avisoDeAmigo(dados.id, dados)))
-    // false explicito = ele desfez a amizade e eu nao fiquei sabendo.
-    let mudou = false
-    respostas.forEach((r, i) => {
-      if (r.status === 'fulfilled' && r.value === false) {
-        delete amigos[ids[i]]
-        mudou = true
-      }
-    })
-    if (mudou) await this.ctx.storage.put('amigos', amigos)
+    // false explicito = ele desfez a amizade e eu nao fiquei sabendo. A lista
+    // e RELIDA aqui: enquanto os outros respondiam, outras chamadas podiam
+    // ter mexido nela (um amigo novo aceito no meio), e gravar a copia de
+    // antes apagaria a mudanca.
+    const desfeitos = ids.filter((_, i) => respostas[i].status === 'fulfilled' && respostas[i].value === false)
+    if (desfeitos.length) {
+      const amigos = await this.amigos()
+      for (const id of desfeitos) delete amigos[id]
+      await this.ctx.storage.put('amigos', amigos)
+    }
   }
 
   async marcarOnline (online) {
@@ -229,16 +232,17 @@ export class Pessoa extends DurableObject {
   // A lista inteira, perguntando a cada amigo como ele esta agora.
   async listaDeAmigos () {
     const meuId = await this.meuId()
-    const amigos = await this.amigos()
-    const ids = Object.keys(amigos)
+    const ids = Object.keys(await this.amigos())
     const respostas = await Promise.allSettled(ids.map((id) => this.stub(id).presencaPara(meuId)))
+    // Relida DEPOIS das respostas (ver avisarAmigos): quem foi aceito ou
+    // desfeito enquanto isso nao pode se perder na gravacao.
+    const amigos = await this.amigos()
     const lista = []
-    let mudou = false
     respostas.forEach((r, i) => {
       const id = ids[i]
+      if (!amigos[id]) return
       if (r.status === 'fulfilled' && r.value === null) {
         delete amigos[id]
-        mudou = true
         return
       }
       if (r.status === 'fulfilled') {
@@ -280,10 +284,13 @@ export class Pessoa extends DurableObject {
       if (!chave || chave === perfil.chave) continue
       if (await this.etiqueta(chave).reivindicar(meuId)) {
         if (perfil.chave) await this.etiqueta(perfil.chave).liberar(meuId)
-        perfil.nome = limpar(nome, 32)
-        perfil.tag = tag
-        perfil.chave = chave
-        await this.ctx.storage.put('perfil', perfil)
+        // Relido depois de esperar os codigos: uma foto trocada enquanto isso
+        // nao pode ser apagada pela copia de antes.
+        const atual = await this.perfil()
+        atual.nome = limpar(nome, 32)
+        atual.tag = tag
+        atual.chave = chave
+        await this.ctx.storage.put('perfil', atual)
         return true
       }
     }
@@ -303,6 +310,12 @@ export class Pessoa extends DurableObject {
 
     let msg
     try { msg = JSON.parse(dados) } catch { return this.enviar(ws, { tipo: 'erro', motivo: 'json inválido' }) }
+    // JSON valido nao e o mesmo que objeto: "null", "1" ou "[]" estouravam
+    // no msg.tipo, e o bloco de erro, lendo msg.tipo de novo, estourava
+    // outra vez, sem tratamento (achado atacando o Worker com lixo).
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.tipo !== 'string') {
+      return this.enviar(ws, { tipo: 'erro', motivo: 'mensagem inválida' })
+    }
 
     try {
       return await this.despachar(ws, msg)
@@ -434,19 +447,25 @@ export class Pessoa extends DurableObject {
       return responder(true)
     }
 
+    if (Object.keys(await this.enviados()).length >= MAXIMO_ENVIADOS) {
+      return responder(false, 'Você tem pedidos demais esperando. Cancele alguns.')
+    }
+
     const eu = await this.perfil()
     const resposta = await this.stub(alvo).receberPedido({ id: meuId, nome: eu.nome, tag: eu.tag })
     if (resposta === 'cheio') return responder(false, 'Essa pessoa tem pedidos demais esperando.')
     if (resposta === 'amigos') {
       // Ele ainda me tinha como amigo (eu tinha perdido a lista): volta.
-      amigos[alvo] = { nome: '', tag: '' }
-      await this.ctx.storage.put('amigos', amigos)
+      const atuais = await this.amigos()
+      atuais[alvo] = { nome: '', tag: '' }
+      await this.ctx.storage.put('amigos', atuais)
       this.paraMim({ tipo: 'amigos', amigos: await this.listaDeAmigos() })
       return responder(true)
     }
 
-    const enviados = await this.enviados()
+    // Lida DEPOIS de esperar o outro, pelo mesmo motivo de avisarAmigos.
     const dele = await this.stub(alvo).presencaPara(null)
+    const enviados = await this.enviados()
     enviados[alvo] = { nome: dele ? dele.nome : '', tag: dele ? dele.tag : '', em: Date.now() }
     await this.ctx.storage.put('enviados', enviados)
     responder(true)

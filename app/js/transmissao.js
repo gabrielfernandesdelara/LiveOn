@@ -297,6 +297,21 @@ function avisarFalhaDeCaptura (fonteId, erro) {
   return avisar('Não consegui capturar essa fonte: ' + (erro && erro.message))
 }
 
+let capturasNestaExecucao = 0
+
+// Captura que abriu tarde demais: fecha tudo o que ela abriu.
+function descartarCaptura (captura, motivo) {
+  anotar(`captura descartada: ${motivo}`)
+  for (const trilha of captura.stream.getTracks()) trilha.stop()
+  if (captura.sdr) {
+    try {
+      window.ponte.sdrParar()
+      window.ponte.aoQuadroSdr(null)
+    } catch { /* sem ponte */ }
+  }
+  pararTrilhaDeProcesso().catch(() => { /* ja parada */ })
+}
+
 async function iniciarTransmissao (fonteId, configAudio) {
   const qualidade = configuracaoDeVideo()
   qualidadeLocal = { altura: qualidade.altura, fps: qualidade.fps }
@@ -309,10 +324,20 @@ async function iniciarTransmissao (fonteId, configAudio) {
     return avisarFalhaDeCaptura(fonteId, erro)
   }
 
+  // A captura leva um tempo para abrir. Saiu da sala enquanto isso: ela nao
+  // pode ficar ligada solta, sem botao para parar.
+  if (!meuId) return descartarCaptura(captura, 'saiu da sala antes de a captura abrir')
+
   streamLocal = captura.stream
   sdrAtual = captura.sdr
   fonteAtual = fonteId
   audioAtual = configAudio
+  // O id da fonte (o numero da janela, nunca o titulo) e quantas capturas
+  // esta execucao ja abriu: o registro de uma amiga (26/11/2026) tinha uma
+  // janela que funcionou e depois so falhas, e nao dava para saber qual tinha
+  // funcionado nem quando ela parou.
+  capturasNestaExecucao++
+  anotar(`transmissao comecou: ${fonteId} (captura ${capturasNestaExecucao} desta execucao)`)
 
   for (const id of participantes.keys()) adicionarTrilhas(garantirPar(id))
   // H.264: confere, com a captura rodando, se ele saiu mesmo pela placa.
@@ -381,13 +406,24 @@ async function ajustarTransmissao (fonteId, configAudio, opcoes = {}) {
     captura = await capturarFonte(fonteId, configAudio, qualidade, sdr)
   } catch (erro) {
     anotarFalhaDeCaptura('troca de fonte', fonteId, configAudio, erro)
+    // A captura convertida ja tinha sido parada para a nova abrir: o que esta
+    // no ar e uma trilha sem imagem, e os amigos ficariam vendo a tela
+    // congelada. Melhor parar e dizer.
+    if (eraSdr) {
+      pararTransmissao()
+      return avisar('Não consegui trocar a fonte, e a transmissão parou. Comece de novo.')
+    }
     return avisarFalhaDeCaptura(fonteId, erro)
   }
+
+  // Parou de transmitir (ou saiu da sala) enquanto a captura nova abria.
+  if (streamLocal !== antigo) return descartarCaptura(captura, 'a transmissao parou antes de a troca abrir')
 
   streamLocal = captura.stream
   sdrAtual = captura.sdr
   fonteAtual = fonteId
   audioAtual = configAudio
+  capturasNestaExecucao++
 
   for (const par of pares.values()) await trocarTrilhas(par)
 
@@ -404,7 +440,7 @@ async function ajustarTransmissao (fonteId, configAudio, opcoes = {}) {
   }
 
   reaplicarQualidade()
-  anotar(`fonte trocada no ar: ${qualidade.altura}p @ ${qualidade.fps}fps`)
+  anotar(`fonte trocada no ar: ${fonteId}, ${qualidade.altura}p @ ${qualidade.fps}fps`)
   sincronizarGrade()
 }
 
@@ -452,6 +488,7 @@ function reaplicarQualidade () {
 
 function pararTransmissao () {
   if (!streamLocal) return
+  anotar(`transmissao parada: ${fonteAtual}`)
 
   for (const par of pares.values()) {
     for (const remetente of par.remetentes) {

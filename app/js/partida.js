@@ -24,7 +24,8 @@
   prepararCodificador().catch(() => {})
 
   // Estado atual da atualizacao (pode ja ter sido baixada antes da tela abrir).
-  mostrarAtualizacao(await window.ponte.estadoAtualizacao())
+  // Envelopado pelo mesmo motivo do ambiente, logo abaixo.
+  try { mostrarAtualizacao(await window.ponte.estadoAtualizacao()) } catch (erro) { anotar('nao consegui ler a atualizacao: ' + erro.message) }
 
   // Envelopado porque um await que rejeita aqui mata TODO o resto da abertura
   // sem erro visivel, foi o que aconteceu quando o handler 'ambiente' nao

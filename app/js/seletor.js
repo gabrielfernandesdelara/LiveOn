@@ -245,14 +245,16 @@ function configuracaoDeVideo () {
 // Em malha quem transmite manda uma copia para cada amigo, entao o upload
 // multiplica. Sem ninguem para assistir, nao ha o que avisar.
 function atualizarAvisoDeQualidade () {
-  const { bitrate } = configuracaoDeVideo()
+  const { altura, fps } = configuracaoDeVideo()
   const amigos = participantes.size
   if (amigos === 0) {
     $('#aviso-qualidade').textContent = ''
     return
   }
 
-  const total = (bitrate * amigos / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })
+  // O teto de cada um com esta plateia (e o limite de banda, se houver): a
+  // conta com o teto de UM amigo so exagerava o total.
+  const total = (bitrateDe(altura, fps, amigos) * amigos / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })
   $('#aviso-qualidade').textContent =
     `Para ${amigos} ${amigos === 1 ? 'amigo' : 'amigos'}: ~${total} Mbps de upload. Cada um recebe a própria cópia.`
 }
@@ -263,13 +265,13 @@ async function configuracaoDeAudio () {
 
   if (modoAudio === 'so-janela') {
     const pid = await window.ponte.audioPidDaFonte(fonteEscolhida)
-    if (!pid) throw new Error('nao consegui descobrir o processo dono desta janela')
+    if (!pid) throw new Error('Não consegui descobrir o programa dono desta janela.')
     return { modo: 'so-janela', pid }
   }
 
   if (modoAudio === 'sem-app') {
     const pid = Number($('#campo-audio-app').value)
-    if (!pid) throw new Error('escolha qual aplicativo excluir')
+    if (!pid) throw new Error('Escolha qual aplicativo excluir.')
     return { modo: 'sem-app', pid }
   }
 
@@ -291,6 +293,13 @@ function desenharFontes () {
   const alvo = $('#fontes')
   const lista = fontesCarregadas.filter((f) => (abaAtual === 'tela' ? f.tela : !f.tela))
   alvo.textContent = ''
+
+  // A escolha que nao esta nesta aba nao vale: trocar de Telas para Janelas
+  // deixava a tela escolhida, invisivel, e o Transmitir mandava ela.
+  if (fonteEscolhida && !lista.some((f) => f.id === fonteEscolhida)) {
+    fonteEscolhida = null
+    $('#btn-confirmar-fonte').disabled = true
+  }
 
   if (lista.length === 0) {
     alvo.textContent = 'Nada encontrado aqui.'
