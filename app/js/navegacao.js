@@ -82,6 +82,7 @@ function voltarParaEntrada () {
   // ficaria por cima da tela de entrada.
   while (fecharDialogo()) { /* fecha um por vez */ }
   fecharPessoas()
+  fecharAmigosDaSala()
   clearTimeout(temporizadorReconexao)
   pararVigia()
   sessao = null

@@ -41,6 +41,33 @@ function definirCodificador (modo) {
   guardar('liveon:codificador', modoCodificador)
   anotar(`codificador escolhido: ${modoCodificador}`)
   mostrarCodificador()
+  reaplicarCodificador()
+}
+
+// Vale na hora (2.1.1, pedido do dono: o que muda no Desempenho muda na
+// hora). Com a tela ou a webcam no ar, poe o codec novo na frente e
+// renegocia cada par. O setCodecPreferences sozinho NAO dispara o
+// negotiationneeded, por isso a oferta e feita aqui, pelo mesmo caminho
+// (perfect negotiation, receberSdp). A imagem segue no codec antigo ate a
+// resposta chegar: nada cai.
+function reaplicarCodificador () {
+  for (const par of pares.values()) {
+    const remetentes = [par.remetentePorTipo.get('video'), par.remetenteCamera].filter(Boolean)
+    if (!remetentes.length) continue
+    for (const remetente of remetentes) preferirCodec(par, remetente)
+    renegociar(par)
+  }
+  if (streamLocal) conferirCodificadorNoAr()
+}
+
+// So oferta com a negociacao parada; no meio de uma, tenta de novo logo.
+function renegociar (par, tentativa = 0) {
+  if (par.pc.signalingState === 'closed' || ![...pares.values()].includes(par)) return
+  if (par.pc.signalingState !== 'stable' || par.fazendoOferta) {
+    if (tentativa < 20) setTimeout(() => renegociar(par, tentativa + 1), 250)
+    return
+  }
+  par.pc.onnegotiationneeded()
 }
 
 // A placa e a versao do Chromium (no userAgent): trocou uma das duas, o
@@ -159,5 +186,5 @@ function mostrarCodificador () {
   else if (conferido) texto = 'Automático: VP8. Aqui o H.264 saiu pelo processador.'
   else if (placaProvavelmenteCodifica()) texto = 'Automático: H.264 na placa de vídeo. Confere na primeira transmissão.'
   else texto = 'Automático: VP8.'
-  nota.textContent = texto + ' Muda na próxima transmissão.'
+  nota.textContent = texto
 }

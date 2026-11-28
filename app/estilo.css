@@ -2423,8 +2423,14 @@ button.remover-amigo.confirmar { width: auto; padding: 0 8px; font-size: 12px; c
 .codigo-amigo-perfil { display: flex; align-items: center; gap: 10px; }
 .codigo-amigo-perfil .meu-codigo { flex: 0 1 auto; font-size: 15px; }
 
-/* Na sala, embaixo da lista de quem esta nela. */
-.chamar-amigos { border-top: 1px solid var(--borda); padding: 4px 6px 6px; max-height: 220px; overflow: auto; }
+/* Na sala (2.1.1): o botao de amigos na barra e o pop-over com a lista. */
+.ancora-amigos-sala { position: relative; }
+#btn-amigos-sala { position: relative; }
+#btn-amigos-sala[aria-expanded="true"] { background: var(--painel-hover); }
+#btn-amigos-sala .selo-pedidos { position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; font-size: 10px; padding: 0 4px; }
+#amigos-sala { width: 320px; max-height: min(560px, 75vh); }
+#amigos-sala .topo-popover button.botao-icone { width: 30px; height: 30px; padding: 0; color: var(--realce); }
+html:not(.sem-animacoes) #amigos-sala:not(.oculto) { transform-origin: top right; animation: cresce-do-canto .18s cubic-bezier(.2, .8, .2, 1); }
 
 /* Avisos: pedido para entrar, convite e pedido de amizade. Embaixo no meio,
    por cima de tudo, um embaixo do outro. */

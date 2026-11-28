@@ -14,13 +14,42 @@
 // STUN. E gratis e sem limite. Entrou na 1.5.8 por dois primos que so viam a
 // tela de quem tinha roteador aberto, e que conseguiam assistir se entrassem
 // por outro wifi e voltassem para o deles depois (20/11/2026).
-const ICE = {
-  iceServers: [
-    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-    { urls: 'stun:stun.cloudflare.com:3478' }
-    // { urls: 'turn:SEU-SERVIDOR:3478', username: 'usuario', credential: 'senha' }
-  ],
-  bundlePolicy: 'max-bundle'
+//
+// Desde a 2.1.1 (pedido do dono) a pessoa escolhe, na aba Desempenho: um
+// servidor so, ou o automatico. Todos foram testados respondendo (candidato
+// srflx) em 28/11/2026; o da Mozilla e o da Ekiga nao responderam e ficaram
+// de fora. O da Nextcloud e o unico na porta 443, a mesma do HTTPS: passa
+// por roteador que barra porta incomum.
+const SERVIDORES_STUN = {
+  cloudflare: { nome: 'Cloudflare', urls: ['stun:stun.cloudflare.com:3478'] },
+  google: { nome: 'Google', urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  twilio: { nome: 'Twilio', urls: ['stun:global.stun.twilio.com:3478'] },
+  nextcloud: { nome: 'Nextcloud (porta 443)', urls: ['stun:stun.nextcloud.com:443'] },
+  sipgate: { nome: 'Sipgate', urls: ['stun:stun.sipgate.net:3478'] },
+  blackberry: { nome: 'BlackBerry', urls: ['stun:stun.voip.blackberry.com:3478'] }
+}
+
+// O automatico usa quatro juntos, de donos e portas diferentes, e o WebRTC
+// fica com o que responder. Quatro e nao todos: com cinco ou mais o Chromium
+// avisa que a busca de caminho fica lenta.
+const STUN_AUTOMATICO = [
+  'stun:stun.cloudflare.com:3478',
+  'stun:stun1.l.google.com:19302',
+  'stun:global.stun.twilio.com:3478',
+  'stun:stun.nextcloud.com:443'
+]
+
+function stunEscolhido () {
+  const valor = typeof lembrar === 'function' ? lembrar('liveon:stun') : ''
+  return SERVIDORES_STUN[valor] ? valor : 'auto'
+}
+
+// A configuracao de cada conexao nova (malha.js). O TURN, se um dia houver,
+// entra aqui: { urls: 'turn:SEU-SERVIDOR:3478', username, credential }.
+function iceDaVez () {
+  const escolha = stunEscolhido()
+  const urls = escolha === 'auto' ? STUN_AUTOMATICO : SERVIDORES_STUN[escolha].urls
+  return { iceServers: [{ urls }], bundlePolicy: 'max-bundle' }
 }
 
 // Teto por par, a 30 fps. Em malha, quem transmite manda uma copia para CADA

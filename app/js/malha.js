@@ -6,7 +6,7 @@
 function garantirPar (id) {
   if (pares.has(id)) return pares.get(id)
 
-  const pc = new RTCPeerConnection(ICE)
+  const pc = new RTCPeerConnection(iceDaVez())
   const par = {
     pc,
     // Desempate da perfect negotiation: em malha os dois lados podem ofertar ao

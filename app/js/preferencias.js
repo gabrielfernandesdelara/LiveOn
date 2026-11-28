@@ -85,6 +85,37 @@ function mostrarBanda () {
   $('#nota-banda').textContent = fixa ? 'A banda escolhida é o limite apenas.' : ''
 }
 
+// Servidor STUN (aba Desempenho, 2.1.1): um so, ou o automatico. Vale na
+// hora: toda conexao passa a usar o novo (setConfiguration), e a que ainda
+// NAO conectou (ou caiu) procura caminho de novo com ele (restartIce). A que
+// ja esta conectada fica como esta: o STUN so serve para achar o caminho, e
+// reiniciar a busca nela so arriscaria um soluco na imagem.
+function definirStun (valor) {
+  guardar('liveon:stun', SERVIDORES_STUN[valor] ? valor : 'auto')
+  const ice = iceDaVez()
+  for (const par of pares.values()) {
+    try { par.pc.setConfiguration({ ...par.pc.getConfiguration(), iceServers: ice.iceServers }) } catch { continue }
+    if (!['connected', 'closed'].includes(par.pc.connectionState)) {
+      try { par.pc.restartIce() } catch { /* fica a busca de antes */ }
+    }
+  }
+  anotar(`servidor STUN: ${stunEscolhido() === 'auto' ? 'automatico' : SERVIDORES_STUN[stunEscolhido()].nome}`)
+  mostrarStun()
+}
+
+function mostrarStun () {
+  const campo = $('#campo-stun')
+  if (campo.options.length === 1) {
+    for (const [valor, s] of Object.entries(SERVIDORES_STUN)) {
+      const opcao = document.createElement('option')
+      opcao.value = valor
+      opcao.textContent = s.nome
+      campo.appendChild(opcao)
+    }
+  }
+  campo.value = stunEscolhido()
+}
+
 // A troca de tema esmaece de um para o outro (animacoes.js).
 function escolherTema (tema) {
   trocarTemaSuave(() => {
@@ -134,6 +165,7 @@ function mostrarAbaConfig (aba) {
   if (aba === 'desempenho') {
     lerInfoDaPlaca().then(mostrarCodificador)
     mostrarBanda()
+    mostrarStun()
   }
   mostrarSecaoConfig(aba, aba)
 }

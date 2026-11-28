@@ -121,6 +121,31 @@
     <span class="pilula oculto" id="rotulo-conexao"></span>
     <span class="cresce"></span>
 
+    <!-- Amigos dentro da sala (2.1.1, amigos.js): a lista inteira, com
+         Chamar para quem nao esta aqui, os pedidos e o adicionar. -->
+    <div class="ancora-amigos-sala">
+      <button id="btn-amigos-sala" class="botao-icone" title="Amigos" aria-expanded="false" aria-controls="amigos-sala"><span data-icone="amigos" data-tamanho="16"></span><span id="selo-amigos-sala" class="selo-pedidos oculto"></span></button>
+      <div id="amigos-sala" class="popover oculto">
+        <div class="topo-popover">
+          <span class="titulo-popover">Amigos</span>
+          <span id="total-online-sala" class="total"></span>
+          <span class="cresce"></span>
+          <button id="btn-adicionar-amigo-sala" class="botao-icone" title="Adicionar amigo"><span data-icone="adicionarAmigo" data-tamanho="16"></span></button>
+        </div>
+        <div id="adicionar-amigo-sala" class="adicionar-amigo oculto">
+          <input id="campo-amigo-sala" type="text" maxlength="44" placeholder="Código do amigo, como Ana#1234" aria-label="Código de amigo" spellcheck="false">
+          <button id="btn-mandar-pedido-sala" class="principal">Mandar pedido</button>
+          <p id="nota-amigo-sala" class="nota-dialogo"></p>
+        </div>
+        <div id="corpo-amigos-sala" class="corpo-amigos"></div>
+        <div class="rodape-amigos">
+          <span class="rotulo-meu-codigo">Seu código</span>
+          <span id="meu-codigo-amigo-sala" class="meu-codigo"></span>
+          <button id="btn-copiar-amigo-sala" class="botao-icone" title="Copiar seu código de amigo"><span data-icone="copiar" data-tamanho="14"></span></button>
+        </div>
+      </div>
+    </div>
+
     <!-- Quem esta na sala: avatares empilhados no botao, a lista inteira no
          pop-over. Substitui a lista lateral fixa. -->
     <div class="ancora-pessoas">
@@ -136,11 +161,6 @@
           <span id="pop-no-ar" class="resumo-no-ar oculto"><span class="ponto"></span><span id="pop-no-ar-texto"></span></span>
         </div>
         <div id="lista-pessoas"></div>
-        <!-- Amigos online fora desta sala, para chamar (amigos.js). -->
-        <div id="chamar-amigos" class="chamar-amigos oculto">
-          <div class="secao-amigos">Chamar amigos</div>
-          <div id="lista-chamar"></div>
-        </div>
         <div class="rodape-popover" id="rotulo-versao"></div>
       </div>
     </div>
@@ -819,7 +839,7 @@
         <div class="grupo-config linha-opcao">
           <div>
             <div class="titulo-grupo">Aceleração</div>
-            <p class="descricao-opcao">Quem desenha o LiveOn e as telas. Se o PC travar com o LiveOn aberto, teste o processador.</p>
+            <p class="descricao-opcao">Quem desenha o LiveOn e as telas. Se o PC travar com o LiveOn aberto, teste o processador. Trocar pede reiniciar o LiveOn.</p>
             <p id="config-nota" class="nota-dialogo"></p>
             <button id="btn-reiniciar" class="principal oculto">Reiniciar agora</button>
           </div>
@@ -865,6 +885,20 @@
               <option value="30">Até 30 Mbps</option>
               <option value="40">Até 40 Mbps</option>
               <option value="50">Até 50 Mbps</option>
+            </select>
+          </span>
+        </div>
+
+        <!-- Servidor STUN (2.1.1, configuracao.js): um so ou o automatico, com
+             quatro juntos. As opcoes sao postas pelo mostrarStun(). -->
+        <div class="grupo-config linha-opcao">
+          <div>
+            <div class="titulo-grupo">Servidor de conexão</div>
+            <p class="descricao-opcao">Ajuda o seu PC e o dos amigos a se acharem pela internet. No automático, o LiveOn usa vários e fica com o que responder. Troque se alguém não consegue ver a sua tela: quem ainda não conectou tenta de novo na hora.</p>
+          </div>
+          <span class="caixa-select">
+            <select id="campo-stun" aria-label="Servidor de conexão">
+              <option value="auto">Automático</option>
             </select>
           </span>
         </div>

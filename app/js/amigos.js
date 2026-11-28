@@ -96,8 +96,10 @@ function conectarAmigos () {
     clearInterval(batidaAmigos)
     // O que estava esperando resposta nao vai receber: solta o botao e o
     // pedido para entrar, senao ficavam presos em "Mandando...".
-    $('#btn-mandar-pedido').disabled = false
-    if ($('#nota-amigo').textContent === 'Mandando...') mostrarNotaDosAmigos('Sem conexão. Tente de novo em instantes.', true)
+    for (const [onde, f] of Object.entries(FORMULARIOS_DE_AMIGO)) {
+      $(f.botao).disabled = false
+      if ($(f.nota).textContent === 'Mandando...') mostrarNotaDosAmigos('Sem conexão. Tente de novo em instantes.', true, onde)
+    }
     if (meuPedido && !meuPedido.pedido) meuPedido = null
     // Os amigos ficam na tela, mas sem saber quem esta online.
     for (const amigo of amigos.values()) { amigo.online = false; amigo.sala = null }
@@ -412,18 +414,7 @@ function desenharLista () {
   }
 
   // Pedidos de amizade esperando resposta.
-  if (pedidosRecebidos.length) {
-    corpo.appendChild(tituloDeSecao('Pedidos de amizade'))
-    for (const pedido of pedidosRecebidos) {
-      const linha = linhaDeAmigo({ ...pedido, online: true }, pedido.tag)
-      linha.classList.add('pedido')
-      linha.append(
-        botaoPequeno('Recusar', () => enviarAmigos({ tipo: 'responder-amizade', id: pedido.id, aceitar: false })),
-        botaoPequeno('Aceitar', () => enviarAmigos({ tipo: 'responder-amizade', id: pedido.id, aceitar: true }), 'principal')
-      )
-      corpo.appendChild(linha)
-    }
-  }
+  secaoDePedidos(corpo)
 
   // Numa sala: agrupados por sala. Um pedido vai para todos os amigos que
   // estao nela, e o primeiro que aceitar manda o codigo.
@@ -499,22 +490,98 @@ function desenharLista () {
   }
 }
 
-// Na sala, dentro da lista de pessoas: amigos online que nao estao aqui.
+// Os pedidos de amizade, com Recusar e Aceitar: iguais na entrada e na sala.
+function secaoDePedidos (corpo) {
+  if (!pedidosRecebidos.length) return
+  corpo.appendChild(tituloDeSecao('Pedidos de amizade'))
+  for (const pedido of pedidosRecebidos) {
+    const linha = linhaDeAmigo({ ...pedido, online: true }, pedido.tag)
+    linha.classList.add('pedido')
+    linha.append(
+      botaoPequeno('Recusar', () => enviarAmigos({ tipo: 'responder-amizade', id: pedido.id, aceitar: false })),
+      botaoPequeno('Aceitar', () => enviarAmigos({ tipo: 'responder-amizade', id: pedido.id, aceitar: true }), 'principal')
+    )
+    corpo.appendChild(linha)
+  }
+}
+
+// Dentro da sala (2.1.1, pedido do dono): a lista inteira, pelo botao de
+// amigos na barra. Online e em outra sala, com Chamar; quem ja esta aqui;
+// offline; e os pedidos. O nome continua desenharChamar porque e chamado de
+// varios lugares desde antes.
 function desenharChamar () {
-  const caixa = $('#chamar-amigos')
-  if (!caixa) return
-  const alvo = $('#lista-chamar')
-  alvo.textContent = ''
-  const fora = meuId ? amigosEmOrdem().filter((a) => a.online && (!a.sala || a.sala.id !== salaAtualResumo)) : []
-  caixa.classList.toggle('oculto', fora.length === 0)
-  for (const amigo of fora) {
-    const linha = linhaDeAmigo(amigo, amigo.sala ? amigo.sala.rotulo : 'Online')
+  const corpo = $('#corpo-amigos-sala')
+  if (!corpo) return
+  corpo.textContent = ''
+  $('#meu-codigo-amigo-sala').textContent = euAmigo.tag || '...'
+  const lista = amigosEmOrdem()
+  const online = lista.filter((a) => a.online).length
+  $('#total-online-sala').textContent = online ? `${online} online` : ''
+  const selo = $('#selo-amigos-sala')
+  selo.textContent = String(pedidosRecebidos.length)
+  selo.classList.toggle('oculto', pedidosRecebidos.length === 0)
+
+  if (!amigosApresentado && !amigos.size) {
+    const vazio = document.createElement('p')
+    vazio.className = 'vazio-amigos'
+    vazio.textContent = navigator.onLine ? 'Conectando...' : 'Sem internet.'
+    corpo.appendChild(vazio)
+    return
+  }
+
+  secaoDePedidos(corpo)
+
+  const botaoChamar = (amigo) => {
     const chamado = (chamados.get(amigo.id) || 0) > Date.now()
     const botao = botaoPequeno(chamado ? 'Chamado' : 'Chamar', () => chamarAmigo(amigo.id), chamado ? '' : 'principal')
-    botao.disabled = chamado
-    linha.appendChild(botao)
-    alvo.appendChild(linha)
+    botao.disabled = chamado || !meuId
+    botao.title = chamado ? 'O convite já foi' : 'Chamar para esta sala'
+    return botao
   }
+
+  const aqui = lista.filter((a) => a.sala && a.sala.id === salaAtualResumo)
+  const fora = lista.filter((a) => a.online && !(a.sala && a.sala.id === salaAtualResumo))
+  const offline = lista.filter((a) => !a.online)
+
+  if (fora.length) corpo.appendChild(tituloDeSecao('Para chamar'))
+  for (const amigo of fora) {
+    const linha = linhaDeAmigo(amigo, amigo.sala ? `Em ${amigo.sala.rotulo}` : 'Online')
+    linha.appendChild(botaoChamar(amigo))
+    corpo.appendChild(linha)
+  }
+
+  if (aqui.length) corpo.appendChild(tituloDeSecao('Nesta sala'))
+  for (const amigo of aqui) corpo.appendChild(linhaDeAmigo(amigo, 'Aqui com você'))
+
+  if (offline.length) corpo.appendChild(tituloDeSecao('Offline'))
+  for (const amigo of offline) {
+    const linha = linhaDeAmigo(amigo, amigo.tag)
+    linha.appendChild(botaoRemover(amigo))
+    corpo.appendChild(linha)
+  }
+
+  if (!lista.length && !pedidosRecebidos.length) {
+    const vazio = document.createElement('p')
+    vazio.className = 'vazio-amigos'
+    vazio.textContent = 'Nenhum amigo ainda. Mande o seu código para alguém, ou adicione o de um amigo.'
+    corpo.appendChild(vazio)
+  }
+}
+
+function amigosDaSalaAbertos () {
+  return !$('#amigos-sala').classList.contains('oculto')
+}
+
+function abrirAmigosDaSala () {
+  $('#amigos-sala').classList.remove('oculto')
+  $('#btn-amigos-sala').setAttribute('aria-expanded', 'true')
+  desenharChamar()
+}
+
+function fecharAmigosDaSala () {
+  $('#amigos-sala').classList.add('oculto')
+  $('#btn-amigos-sala').setAttribute('aria-expanded', 'false')
+  $('#adicionar-amigo-sala').classList.add('oculto')
 }
 
 function desenharCodigoNoPerfil () {
@@ -548,15 +615,23 @@ function mostrarAdicionar (codigo = '') {
   $('#adicionar-amigo').classList.remove('oculto')
   const campo = $('#campo-amigo')
   if (codigo) campo.value = codigo
-  mostrarNotaDosAmigos('')
+  mostrarNotaDosAmigos('', false, 'entrada')
   campo.focus()
 }
 
-function mostrarNotaDosAmigos (texto, alerta = false) {
-  const nota = $('#nota-amigo')
+function mostrarNotaDosAmigos (texto, alerta = false, onde = formularioDoPedido) {
+  const nota = $(FORMULARIOS_DE_AMIGO[onde].nota)
   nota.textContent = texto
   nota.classList.toggle('alerta', alerta)
 }
+
+// O formulario de adicionar existe em dois lugares (a lista da entrada e a
+// da sala). A resposta do servidor volta para o que mandou.
+const FORMULARIOS_DE_AMIGO = {
+  entrada: { campo: '#campo-amigo', botao: '#btn-mandar-pedido', nota: '#nota-amigo', caixa: '#adicionar-amigo' },
+  sala: { campo: '#campo-amigo-sala', botao: '#btn-mandar-pedido-sala', nota: '#nota-amigo-sala', caixa: '#adicionar-amigo-sala' }
+}
+let formularioDoPedido = 'entrada'
 
 // Nome#1234, do jeito que a pessoa colou ou digitou.
 const CODIGO_DE_AMIGO = /^\s*(.{1,32}?)\s*#\s*(\d{4})\s*$/
@@ -566,18 +641,21 @@ function codigoDeAmigo (texto) {
   return achado ? `${achado[1].trim()}#${achado[2]}` : ''
 }
 
-function mandarPedidoDeAmizade () {
-  const tag = codigoDeAmigo($('#campo-amigo').value)
+function mandarPedidoDeAmizade (onde = 'entrada') {
+  formularioDoPedido = onde
+  const f = FORMULARIOS_DE_AMIGO[onde]
+  const tag = codigoDeAmigo($(f.campo).value)
   if (!tag) return mostrarNotaDosAmigos('Escreva o código do amigo, como Ana#1234.', true)
   if (!enviarAmigos({ tipo: 'adicionar', tag })) return mostrarNotaDosAmigos('Sem conexão. Tente de novo em instantes.', true)
-  $('#btn-mandar-pedido').disabled = true
+  $(f.botao).disabled = true
   mostrarNotaDosAmigos('Mandando...')
 }
 
 function respostaDoAdicionar (msg) {
-  $('#btn-mandar-pedido').disabled = false
+  const f = FORMULARIOS_DE_AMIGO[formularioDoPedido]
+  $(f.botao).disabled = false
   if (!msg.ok) return mostrarNotaDosAmigos(msg.motivo || 'Não deu certo.', true)
-  $('#campo-amigo').value = ''
+  $(f.campo).value = ''
   mostrarNotaDosAmigos('Pedido enviado. Falta a outra pessoa aceitar.')
 }
 
@@ -793,11 +871,32 @@ $('#btn-adicionar-amigo').onclick = () => {
   if ($('#adicionar-amigo').classList.contains('oculto')) mostrarAdicionar()
   else $('#adicionar-amigo').classList.add('oculto')
 }
-$('#btn-mandar-pedido').onclick = mandarPedidoDeAmizade
+$('#btn-mandar-pedido').onclick = () => mandarPedidoDeAmizade('entrada')
 $('#campo-amigo').addEventListener('keydown', (evento) => {
-  if (evento.key === 'Enter') mandarPedidoDeAmizade()
+  if (evento.key === 'Enter') mandarPedidoDeAmizade('entrada')
 })
-$('#campo-amigo').addEventListener('input', () => mostrarNotaDosAmigos(''))
+$('#campo-amigo').addEventListener('input', () => mostrarNotaDosAmigos('', false, 'entrada'))
+
+// Os amigos dentro da sala.
+$('#btn-amigos-sala').onclick = (evento) => {
+  evento.stopPropagation()
+  if (amigosDaSalaAbertos()) fecharAmigosDaSala()
+  else abrirAmigosDaSala()
+}
+$('#btn-adicionar-amigo-sala').onclick = () => {
+  const caixa = $('#adicionar-amigo-sala')
+  caixa.classList.toggle('oculto')
+  if (!caixa.classList.contains('oculto')) {
+    mostrarNotaDosAmigos('', false, 'sala')
+    $('#campo-amigo-sala').focus()
+  }
+}
+$('#btn-mandar-pedido-sala').onclick = () => mandarPedidoDeAmizade('sala')
+$('#campo-amigo-sala').addEventListener('keydown', (evento) => {
+  if (evento.key === 'Enter') mandarPedidoDeAmizade('sala')
+})
+$('#campo-amigo-sala').addEventListener('input', () => mostrarNotaDosAmigos('', false, 'sala'))
+$('#btn-copiar-amigo-sala').onclick = () => copiarMeuCodigo($('#btn-copiar-amigo-sala'))
 $('#btn-copiar-amigo').onclick = () => copiarMeuCodigo($('#btn-copiar-amigo'))
 $('#btn-copiar-amigo-perfil').onclick = () => copiarMeuCodigo($('#btn-copiar-amigo-perfil'))
 for (const botao of document.querySelectorAll('#opcao-invisivel button')) botao.onclick = () => definirInvisivel(botao.dataset.valor)
@@ -807,6 +906,7 @@ $('#campo-nome').addEventListener('blur', mandarNomeAosAmigos)
 // Clique fora fecha a lista, como o pop-over de pessoas.
 document.addEventListener('click', (evento) => {
   if (listaDeAmigosAberta() && !evento.target.closest('#amigos-entrada')) fecharListaDeAmigos()
+  if (amigosDaSalaAbertos() && !evento.target.closest('.ancora-amigos-sala')) fecharAmigosDaSala()
 })
 
 // Comeca ja na abertura, se a pessoa ja tem nome (sem nome, o Continuar da

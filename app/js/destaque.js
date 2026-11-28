@@ -55,6 +55,7 @@ document.addEventListener('keydown', (evento) => {
   if (fecharDialogo()) return
   if (pessoasAbertas()) return fecharPessoas()
   if (listaDeAmigosAberta()) return fecharListaDeAmigos()
+  if (amigosDaSalaAbertos()) return fecharAmigosDaSala()
   sairDaTelaCheia()
 })
 

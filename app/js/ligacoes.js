@@ -117,6 +117,7 @@ $('#campo-codificador').onchange = () => definirCodificador($('#campo-codificado
 $('#campo-qualidade-altura').onchange = definirQualidadePadrao
 $('#campo-qualidade-fps').onchange = definirQualidadePadrao
 $('#campo-banda').onchange = () => definirBanda($('#campo-banda').value)
+$('#campo-stun').onchange = () => definirStun($('#campo-stun').value)
 for (const botao of document.querySelectorAll('#opcao-pausa button')) botao.onclick = () => definirModoPausa(botao.dataset.valor)
 $('#btn-abrir-log').onclick = () => window.ponte.abrirPastaDoLog('registro')
 $('#btn-abrir-monitoria').onclick = () => window.ponte.abrirPastaDoLog('monitoria')
